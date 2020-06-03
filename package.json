@@ -1,0 +1,15 @@
+{
+	"name": "DVB-ContentGuide-Check",
+	"description": "DVB Content Guide metadata validator",
+	"version": "0.0.1",
+	"private": true,
+	"dependencies": {
+		"express": "4.x",
+		"express-fileupload": "",
+		"libxmljs": "^0.19.7",
+		"morgan": "^1.9.1",
+		"sync-request": "6.1.0",
+		"xmllint": "0.1.1",
+		"sprintf-js": "^1.1.2"
+	}
+}
