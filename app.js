@@ -82,14 +82,14 @@ morgan.token("parseErr",function getParseErr(req) {
 morgan.token("agent",function getAgent(req) {
     return "("+req.headers["user-agent"]+")";
 });
-morgan.token("slLoc",function getCheckedLocation(req) {
-	if (req.files && req.files.SLfile) return "["+req.files.SLfile.name+"]";
-    if (req.query.SLurl) return "["+req.query.SLurl+"]";
+morgan.token("cgLoc",function getCheckedLocation(req) {
+	if (req.files && req.files.CGfile) return "["+req.files.CGfile.name+"]";
+    if (req.query.CGurl) return "["+req.query.CGurl+"]";
 	return "[*]";
 });
 
 
-app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length] - :response-time ms :agent :parseErr :slLoc"));
+app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length] - :response-time ms :agent :parseErr :cgLoc"));
 
 /**
  * determines if a value is in a set of values - simular to 
@@ -164,24 +164,24 @@ function isEmpty(obj) {
 
 
 
-const FORM_TOP="<html><head><title>DVB-I Service List Validator</title></head><body>";
+const FORM_TOP="<html><head><title>DVB-I Content Guide Validator</title></head><body>";
 
-const PAGE_HEADING="<h1>DVB-I Service List Validator</h1>";
-const ENTRY_FORM_URL="<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"SLurl\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
+const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
+const ENTRY_FORM_URL="<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
 
-const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"SLfile\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
+const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
 
 const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
 const SUMMARY_FORM_HEADER = "<table><tr><th>item</th><th>count</th></tr>";
 const FORM_BOTTOM="</body></html>";
 
 /**
- * constructs HTML output of the errors found in the service list analysis
+ * constructs HTML output of the errors found in the content guide analysis
  *
- * @param {boolean} URLmode if true ask for a URL to a service list, if false ask for a file
+ * @param {boolean} URLmode if true ask for a URL to a content guide, if false ask for a file
  * @param {Object} res the Express result 
- * @param {string} lastURL the url of the service list - used to keep the form intact
- * @param {Object} o the errors and warnings found during the service list validation
+ * @param {string} lastURL the url of the content guide - used to keep the form intact
+ * @param {Object} o the errors and warnings found during the content guide validation
  */
 function drawForm(URLmode, res, lastInput, o) {
     res.write(FORM_TOP);    
@@ -250,7 +250,6 @@ function drawForm(URLmode, res, lastInput, o) {
         }
         if (!resultsShown) res.write("no errors or warnings");
     }
-    res.write(FORM_BOTTOM);        
 }
 
 
@@ -284,13 +283,13 @@ function NoHrefAttribute(errs, src, loc) {
  *
  * @param {Object} node The XML tree node (either a <Service> or a <ServiceInstance>) to be checked
  * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
- * @param {string} SL_SCHEMA Used when constructing Xpath queries
+ * @param {string} CG_SCHEMA Used when constructing Xpath queries
  * @returns {boolean}  true if the node contains a <RelatedMaterial> element which signals an application else false
  */
-function hasSignalledApplication(node, SCHEMA_PREFIX, SL_SCHEMA) {
+function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
 	var i=1, elem;
-    while (elem=node.get(SCHEMA_PREFIX+":RelatedMaterial["+i+"]", SL_SCHEMA)) {
-        var hr=elem.get(SCHEMA_PREFIX+":HowRelated", SL_SCHEMA);
+    while (elem=node.get(SCHEMA_PREFIX+":RelatedMaterial["+i+"]", CG_SCHEMA)) {
+        var hr=elem.get(SCHEMA_PREFIX+":HowRelated", CG_SCHEMA);
 		if (hr && validServiceApplication(hr)) 
 			return true;			
         i++;
@@ -304,10 +303,10 @@ function hasSignalledApplication(node, SCHEMA_PREFIX, SL_SCHEMA) {
 /**
  * validate the content guide and record any errors
  *
- * @param {String} SLtext the service list text to be validated
+ * @param {String} CGtext the service list text to be validated
  * @param {Class} errs errors found in validaton
  */
-function validateServiceList(SLtext, errs) {
+function validateContentGuide(CGtext, errs) {
 	var CG=null;
 	if (CGtext) try {
 		CG = libxml.parseXmlString(CGtext);
@@ -350,7 +349,7 @@ function validateServiceList(SLtext, errs) {
 
 function checkQuery(req) {
     if (req.query) {
-        if (req.query.SLurl)
+        if (req.query.CGurl)
             return true;
         
         return false;
@@ -378,10 +377,10 @@ function processQuery(req,res) {
             CGxml = syncRequest("GET", req.query.CGurl);
         }
         catch (err) {
-            errs.push("retrieval of URL ("+req.query.SLurl+") failed");
+            errs.push("retrieval of URL ("+req.query.CGurl+") failed");
         }
 		if (CGxml) {
-			validateServiceList(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
+			validateContentGuide(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
 		}
 
         drawForm(true, res, req.query.CGurl, {errors:errs});
@@ -399,7 +398,7 @@ app.use(fileUpload());
 
 function checkFile(req) {
     if (req.files) {
-        if (req.files.SLfile)
+        if (req.files.CGfile)
             return true;
         
         return false;
@@ -416,7 +415,7 @@ function processFile(req,res) {
     if (isEmpty(req.query)) {
         drawForm(false, res);    
     } else if (!checkFile(req)) {
-        drawForm(false, res, req.query.SLfile, {error:"File not specified"});
+        drawForm(false, res, req.query.CGfile, {error:"File not specified"});
         res.status(400);
     }
     else {
@@ -426,15 +425,19 @@ function processFile(req,res) {
             CGxml = req.files.CGfile.data;
         }
         catch (err) {
-            errs.push("retrieval of FILE ("+req.query.SLfile+") failed");
+            errs.push("retrieval of FILE ("+req.query.CGfile+") failed");
         }
 		if (CGxml) {
-			validateServiceList(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
+			validateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
 		}
 
         drawForm(false, res, req.query.CGfile, {errors:errs});
     }
     res.end();
+}
+
+function loadDataFiles() {
+	
 }
 
 
