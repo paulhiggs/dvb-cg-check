@@ -196,7 +196,8 @@ const FORM_BOTTOM="</body></html>";
  */
 function drawForm(URLmode, res, lastInput, lastType, o) {
     res.write(FORM_TOP);    
-    res.write(PAGE_HEADING);    
+    res.write(PAGE_HEADING);
+   
     if (URLmode) 
 		res.write(sprintf(ENTRY_FORM_URL, lastInput ? lastInput : ""));
 	else res.write(sprintf(ENTRY_FORM_FILE, lastInput ? lastInput : ""));
@@ -451,22 +452,25 @@ function processFile(req,res) {
     if (isEmpty(req.query)) {
         drawForm(false, res);    
     } else if (!checkFile(req)) {
-        drawForm(false, res, req.query.CGfile, req.body.requestType, {error:"File not specified"});
+        drawForm(false, res, req.files.CGfile.name, req.body.requestType, {error:"File not specified"});
         res.status(400);
     }
     else {
         var CGxml=null;
         var errs=new ErrorList();
+		var fname="***";
+		if (req && req.files && req.files.CGfile) fname=req.files.CGfile.name;
         try {
             CGxml = req.files.CGfile.data;
         }
         catch (err) {
-            errs.push("retrieval of FILE ("+req.query.CGfile+") failed");
+            errs.push("retrieval of FILE ("+fname+") failed");
         }
 		if (CGxml) {
 			validateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
 		}
-        drawForm(false, res, req.query.CGfile, req.body.requestType, {errors:errs});
+		
+        drawForm(false, res, fname, req.body.requestType, {errors:errs});
     }
     res.end();
 }
