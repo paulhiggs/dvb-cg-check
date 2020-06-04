@@ -173,13 +173,21 @@ const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p>
 
 const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
 
+const CG_REQUEST_SCHEDULE="schedInfo";
+const CG_REQUEST_PROGRAM="progInfo";
+const CG_REQUEST_EPISODES="moreEpisodes";
+const CG_REQUEST_BS_CATEGORIES="bsCategories";
+const CG_REQUEST_BS_LISTS="bsLists";
+const CG_REQUEST_BS_CONTENTS="bsContents";
+
+
 const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
-const ENTRY_FORM_REQUEST_TYPES = [{"value":"schedInfo","label":"Schedule Info"},
-	                              {"value":"progInfo","label":"Program Info"},
-	                              {"value":"moreEpisodes","label":"More Episodes"},
-	                              {"value":"bsCategories","label":"Box Set Categories"},
-	                              {"value":"bsLists","label":"Box Set Lists"},
-	                              {"value":"bsContents","label":"Box Set Contents"}];
+const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE,"label":"Schedule Info"},
+	                              {"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
+	                              {"value":CG_REQUEST_EPISODES,"label":"More Episodes"},
+	                              {"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
+	                              {"value":CG_REQUEST_BS_LISTS,"label":"Box Set Lists"},
+	                              {"value":CG_REQUEST_BS_CONTENTS,"label":"Box Set Contents"}];
 const FORM_END="</form>";
 								  
 const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
@@ -203,13 +211,12 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
 	else res.write(sprintf(ENTRY_FORM_FILE, lastInput ? lastInput : ""));
 	res.write(ENTRY_FORM_REQUEST_TYPE_HEADER);
 	
-	if (!lastType) lastType=ENTRY_FORM_REQUEST_TYPES[1].value;
+	if (!lastType) lastType=ENTRY_FORM_REQUEST_TYPES[0].value;
 	ENTRY_FORM_REQUEST_TYPES.forEach(choice => {
 		res.write("<input type=\"radio\" name=\""+ENTRY_FORM_REQUEST_TYPE_ID+"\" value=\""+choice.value+"\"");
 		if (lastType==choice.value) {
 			res.write(" checked")
 		}
-		
 		res.write(">"+choice.label+"</input>")
 	});
 	res.write(FORM_END);
