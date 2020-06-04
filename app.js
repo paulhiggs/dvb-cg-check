@@ -169,8 +169,19 @@ const FORM_TOP="<html><head><title>DVB-I Content Guide Validator</title></head><
 const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
 const ENTRY_FORM_URL="<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
 
-const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
+const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"%s\"><input type=\"submit\" value=\"submit\">";
 
+const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
+
+const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
+const ENTRY_FORM_REQUEST_TYPES = [{"value":"schedInfo","label":"Schedule Info"},
+	                              {"value":"progInfo","label":"Program Info"},
+	                              {"value":"moreEpisodes","label":"More Episodes"},
+	                              {"value":"bsCategories","label":"Box Set Categories"},
+	                              {"value":"bsLists","label":"Box Set Lists"},
+	                              {"value":"bsContents","label":"Box Set Contents"}];
+const FORM_END="</form>";
+								  
 const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
 const SUMMARY_FORM_HEADER = "<table><tr><th>item</th><th>count</th></tr>";
 const FORM_BOTTOM="</body></html>";
@@ -183,12 +194,25 @@ const FORM_BOTTOM="</body></html>";
  * @param {string} lastURL the url of the content guide - used to keep the form intact
  * @param {Object} o the errors and warnings found during the content guide validation
  */
-function drawForm(URLmode, res, lastInput, o) {
+function drawForm(URLmode, res, lastInput, lastType, o) {
     res.write(FORM_TOP);    
     res.write(PAGE_HEADING);    
     if (URLmode) 
 		res.write(sprintf(ENTRY_FORM_URL, lastInput ? lastInput : ""));
 	else res.write(sprintf(ENTRY_FORM_FILE, lastInput ? lastInput : ""));
+	res.write(ENTRY_FORM_REQUEST_TYPE_HEADER);
+	
+	if (!lastType) lastType=ENTRY_FORM_REQUEST_TYPES[1].value;
+	ENTRY_FORM_REQUEST_TYPES.forEach(choice => {
+		res.write("<input type=\"radio\" name=\""+ENTRY_FORM_REQUEST_TYPE_ID+"\" value=\""+choice.value+"\"");
+		if (lastType==choice.value) {
+			res.write(" checked")
+		}
+		
+		res.write(">"+choice.label+"</input>")
+	});
+	res.write(FORM_END);
+	
     res.write(RESULT_WITH_INSTRUCTION);
     if (o) {
         if (o.error) {
@@ -343,6 +367,18 @@ function validateContentGuide(CGtext, errs) {
 			SCHEMA_NAMESPACE=CG.root().namespace().href();
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
+		var ProgramDescription=CG.get(SCHEMA_PREFIX+":ProgramDescription", CG_SCHEMA);
+		if (!ProgramDescription) {
+			errs.push("No <ProgramDescription> element specified.");
+			return;
+		}
+
+		// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
+		// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
+		// more episodes response (6/7/3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
+		// box set categories response (6.8.2.3) has <GroupInformationTable> element
+		// box set lists response (6.8.3.3) has <GroupInformationTable> element
+		// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
 
 	}	
 }
@@ -367,7 +403,7 @@ function processQuery(req,res) {
     if (isEmpty(req.query)) {
         drawForm(true, res);    
     } else if (!checkQuery(req)) {
-        drawForm(true, res, req.query.CGurl, {error:"URL not specified"});
+        drawForm(true, res, req.query.CGurl, req.query.requestType, {error:"URL not specified"});
         res.status(400);
     }
     else {
@@ -383,7 +419,7 @@ function processQuery(req,res) {
 			validateContentGuide(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
 		}
 
-        drawForm(true, res, req.query.CGurl, {errors:errs});
+        drawForm(true, res, req.query.CGurl, req.query.requestType, {errors:errs});
     }
     res.end();
 }
@@ -415,7 +451,7 @@ function processFile(req,res) {
     if (isEmpty(req.query)) {
         drawForm(false, res);    
     } else if (!checkFile(req)) {
-        drawForm(false, res, req.query.CGfile, {error:"File not specified"});
+        drawForm(false, res, req.query.CGfile, req.body.requestType, {error:"File not specified"});
         res.status(400);
     }
     else {
@@ -430,8 +466,7 @@ function processFile(req,res) {
 		if (CGxml) {
 			validateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
 		}
-
-        drawForm(false, res, req.query.CGfile, {errors:errs});
+        drawForm(false, res, req.query.CGfile, req.body.requestType, {errors:errs});
     }
     res.end();
 }
