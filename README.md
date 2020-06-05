@@ -6,13 +6,13 @@ Validates the value space of the instance document, validation against the schem
 
 
 Checks performed:
-
+* ensure only the permitted elements are present in &lt;ProgramDescription$gt;
   
 ## Use
 ### URL based validation  
-&lt;server&gt;/check gives a basic/primitive UI. Enter the URL for a content guide query and press "Submit" button. Await results!
+&lt;server&gt;/check gives a basic/primitive UI. Enter the URL for a content guide query and the type of query/response from the endpoint. Press "Submit" button and await results!
 ### File based validation
-&lt;server&gt;/checkFile gives a basic/primitive UI. Select the file containing a DVB-I content guide metadata fragment and press "Submit" button. Await results!
+&lt;server&gt;/checkFile gives a basic/primitive UI. Select the file containing a DVB-I content guide metadata fragment and the type of response from the endpoint. Press "Submit" button and await results!
 
 ## Installation
 1. Clone this repository `git clone https://github.com/paulhiggs/dvb-gc-check.git`

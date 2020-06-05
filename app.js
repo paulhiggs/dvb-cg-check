@@ -39,6 +39,14 @@ var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf
 
 
+const CG_REQUEST_SCHEDULE="schedInfo";
+const CG_REQUEST_PROGRAM="progInfo";
+const CG_REQUEST_EPISODES="moreEpisodes";
+const CG_REQUEST_BS_CATEGORIES="bsCategories";
+const CG_REQUEST_BS_LISTS="bsLists";
+const CG_REQUEST_BS_CONTENTS="bsContents";
+
+
 
 class ErrorList {
 /**
@@ -173,14 +181,6 @@ const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p>
 
 const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
 
-const CG_REQUEST_SCHEDULE="schedInfo";
-const CG_REQUEST_PROGRAM="progInfo";
-const CG_REQUEST_EPISODES="moreEpisodes";
-const CG_REQUEST_BS_CATEGORIES="bsCategories";
-const CG_REQUEST_BS_LISTS="bsLists";
-const CG_REQUEST_BS_CONTENTS="bsContents";
-
-
 const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
 const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE,"label":"Schedule Info"},
 	                              {"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
@@ -203,6 +203,8 @@ const FORM_BOTTOM="</body></html>";
  * @param {Object} o the errors and warnings found during the content guide validation
  */
 function drawForm(URLmode, res, lastInput, lastType, o) {
+	
+console.log("--> lastInput", lastInput)	
     res.write(FORM_TOP);    
     res.write(PAGE_HEADING);
    
@@ -330,7 +332,34 @@ function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
     return false;
 }
 
-
+/**
+ * check that only the specified child elements are in the parent element, no others
+ *
+ * @param {string} CG_SCHEMA     Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
+ * @param {Object} parentElement the element whose children should be checked
+ * @param {Array}  childElements the element names permitted within the parent
+ * @param {string} requestType   the type of content guide request being checked
+ * @param {Class}  errs          errors found in validaton
+ */
+function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, childElements, requestType, errs) {
+	// check that each of the specifid childElements exists
+	childElements.forEach(elem => {
+		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) {
+			errs.push("Element <"+elem+"> not specified in <"+parentElement.name()+">");
+		} 
+	});
+	
+	// check that no additional child elements existance
+	var child, c=0;
+	while (child = parentElement.child(c)) {
+		if (!isIn(childElements, child.name())) {
+			errs.push("Element <"+child.name()+"> not permitted");
+		}
+		c++;
+	}
+	
+}
 
 /**
  * validate the content guide and record any errors
@@ -338,7 +367,7 @@ function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
  * @param {String} CGtext the service list text to be validated
  * @param {Class} errs errors found in validaton
  */
-function validateContentGuide(CGtext, errs) {
+function validateContentGuide(CGtext, requestType, errs) {
 	var CG=null;
 	if (CGtext) try {
 		CG = libxml.parseXmlString(CGtext);
@@ -381,12 +410,33 @@ function validateContentGuide(CGtext, errs) {
 			return;
 		}
 
-		// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-		// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
-		// more episodes response (6/7/3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
-		// box set categories response (6.8.2.3) has <GroupInformationTable> element
-		// box set lists response (6.8.3.3) has <GroupInformationTable> element
-		// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
+		switch (requestType) {
+		case CG_REQUEST_SCHEDULE:
+			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
+			break;
+		case CG_REQUEST_PROGRAM:
+			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
+			break;
+		case CG_REQUEST_EPISODES:
+			// more episodes response (6/7/3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramInformationTable","GroupInformationTable"], requestType, errs);
+			break;
+		case CG_REQUEST_BS_CATEGORIES:
+			// box set categories response (6.8.2.3) has <GroupInformationTable> element
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["GroupInformationTable"], requestType, errs);
+			break;
+		case CG_REQUEST_BS_LISTS:
+			// box set lists response (6.8.3.3) has <GroupInformationTable> element
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["GroupInformationTable"], requestType, errs);
+			break;
+		case CG_REQUEST_BS_CONTENTS:
+			// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramInformationTable","GroupInformationTable","ProgramLocationTable"], requestType, errs);
+			break;
+		}
+
 
 	}	
 }
@@ -424,7 +474,7 @@ function processQuery(req,res) {
             errs.push("retrieval of URL ("+req.query.CGurl+") failed");
         }
 		if (CGxml) {
-			validateContentGuide(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
+			validateContentGuide(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), req.query.requestType, errs);
 		}
 
         drawForm(true, res, req.query.CGurl, req.query.requestType, {errors:errs});
@@ -474,7 +524,7 @@ function processFile(req,res) {
             errs.push("retrieval of FILE ("+fname+") failed");
         }
 		if (CGxml) {
-			validateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), errs);
+			validateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), req.body.requestType, errs);
 		}
 		
         drawForm(false, res, fname, req.body.requestType, {errors:errs});
