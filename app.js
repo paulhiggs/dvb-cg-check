@@ -38,6 +38,11 @@ const { parse } = require("querystring");
 var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf
 
+// constraints from the DVB-I specification
+const MAX_TITLE_LENGTH=80;
+
+// convenience/readability values
+const DEFAULT_LANGUAGE="***";
 
 const CG_REQUEST_SCHEDULE="schedInfo";
 const CG_REQUEST_PROGRAM="progInfo";
@@ -203,8 +208,6 @@ const FORM_BOTTOM="</body></html>";
  * @param {Object} o the errors and warnings found during the content guide validation
  */
 function drawForm(URLmode, res, lastInput, lastType, o) {
-	
-console.log("--> lastInput", lastInput)	
     res.write(FORM_TOP);    
     res.write(PAGE_HEADING);
    
@@ -288,17 +291,6 @@ console.log("--> lastInput", lastInput)
 
 
 
-/**
- * Add an error message for missing <xxxDeliveryParameters>
- *
- * @param {Object} errs Errors buffer
- * @param {String} source The missing source type
- * @param {String} serviceId The serviceId whose instance is missing delivery parameters
- */
-function NoDeliveryParams(errs, source, serviceId) {
-    errs.push(source+" delivery parameters not specified for service instance in service \""+serviceId+"\"");
-    errs.increment("no delivery params");
-}
 
 /**
  * Add an error message when the @href is not specified for an element
@@ -354,12 +346,77 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
 	var child, c=0;
 	while (child = parentElement.child(c)) {
 		if (!isIn(childElements, child.name())) {
-			errs.push("Element <"+child.name()+"> not permitted");
+			if (child.name() != 'text')
+				errs.push("Element <"+child.name()+"> not permitted");
 		}
 		c++;
 	}
-	
 }
+
+
+/**
+ * validate the <ProgramInformation> element against the profile for the given request/response type
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} ProgramInformation  the element whose children should be checked
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
+ */
+function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, parentLanguage) {
+	const ELEMENT_NAME="<ProgramInformation>";
+	if (!ProgramInformation.attr('programId')) {
+		errs.push("@programId not specified for "+ELEMENT_NAME);
+	}
+	var piLang=ProgramInformation.attr('lang') ? ProgramInformation.attr('lang').value() : parentLanguage;
+	var BasicDescription=ProgramInformation.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
+	if (!BasicDescription) {
+		errs.push("<BasicDescription> not specified for "+ELEMENT_NAME)
+	}
+	else {
+		var bdLang=BasicDescription.attr('lang') ? BasicDescription.attr('lang').value() : piLang;
+		// <Title> - only 1..2 elements per language permitted with "main" and optional "secondary" 
+		var mainSet=[], secondarySet=[];
+		var t=0, Title;
+		
+		while (Title=BasicDescription.child(t)) {
+			if (Title.name()=="Title") {
+				var TitleType=Title.attr('type') ? Title.attr('type').value() : "main"; // MPEG7 default type is "main"
+				var TitleLang=Title.attr('lang') ? Title.attr('lang').value() : bdLang; // use parent elements language if not specified
+				var titleStr=Title.text().replace(/(&.+;)/ig,"*");
+				
+				console.log("--> Title", TitleType, TitleLang)
+				
+				if (titleStr.length > MAX_TITLE_LENGTH)
+					errs.push("<Title> length exceeds "+MAX_TITLE_LENGTH+" characters")
+				if (TitleType=="main") {
+					if (isIn(mainSet, TitleLang))
+						errs.push("only a single language is permitted for @type=\"main\"")
+					else mainSet.push(TitleLang);
+				}
+				else if (TitleType="secondary") {
+					if (isIn(secondarySet, TitleLang))
+						errs.push("only a single language is permitted for @type=\"secondary\"")
+					else secondarySet.push(TitleLang);
+				}
+				else
+					errs.push("type=\""+TitleType+"\" is not permitted for <Title>");
+				
+				secondarySet.forEach(lang => {
+					if (!isIn(mainSet, lang)) {
+						var t = lang != DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
+						errs.push("@type=\"secondary\" specified without @type=\"main\"" + t);
+					}
+				})
+				
+			}
+			t++;
+		}
+
+	}
+}
+
 
 /**
  * validate the content guide and record any errors
@@ -404,16 +461,36 @@ function validateContentGuide(CGtext, requestType, errs) {
 			SCHEMA_NAMESPACE=CG.root().namespace().href();
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
+		var tvaMainLang=CG.root().attr("lang") ? CG.root().attr("lang").value() : DEFAULT_LANGUAGE;
+		
 		var ProgramDescription=CG.get(SCHEMA_PREFIX+":ProgramDescription", CG_SCHEMA);
 		if (!ProgramDescription) {
 			errs.push("No <ProgramDescription> element specified.");
 			return;
 		}
+		var progDescrLang=ProgramDescription.attr("lang") ? ProgramDescription.attr("lang").value() : tvaMainLang;
 
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
+			var pi=0, ProgramInformation;
+			var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":ProgramInformationTable", CG_SCHEMA);
+			
+			var progInfTabLang=ProgramInformationTable.attr("lang") ? ProgramInformationTable.attr("lang").value() : progDescrLang;
+/*	UURGH: this loop style is not working		
+			while (ProgramInformation = ProgramInformationTable.get(SCHEMA_PREFIX+":ProgramInformation["+pi+"]", CG_SCHEMA)) {
+				console.log("--ProgramInformation", pi);
+				ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
+				pi++;
+			}
+*/
+			while (ProgramInformation=ProgramInformationTable.child(pi)) {
+				if (ProgramInformation.name()=="ProgramInformation") {
+					ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
+				}
+				pi++;
+			}
 			break;
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
