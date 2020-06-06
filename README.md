@@ -7,7 +7,8 @@ Validates the value space of the instance document, validation against the schem
 
 Checks performed:
 * ensure only the permitted elements are present in &lt;ProgramDescription&gt;
-* &lt;Title&gt; rules for &lt;BasicDescription&gt;[Schedule]
+* &lt;Title&gt; rules for &lt;BasicDescription&gt;
+* &lt;Synopsis&gt; rules for &lt;BasicDescription&gt;
   
 ## Use
 ### URL based validation  

@@ -41,6 +41,13 @@ var sprintf = require("sprintf-js").sprintf,
 // constraints from the DVB-I specification
 const MAX_TITLE_LENGTH=80;
 
+const SYNOPSIS_SHORT_LENGTH = 90,
+      SYNOPSIS_MEDIUM_LENGTH = 250, 
+      SYNOPSIS_LONG_LENGTH = 1200; 
+const SYNOPSIS_SHORT_LABEL = "short",
+      SYNOPSIS_MEDIUM_LABEL = "medium", 
+      SYNOPSIS_LONG_LABEL = "long"; 
+
 // convenience/readability values
 const DEFAULT_LANGUAGE="***";
 
@@ -121,6 +128,26 @@ function isIn(values, value){
                 return true;
     }
     return false;
+}
+
+/*
+ * replace ENTITY strings with a generic characterSet
+ *
+ * @param {string} str string containing HTML or XML entities (starts with & ends with ;)
+ * @return {string} the string with entities replaced with a single character '*'
+ */
+function unEntity(str) {
+	return str.replace(/(&.+;)/ig,"*");
+}
+
+/* 
+ * convert characters in the string to HTML entities
+ *
+ * @param {string} str that should be displayed in HTML
+ * @return {string} a string with ENTITY representations of < and >
+ */
+function HTMLize(str) {
+	return str.replace(/</g,"&lt;").replace(/>/g,"&gt;");              
 }
 
 /**
@@ -240,8 +267,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
                         res.write(SUMMARY_FORM_HEADER);
                         tableHeader=true;
                     }
-                    var t=i.replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                    res.write("<tr><td>"+t+"</td><td>"+o.errors.counts[i]+"</td></tr>");
+                    res.write("<tr><td>"+HTMLize(i)+"</td><td>"+o.errors.counts[i]+"</td></tr>");
                     resultsShown=true;
                 }
             }
@@ -251,8 +277,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
                         res.write(SUMMARY_FORM_HEADER);
                         tableHeader=true;
                     }
-                    var t=i.replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                    res.write("<tr><td><i>"+t+"</i></td><td>"+o.errors.countsWarn[i]+"</td></tr>");
+                    res.write("<tr><td><i>"+HTMLize(i)+"</i></td><td>"+o.errors.countsWarn[i]+"</td></tr>");
                     resultsShown=true;
                 }
             }
@@ -267,7 +292,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
                     tableHeader=true;                    
                 }
                 var t=value.replace(/</g,"&lt").replace(/>/g,"&gt");
-                res.write("<tr><td>"+t+"</td></tr>");
+                res.write("<tr><td>"+HTMLize(value)+"</td></tr>");
                 resultsShown=true;
             });
             if (tableHeader) res.write("</table>");
@@ -279,8 +304,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
                     res.write("<table><tr><th>warnings</th></tr>");
                     tableHeader=true;                    
                 }
-                var t=value.replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                res.write("<tr><td>"+t+"</td></tr>");
+                res.write("<tr><td>"+HTMLize(value)+"</td></tr>");
                 resultsShown=true;
             });
             if (tableHeader) res.write("</table>");        
@@ -355,6 +379,61 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
 
 
 /**
+ * validate the <Synopsis> elements 
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} BasicDescription    the element whose children should be checked
+ * @param {array}  allowedLengths	   @length attributes permitted
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
+ */
+function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLengths, requestType, errs, parentLanguage) {
+	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
+	
+	while (Synopsis=BasicDescription.child(s)) {
+		if (Synopsis.name()=="Synopsis") {
+			if (Synopsis.attr('length')) {
+				var len = Synopsis.attr('length').value();
+				if (isIn(allowedLengths, len)) {
+					switch (len) {
+					case SYNOPSIS_SHORT_LABEL:
+						if ((unEntity(Synopsis.text()).length) > SYNOPSIS_SHORT_LENGTH)
+							errs.push("length of <Synopsis length=\""+SYNOPSIS_SHORT_LABEL+"\"> exceeds "+SYNOPSIS_SHORT_LENGTH+" characters");
+						if (hasShort)
+							errs.push("only a single instance of <Synopsis length=\""+SYNOPSIS_SHORT_LABEL+"\"> is permitted");
+						hasShort=true;
+						break;
+					case SYNOPSIS_MEDIUM_LABEL:
+						if ((unEntity(Synopsis.text()).length) > SYNOPSIS_MEDIUM_LENGTH)
+							errs.push("length of <Synopsis length=\""+SYNOPSIS_MEDIUM_LABEL+"\"> exceeds "+SYNOPSIS_MEDIUM_LENGTH+" characters");
+						if (hasMedium)
+							errs.push("only a single instance of <Synopsis length=\""+SYNOPSIS_MEDIUM_LABEL+"\"> is permitted");
+						hasMedium=true;
+						break;
+					case SYNOPSIS_LONG_LABEL:
+						if ((unEntity(Synopsis.text()).length) > SYNOPSIS_LONG_LENGTH)
+							errs.push("length of <Synopsis length=\""+SYNOPSIS_LONG_LABEL+"\"> exceeds "+SYNOPSIS_LONG_LENGTH+" characters");
+						if (hasLong)
+							errs.push("only a single instance of <Synopsis length=\""+SYNOPSIS_LONG_LABEL+"\"> is permitted");
+						hasLong=true;
+						break;						
+					}
+				}
+				else
+					errs.push("@length=\""+len+"\" is not permitted for this request type");
+			}
+			else 
+				errs.push("@length attribute is required for <Synopsis>");
+		}
+		s++;
+	}
+	
+}
+
+
+/**
  * validate the <ProgramInformation> element against the profile for the given request/response type
  *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
@@ -376,17 +455,16 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	}
 	else {
 		var bdLang=BasicDescription.attr('lang') ? BasicDescription.attr('lang').value() : piLang;
+		
 		// <Title> - only 1..2 elements per language permitted with "main" and optional "secondary" 
+		//           requirements are the same for Schedule, Program and Box Set Contents response
 		var mainSet=[], secondarySet=[];
 		var t=0, Title;
-		
 		while (Title=BasicDescription.child(t)) {
 			if (Title.name()=="Title") {
 				var TitleType=Title.attr('type') ? Title.attr('type').value() : "main"; // MPEG7 default type is "main"
 				var TitleLang=Title.attr('lang') ? Title.attr('lang').value() : bdLang; // use parent elements language if not specified
-				var titleStr=Title.text().replace(/(&.+;)/ig,"*");
-				
-				console.log("--> Title", TitleType, TitleLang)
+				var titleStr=unEntity(Title.text());
 				
 				if (titleStr.length > MAX_TITLE_LENGTH)
 					errs.push("<Title> length exceeds "+MAX_TITLE_LENGTH+" characters")
@@ -414,6 +492,22 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			t++;
 		}
 
+		// <Synopsis> - validity depends on use
+		switch (requestType) {
+		case CG_REQUEST_SCHEDULE:
+			// clause 6.10.5.2 - 1..2 instances permitted - one each of @length="short"(90) and "medium"(250)
+			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+			break;
+		case CG_REQUEST_PROGRAM:
+			// clause 6.10.5.3 -- 1..3 instances permitted - one each of @length="short"(90), "medium"(250) and "long"(1200)
+			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
+			break;
+		case CG_REQUEST_BS_CONTENTS:
+			// clause 6.10.5.4 - only 1 instance permitted - @length="medium"(250)
+			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+			break;
+			
+		}
 	}
 }
 
