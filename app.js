@@ -63,14 +63,16 @@ const CG_REQUEST_BS_CONTENTS="bsContents";
 const dirCS = "cs",
       TVA_ContentCSFilename=path.join(dirCS,"ContentCS.xml"),
       TVA_FormatCSFilename=path.join(dirCS,"FormatCS.xml"),
-      DVBI_ContentSubjectFilename=path.join(dirCS,"DVBContentSubjectCS-2019.xml");
+      DVBI_ContentSubjectFilename=path.join(dirCS,"DVBContentSubjectCS-2019.xml"),
+	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt");
 
 const REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
       TVA_ContentCSURL=REPO_RAW + "cs/" + "ContentCS.xml",
       TVA_FormatCSURL=REPO_RAW + "cs/" + "FormatCS.xml",
-      DVBI_ContentSubjectURL=REPO_RAW + "cs/" + "DVBContentSubjectCS-2019.xml";
+      DVBI_ContentSubjectURL=REPO_RAW + "cs/" + "DVBContentSubjectCS-2019.xml",
+	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt";
 
-var allowedGenres=[];
+var allowedGenres=[], allowedCreditItemRoles=[];
 
 class ErrorList {
 /**
@@ -252,7 +254,83 @@ function loadCS(values, useURL, CSfilename, CSurl) {
 } 
 //--------------------------------------------------------------- 
  
+//---------------- CreditsItem@role LOADING ----------------
 
+if(typeof(String.prototype.trim) === "undefined")
+{
+    String.prototype.trim = function() 
+    {
+        return String(this).replace(/^\s+|\s+$/g, '');
+    };
+}
+
+/**
+ * add the seperate lines from the buffer into the array 
+ *
+ * @param {Array} values  the linear list of values 
+ * @param {String} data   the list of values, 1 per line
+ */
+function addRoles(values, data) {
+	var lines = data.split('\n');
+	for (var line=0; line<lines.length; line++) {
+		values.push(lines[line].trim());
+	}
+	console.log(values);	
+}
+
+/**
+ * read a the list of valid roles from a file 
+ *
+ * @param {Array} values         the linear list of values 
+ * @param {String} rolesFilename the filename to load
+ */
+function loadRolesFromFile(values, rolesFilename) {
+	console.log("reading CS from", rolesFilename);
+    fs.readFile(rolesFilename, {encoding: "utf-8"}, function(err,data){
+        if (!err) {
+			addRoles(values, data);
+        } else {
+            console.log(err);
+        }
+    });
+}
+
+/**
+ * read a the list of valid roles from a network location referenced by a REL  
+ *
+ * @param {Array} values 	The linear list of values
+ * @param {String} rolesURL URL to the load
+ */
+function loadRolesFromURL(values, rolesURL) { 
+	console.log("retrieving @roles from", rolesURL);
+	var xhttp = new XmlHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if (this.readyState == 4) {
+			if (this.status == 200) {
+				addRoles(values, xhttp.responseText);
+			}
+			else console.log("error ("+this.status+") retrieving "+csURL);	
+		}
+	};
+	xhttp.open("GET", csURL, true);
+	xhttp.send();
+} 
+
+/**
+ * loads role values from either a local file or an URL based location
+ *
+ * @param {Array} values        The linear list of values within the classification scheme
+ * @param {boolean} useURL      if true use the URL loading method else use the local file
+ * @param {String} roleFilename the filename of the classification scheme
+ * @param {String} roleURL      URL to the classification scheme
+ * 
+ */ 
+function loadRoles(values, useURL, roleFilename, roleURL) {
+	if (useURL)
+		loadRolesFromURL(values,roleURL);
+	else loadRolesFromFile(values, roleFilename);	
+} 
+//----------------------------------------------------------
 
 
 
@@ -569,6 +647,74 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 		errs.push("More than "+maxGenres+" <Genre> element"+(maxGenres>1?"s":"")+" specified");
 }
 
+/**
+ * validate the <ParentalGuidance> elements specified
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {Class}   errs                errors found in validaton
+ */
+function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs) {
+	
+	
+}
+
+
+/**
+ * validate the <CreditsItem> elements specified
+ *
+ * @param {string}  CG_SCHEMA        Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX    Used when constructing Xpath queries
+ * @param {Object}  CreditsItem      the element to be checked
+ * @param {Class}   errs             errors found in validaton
+ */
+function ValidateCreditsItem(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, errs) {
+	if (CreditsItem.attr('role')) {
+		var CreditsItemRole = CreditsItem.attr('role').value();
+		if (!isIn(allowedCreditItemRoles, CreditsItemRole))
+			errs.push("\""+CreditsItemRole+"\" is not valid for CreditsItem@role");
+	}
+	else 
+		errs.push("CreditsItem@role not specified")
+}
+
+/**
+ * validate the <CreditsList> elements specified
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {Class}   errs                errors found in validaton
+ */
+function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs) {
+	var CreditsList=BasicDescription.get(SCHEMA_PREFIX+":CreditsList", CG_SCHEMA);
+	if (CreditsList) {
+		var ci=0, CreditsItem;
+		while (CreditsItem=CreditsList.child(ci)) {
+			if (CreditsItem.name()=="CreditsItem") {
+				ValidateCreditsItem(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, errs);
+			}
+			ci++;
+		}
+	}
+}
+
+/**
+ * validate the <RelatedMateial> elements specified
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {integer} minRMelements       the minimum number of RelatedMaterial elements
+ * @param {integer} maxRMelements       the maximum number of RelatedMaterial elements
+ * @param {Class}   errs                errors found in validaton
+ */
+function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
+	
+	
+}
+
 
 /**
  * validate the <ProgramInformation> element against the profile for the given request/response type
@@ -663,7 +809,6 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			}
 		}
 
-
 		// <Genre> - 
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE:
@@ -679,6 +824,58 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			}
 		}
 
+		// <ParentalGuidance> - 
+		switch (requestType) {
+		case CG_REQUEST_SCHEDULE:
+			// clause 6.10.5.2 -- 0..2 instances permitted - first must contain age 
+		case CG_REQUEST_PROGRAM:
+			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 
+		case CG_REQUEST_BS_CONTENTS:
+			// clause 6.10.5.4 -- 0..2 instances permitted - first must contain age
+			ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);
+			break;
+		default:
+			// make sure <ParentalGuidance> elements are not in the Basic Description
+			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "ParentalGuidance")) {
+				errs.push("<ParentalGuidance> not permitted in <BasicDescription> for this request type");
+			}
+		}
+		
+		// <CreditsList> - 
+		switch (requestType) {
+		case CG_REQUEST_PROGRAM:
+			// clause 6.10.5.3 -- 
+			ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);
+			break;
+		default:
+			// make sure <CreditsList> elements are not in the Basic Description
+			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "CreditsList")) {
+				errs.push("<CreditsList> not permitted in <BasicDescription> for this request type");
+			}
+		}
+		
+		// <RelatedMaterial> - 
+		switch (requestType) {
+		case CG_REQUEST_SCHEDULE:
+			// clause 6.10.5.2 -- 0..2 instances permitted 
+			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 2, errs);
+			break;
+		case CG_REQUEST_PROGRAM:
+			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 
+			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+			break;
+		case CG_REQUEST_BS_CONTENTS:
+			// clause 6.10.5.4 -- 0..2 instances permitted - first must contain age
+			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+			break;
+		default:
+			// make sure <RelatedMaterial> elements are not in the Basic Description
+			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMaterial")) {
+				errs.push("<RelatedMaterial> not permitted in <BasicDescription> for this request type");
+			}
+		}
+		
+		
 	}
 }
 
@@ -897,6 +1094,9 @@ function processFile(req,res) {
     res.end();
 }
 
+
+
+
 function loadDataFiles(useURLs) {
 	console.log("loading classification schemes...");
     allowedGenres=[];
@@ -904,6 +1104,9 @@ function loadDataFiles(useURLs) {
 	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
 	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
   
+	console.log("loading CreditItem roles...");
+	allowedCreditItemRoles=[];
+	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
 }
 
 
