@@ -39,7 +39,8 @@ var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf
 
 // constraints from the DVB-I specification
-const MAX_TITLE_LENGTH=80;
+const MAX_TITLE_LENGTH=80,
+      MAX_KEYWORD_LENGTH=32;
 
 const SYNOPSIS_SHORT_LENGTH = 90,
       SYNOPSIS_MEDIUM_LENGTH = 250, 
@@ -47,6 +48,7 @@ const SYNOPSIS_SHORT_LENGTH = 90,
 const SYNOPSIS_SHORT_LABEL = "short",
       SYNOPSIS_MEDIUM_LABEL = "medium", 
       SYNOPSIS_LONG_LABEL = "long"; 
+
 
 // convenience/readability values
 const DEFAULT_LANGUAGE="***";
@@ -58,7 +60,17 @@ const CG_REQUEST_BS_CATEGORIES="bsCategories";
 const CG_REQUEST_BS_LISTS="bsLists";
 const CG_REQUEST_BS_CONTENTS="bsContents";
 
+const dirCS = "cs",
+      TVA_ContentCSFilename=path.join(dirCS,"ContentCS.xml"),
+      TVA_FormatCSFilename=path.join(dirCS,"FormatCS.xml"),
+      DVBI_ContentSubjectFilename=path.join(dirCS,"DVBContentSubjectCS-2019.xml");
 
+const REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
+      TVA_ContentCSURL=REPO_RAW + "cs/" + "ContentCS.xml",
+      TVA_FormatCSURL=REPO_RAW + "cs/" + "FormatCS.xml",
+      DVBI_ContentSubjectURL=REPO_RAW + "cs/" + "DVBContentSubjectCS-2019.xml";
+
+var allowedGenres=[];
 
 class ErrorList {
 /**
@@ -150,6 +162,7 @@ function HTMLize(str) {
 	return str.replace(/</g,"&lt;").replace(/>/g,"&gt;");              
 }
 
+//---------------- CLASSIFICATION SCHEME LOADING ---------------- 
 /**
  * Constructs a linear list of terms from a heirarical clssification schemes which are read from an XML document and parsed by libxmljs
  *
@@ -169,28 +182,77 @@ function addCSTerm(values,CSuri,term){
 }
 
 /**
- * read a classification scheme and load its hierarical values into a linear list 
+ * load the hierarical values from an XML classification scheme document into a linear list 
  *
  * @param {Array} values The linear list of values within the classification scheme
- * @param {String] classificationScheme the filename of the classification scheme
+ * @param {String} xmlCS the XML document  of the classification scheme
  */
-function loadCS(values, classificationScheme) {
+function loadClassificationScheme(values, xmlCS) {
+	if (!xmlCS) return;
+	var CSnamespace = xmlCS.root().attr("uri");
+	if (!CSnamespace) return;
+	var t=0, term;
+	while (term=xmlCS.root().child(t)) {
+		addCSTerm(values,CSnamespace.value(),term);
+		t++;
+	}
+}
+
+/**
+ * read a classification scheme from a local file and load its hierarical values into a linear list 
+ *
+ * @param {Array} values The linear list of values within the classification scheme
+ * @param {String} classificationScheme the filename of the classification scheme
+ */
+function loadCSfromFile(values, classificationScheme) {
+	console.log("reading CS from", classificationScheme);
     fs.readFile(classificationScheme, {encoding: "utf-8"}, function(err,data){
         if (!err) {
-            var xmlCS = libxml.parseXmlString(data.replace(/(\r\n|\n|\r|\t)/gm,""));
-            if (!xmlCS) return;
-            var CSnamespace = xmlCS.root().attr("uri");
-            if (!CSnamespace) return;
-            var t=0, term;
-            while (term=xmlCS.root().child(t)) {
-                addCSTerm(values,CSnamespace.value(),term);
-                t++;
-            }
+			loadClassificationScheme(values, libxml.parseXmlString(data.replace(/(\r\n|\n|\r|\t)/gm,"")));
         } else {
             console.log(err);
         }
     });
 }
+
+/**
+ * read a classification scheme from a URL and load its hierarical values into a linear list 
+ *
+ * @param {Array} values The linear list of values within the classification scheme
+ * @param {String} csURL URL to the classification scheme
+ */
+function loadCSfromURL(values, csURL) { 
+	console.log("retrieving CS from", csURL);
+	var xhttp = new XmlHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if (this.readyState == 4) {
+			if (this.status == 200) {
+				loadClassificationScheme(values, libxml.parseXmlString(xhttp.responseText));
+			}
+			else console.log("error ("+this.status+") retrieving "+csURL);	
+		}
+	};
+	xhttp.open("GET", csURL, true);
+	xhttp.send();
+} 
+ 
+/**
+ * loads classification scheme values from either a local file or an URL based location
+ *
+ * @param {Array} values The linear list of values within the classification scheme
+ * @param {boolean} useURL if true use the URL loading method else use the local file
+ * @param {String} CSfilename the filename of the classification scheme
+ * @param {String} CSurl URL to the classification scheme
+ * 
+ */ 
+function loadCS(values, useURL, CSfilename, CSurl) {
+	if (useURL)
+		loadCSfromURL(values,CSurl);
+	else loadCSfromFile(values, CSfilename);	
+} 
+//--------------------------------------------------------------- 
+ 
+
 
 
 
@@ -377,6 +439,24 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
 	}
 }
 
+/**
+ * see if the named child element exists in the parent
+ *
+ * @param {string} CG_SCHEMA        Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX    Used when constructing Xpath queries
+ * @param {Object} parentElement    The element to check
+ * @param {string} childElement     The name of the element to look for
+ * @returns {boolean}  true if the parentElement contains an element with the name specified in childElement else false
+ */
+function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
+	var c=0, Child;
+	while (Child=parentElement.child(c)) {
+		if (Child.name() == childElement)
+			return true;
+		c++;
+	}
+	return false;
+}
 
 /**
  * validate the <Synopsis> elements 
@@ -430,6 +510,63 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLen
 		s++;
 	}
 	
+}
+
+
+/**
+ * validate the <Keyword> elements specified
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {integer} minKeywords         the minimum number of keywords
+ * @param {integer} maxKeywords         the maximum number of keywords
+ * @param {Class}   errs                errors found in validaton
+ */
+function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs) {
+	var k=0, Keyword, count=0;
+	while (Keyword=BasicDescription.child(k)) {
+		if (Keyword.name()=="Keyword") {
+			count++;
+			var keywordType = Keyword.attr('type') ? Keyword.attr('type').value() : "main";
+			if (keywordType != "main" && keywordType != "other")
+				errs.push("@type=\""+keywordType+"\" not permitted for <Keyword>");
+			if (unEntity(Keyword.text()).length > MAX_KEYWORD_LENGTH)
+				errs.push("<Keyword> length is greater than "+MAX_KEYWORD_LENGTH);
+		}
+		k++;
+	}
+	if (count > maxKeywords)
+		errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified");
+}
+
+/**
+ * validate the <Genre> elements specified
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {integer} minGenres           the minimum number of genre elements
+ * @param {integer} maxGenres           the maximum number of genre elements
+ * @param {Class}   errs                errors found in validaton
+ */
+function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, maxGenres, errs) {
+	var g=0, Genre, count=0;
+	while (Genre=BasicDescription.child(g)) {
+		if (Genre.name()=="Genre") {
+			count++;
+			var genreType = Genre.attr('type') ? Genre.attr('type').value() : "main";
+			if (genreType != "main")
+				errs.push("@type=\""+genreType+"\" not permitted for <Genre>");
+			
+			var genreValue = Genre.attr('href') ? Genre.attr('href').value() : "";
+			if (!isIn(allowedGenres, genreValue))
+				errs.push("invalid value \""+genreValue+"\" for <Genre>");
+		}
+		g++;
+	}
+	if (count > maxGenres)
+		errs.push("More than "+maxGenres+" <Genre> element"+(maxGenres>1?"s":"")+" specified");
 }
 
 
@@ -495,7 +632,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		// <Synopsis> - validity depends on use
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE:
-			// clause 6.10.5.2 - 1..2 instances permitted - one each of @length="short"(90) and "medium"(250)
+			// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and "medium"(250)
 			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
 			break;
 		case CG_REQUEST_PROGRAM:
@@ -503,11 +640,79 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
 			break;
 		case CG_REQUEST_BS_CONTENTS:
-			// clause 6.10.5.4 - only 1 instance permitted - @length="medium"(250)
+			// clause 6.10.5.4 -- only 1 instance permitted - @length="medium"(250)
 			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
 			break;
-			
+		default:
+			// make sure <Synopsis> elements are not in the Basic Description
+			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Synopsis")) {
+				errs.push("<Synopsis> not permitted in <BasicDescription> for this request type");
+			}
 		}
+
+		// <Keyword> - 
+		switch (requestType) {
+		case CG_REQUEST_PROGRAM:
+			// clause 6.10.5.3 -- 0..20 instances permitted 
+			ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs);
+			break;
+		default:
+			// make sure <Keyword> elements are not in the Basic Description
+			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Keyword")) {
+				errs.push("<Keyword> not permitted in <BasicDescription> for this request type");
+			}
+		}
+
+
+		// <Genre> - 
+		switch (requestType) {
+		case CG_REQUEST_SCHEDULE:
+			// clause 6.10.5.2 -- 0..1 instances permitted 
+		case CG_REQUEST_PROGRAM:
+			// clause 6.10.5.3 -- 0..1 instances permitted 
+			ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+			break;
+		default:
+			// make sure <Genre> elements are not in the Basic Description
+			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Genre")) {
+				errs.push("<Genre> not permitted in <BasicDescription> for this request type");
+			}
+		}
+
+	}
+}
+
+/**
+ * find and validate any <ProgramInformation> elements in the <ProgramInformationTable>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
+ * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class} errs errors found in validaton
+ */
+function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
+	var pi=0, ProgramInformation;
+	var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":ProgramInformationTable", CG_SCHEMA);
+	
+	if (!ProgramInformationTable) {
+		errs.push("<ProgramInformationTable> not specified in <"+ProgramDescription.name()+">");
+		return;
+	}
+	var progInfTabLang=ProgramInformationTable.attr("lang") ? ProgramInformationTable.attr("lang").value() : progDescrLang;
+/*	UURGH: this loop style is not working		
+	while (ProgramInformation = ProgramInformationTable.get(SCHEMA_PREFIX+":ProgramInformation["+pi+"]", CG_SCHEMA)) {
+		console.log("--ProgramInformation", pi);
+		ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
+		pi++;
+	}
+*/
+	while (ProgramInformation=ProgramInformationTable.child(pi)) {
+		if (ProgramInformation.name()=="ProgramInformation") {
+			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
+		}
+		pi++;
 	}
 }
 
@@ -568,27 +773,14 @@ function validateContentGuide(CGtext, requestType, errs) {
 		case CG_REQUEST_SCHEDULE:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
-			var pi=0, ProgramInformation;
-			var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":ProgramInformationTable", CG_SCHEMA);
 			
-			var progInfTabLang=ProgramInformationTable.attr("lang") ? ProgramInformationTable.attr("lang").value() : progDescrLang;
-/*	UURGH: this loop style is not working		
-			while (ProgramInformation = ProgramInformationTable.get(SCHEMA_PREFIX+":ProgramInformation["+pi+"]", CG_SCHEMA)) {
-				console.log("--ProgramInformation", pi);
-				ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
-				pi++;
-			}
-*/
-			while (ProgramInformation=ProgramInformationTable.child(pi)) {
-				if (ProgramInformation.name()=="ProgramInformation") {
-					ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
-				}
-				pi++;
-			}
+			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
+			
+			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		case CG_REQUEST_EPISODES:
 			// more episodes response (6/7/3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
@@ -605,6 +797,8 @@ function validateContentGuide(CGtext, requestType, errs) {
 		case CG_REQUEST_BS_CONTENTS:
 			// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramInformationTable","GroupInformationTable","ProgramLocationTable"], requestType, errs);
+			
+			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		}
 
@@ -703,13 +897,18 @@ function processFile(req,res) {
     res.end();
 }
 
-function loadDataFiles() {
-	
+function loadDataFiles(useURLs) {
+	console.log("loading classification schemes...");
+    allowedGenres=[];
+	loadCS(allowedGenres, useURLs, TVA_ContentCSFilename, TVA_ContentCSURL);
+	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
+	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
+  
 }
 
 
 // read in the validation data
-loadDataFiles();
+loadDataFiles(false);
 
 // initialize Express
 app.use(express.urlencoded({ extended: true }));
