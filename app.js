@@ -41,6 +41,9 @@ var sprintf = require("sprintf-js").sprintf,
 // constraints from the DVB-I specification
 const MAX_TITLE_LENGTH=80,
       MAX_KEYWORD_LENGTH=32;
+const MAX_ORGANIZATION_NAME_LENGTH=32;
+const MAX_NAME_PART_LENGTH=32;
+const MAX_EXPLANATORY_TEXT_LENGTH=160;
 
 const SYNOPSIS_SHORT_LENGTH = 90,
       SYNOPSIS_MEDIUM_LENGTH = 250, 
@@ -274,8 +277,7 @@ function addRoles(values, data) {
 	var lines = data.split('\n');
 	for (var line=0; line<lines.length; line++) {
 		values.push(lines[line].trim());
-	}
-	console.log(values);	
+	}	
 }
 
 /**
@@ -648,35 +650,100 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 }
 
 /**
- * validate the <ParentalGuidance> elements specified
+ * validate the <ParentalGuidance> elements specified. 
  *
  * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
  * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {integer} minPGelements       the minimum number of genre elements
+ * @param {integer} maxPGelements       the maximum number of genre elements
  * @param {Class}   errs                errors found in validaton
  */
-function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs) {
+function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minPGelements, maxPGelements, errs) {
+	// first <ParentalGuidance> element must contain an <mpeg7:MinimumAge> element
+	var pg=0, ParentalGuidance, countParentalGuidance=0;
 	
-	
+	while (ParentalGuidance=BasicDescription.child(pg)) {
+		if (ParentalGuidance.name()=="ParentalGuidance") {
+			countParentalGuidance++;
+			
+			var pgc=0, pgChild, countExplanatoryText=0;
+			while (pgChild=ParentalGuidance.child(pgc)) {
+				
+				if (pgChild.name()!="text") {
+					
+					if (pgChild.name()=="MinimumAge" || pgChild.name()=="ParentalRating") {
+						if (countParentalGuidance==1 && pgChild.name()!="MinimumAge")
+							errs.push("first <ParentalGuidance> element must contain <mpeg7:MinimumAge>");
+						
+						if (pgChild.name()=="MinimumAge" && countParentalGuidance != 1)
+							errs.push("<MinimumAge> must be in the first <ParentalGuidance> element");
+						
+						if (pgChild.name()=="ParentalRating") {
+							if (!pgChild.attr('href'))
+								errs.push("@href not specified in <ParentalRating>");
+						}
+					}
+					if (pgChild.name()=="ExplanatoryText") {
+						countExplanatoryText++;
+						if (pgChild.attr("length")) {
+							if (pgChild.attr("length").value()!="long")
+								errs.push("@length=\""+pgChild.attr("length").value()+"\" is not allowed for <ExplanatoryText>")
+						}
+						else 
+							errs.push("@length=\"long\" is required for <ExplanatoryText>");
+						
+						if (unEntity(pgChild.text()).length > MAX_EXPLANATORY_TEXT_LENGTH)
+							errs.push("length of <ExplanatoryText> cannot exceed "+MAX_EXPLANATORY_TEXT_LENGTH+"");
+					}
+				}
+				pgc++;
+			}
+			if (countExplanatoryText > 1)
+				errs.push("only a single <ExplanatoryText> element is premitted in <ParentalGuidance>")
+		}
+		pg++;
+	}
+	if (countParentalGuidance>maxPGelements)
+		errs.push("no more than "+maxPGelements+"<ParentalGuidance> elements are premitted");
 }
 
 
 /**
- * validate the <CreditsItem> elements specified
+ * validate a name (either PersonName of Character) to ensure a single GivenName is present with a single optional FamilyName
  *
  * @param {string}  CG_SCHEMA        Used when constructing Xpath queries
  * @param {string}  SCHEMA_PREFIX    Used when constructing Xpath queries
- * @param {Object}  CreditsItem      the element to be checked
+ * @param {Object}  elem             the element whose children should be checked
  * @param {Class}   errs             errors found in validaton
  */
-function ValidateCreditsItem(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, errs) {
-	if (CreditsItem.attr('role')) {
-		var CreditsItemRole = CreditsItem.attr('role').value();
-		if (!isIn(allowedCreditItemRoles, CreditsItemRole))
-			errs.push("\""+CreditsItemRole+"\" is not valid for CreditsItem@role");
+function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs ) {
+	
+	function checkNamePart(elem, parentElem, errs) {
+		if (unEntity(elem.text()).length > MAX_NAME_PART_LENGTH)	
+			errs.push("<"+elem.name()+"> in <"+parentElem.name()+"> is longer than "+MAX_NAME_PART_LENGTH+" characters");
 	}
-	else 
-		errs.push("CreditsItem@role not specified")
+	var se=0, subElem;
+	var familyNameCount=0, givenNameCount=0, otherElemCount=0;
+	while (subElem=elem.child(se)) {
+		switch (subElem.name()) {
+			case "GivenName":
+				givenNameCount++;
+				checkNamePart(subElem, elem, errs);
+			    break;
+			case "FamilyName":
+				familyNameCount++;
+				checkNamePart(subElem, elem, errs);
+			    break;
+			default:
+				otherElemCount++;			
+		}
+		se++;
+	}
+	if (givenNameCount==0)
+		errs.push("<GivenName> is mandatory in <"+elem.name()+">");
+	if (familyNameCount>1)
+		errs.push("only a single <FamilyName> is permitted in <"+elem.name()+">");
 }
 
 /**
@@ -687,13 +754,60 @@ function ValidateCreditsItem(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, errs) {
  * @param {Object}  BasicDescription    the element whose children should be checked
  * @param {Class}   errs                errors found in validaton
  */
-function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs) {
+function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 	var CreditsList=BasicDescription.get(SCHEMA_PREFIX+":CreditsList", CG_SCHEMA);
 	if (CreditsList) {
-		var ci=0, CreditsItem;
+		var ci=0, CreditsItem;		
 		while (CreditsItem=CreditsList.child(ci)) {
 			if (CreditsItem.name()=="CreditsItem") {
-				ValidateCreditsItem(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, errs);
+				if (CreditsItem.attr('role')) {
+					var CreditsItemRole = CreditsItem.attr('role').value();
+					if (!isIn(allowedCreditItemRoles, CreditsItemRole))
+						errs.push("\""+CreditsItemRole+"\" is not valid for CreditsItem@role");
+				}
+				else 
+					errs.push("CreditsItem@role not specified")
+				var foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
+				var s=0, elem;
+				while (elem=CreditsItem.child(s)) {
+					switch (elem.name()) {
+						case "PersonName":
+							foundPersonName++;
+							// required to have a GivenName optionally have a FamilyName
+							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+							break;
+						case "Character":
+							foundCharacter++;
+							// required to have a GivenName optionally have a FamilyName
+							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+							break;
+						case "OrganizationName":
+							foundOrganizationName++;
+							if (unEntity(elem.text()).length > MAX_ORGANIZATION_NAME_LENGTH)
+								errs.push("length of <OrganizationName> in <CreditsItem> exceeds "+MAX_ORGANIZATION_NAME_LENGTH+" characters")
+							break;
+						default:
+							if (elem.name() != "text")
+								errs.push("extra element <"+elem.name()+"> found in <CreditsItem>");
+					}
+					if (foundPersonName>1)
+						errs.push("only a single <PersonName> is permitted in <CreditsItem>");
+					if (foundCharacter>1)
+						errs.push("only a single <Character> is permitted in <CreditsItem>");
+					if (foundOrganizationName>1)
+						errs.push("only a single <OrganizationName> is permitted in <CreditsItem>");
+					if (foundCharacter>0 && foundPersonName==0)
+						errs.push("<CharacterName> in <CreditsItem> requires <PersonName>");
+					if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
+						errs.push("<OrganizationName> can only be present when <PersonName> is absent in <CreditsItem>");
+					s++;
+				}			
+				if (foundPersonName>1)
+					errs.push("only a single <PersonName> is permitted in <CreditsItem>")
+				if (foundCharacter>1)
+					errs.push("only a single <Character> is permitted in <CreditsItem>")
+				if (foundOrganizationName>1)
+					errs.push("only a single <Organization> is permitted in <CreditsItem>")
 			}
 			ci++;
 		}
@@ -701,7 +815,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs) 
 }
 
 /**
- * validate the <RelatedMateial> elements specified
+ * validate the <RelatedMaterial> elements specified
  *
  * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
  * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
@@ -711,8 +825,18 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs) 
  * @param {Class}   errs                errors found in validaton
  */
 function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
-	
-	
+	var rm=0, RelatedMaterial, countRelatedMaterial++;
+	while (RelatedMaterial=BasicDescription.child(rm)) {
+		if (RelatedMaterial.name()=="RelatedMaterial") {
+			countRelatedMaterial++;
+			
+			// no additional checks are needed - DVB-I client should be robust to any siganlled RelatedMaterial
+		}
+		
+		rm++;
+	}
+	if (countRelatedMaterial > maxRMelements)
+		errs.push("a maximum of "+maxRMelements+" <RelatedMaterial> are permitted")
 }
 
 
@@ -832,7 +956,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 
 		case CG_REQUEST_BS_CONTENTS:
 			// clause 6.10.5.4 -- 0..2 instances permitted - first must contain age
-			ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);
+			ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
 			break;
 		default:
 			// make sure <ParentalGuidance> elements are not in the Basic Description
@@ -857,15 +981,15 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		// <RelatedMaterial> - 
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE:
-			// clause 6.10.5.2 -- 0..2 instances permitted 
-			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 2, errs);
+			// clause 6.10.5.2 -- 0..1 instances permitted 
+			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 			break;
 		case CG_REQUEST_PROGRAM:
-			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 
+			// clause 6.10.5.3 -- 0..1 instances permitted - first must contain age 
 			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 			break;
 		case CG_REQUEST_BS_CONTENTS:
-			// clause 6.10.5.4 -- 0..2 instances permitted - first must contain age
+			// clause 6.10.5.4 -- 0..1 instances permitted - first must contain age
 			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 			break;
 		default:
