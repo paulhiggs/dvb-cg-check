@@ -56,7 +56,8 @@ const SYNOPSIS_SHORT_LABEL = "short",
 // convenience/readability values
 const DEFAULT_LANGUAGE="***";
 
-const CG_REQUEST_SCHEDULE="schedInfo";
+const CG_REQUEST_SCHEDULE_TIME="schedInfo-time";
+const CG_REQUEST_SCHEDULE_NOWNEXT="schedInfo-now";
 const CG_REQUEST_PROGRAM="progInfo";
 const CG_REQUEST_EPISODES="moreEpisodes";
 const CG_REQUEST_BS_CATEGORIES="bsCategories";
@@ -356,7 +357,8 @@ const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p>
 const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
 
 const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
-const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE,"label":"Schedule Info"},
+const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE_TIME,"label":"Schedule Info (time stamp)"},
+	                              {"value":CG_REQUEST_SCHEDULE_NOWNEXT,"label":"Schedule Info (now/next)"},
 	                              {"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
 	                              {"value":CG_REQUEST_EPISODES,"label":"More Episodes"},
 	                              {"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
@@ -825,7 +827,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
  * @param {Class}   errs                errors found in validaton
  */
 function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
-	var rm=0, RelatedMaterial, countRelatedMaterial++;
+	var rm=0, RelatedMaterial, countRelatedMaterial=0;
 	while (RelatedMaterial=BasicDescription.child(rm)) {
 		if (RelatedMaterial.name()=="RelatedMaterial") {
 			countRelatedMaterial++;
@@ -901,23 +903,24 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 
 		// <Synopsis> - validity depends on use
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE:
-			// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and "medium"(250)
-			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
-			break;
-		case CG_REQUEST_PROGRAM:
-			// clause 6.10.5.3 -- 1..3 instances permitted - one each of @length="short"(90), "medium"(250) and "long"(1200)
-			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
-			break;
-		case CG_REQUEST_BS_CONTENTS:
-			// clause 6.10.5.4 -- only 1 instance permitted - @length="medium"(250)
-			ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
-			break;
-		default:
-			// make sure <Synopsis> elements are not in the Basic Description
-			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Synopsis")) {
-				errs.push("<Synopsis> not permitted in <BasicDescription> for this request type");
-			}
+			case CG_REQUEST_SCHEDULE_TIME:
+			case CG_REQUEST_SCHEDULE_NOWNEXT:
+				// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and "medium"(250)
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+				break;
+			case CG_REQUEST_PROGRAM:
+				// clause 6.10.5.3 -- 1..3 instances permitted - one each of @length="short"(90), "medium"(250) and "long"(1200)
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
+				break;
+			case CG_REQUEST_BS_CONTENTS:
+				// clause 6.10.5.4 -- only 1 instance permitted - @length="medium"(250)
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+				break;
+			default:
+				// make sure <Synopsis> elements are not in the Basic Description
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Synopsis")) {
+					errs.push("<Synopsis> not permitted in <BasicDescription> for this request type");
+				}
 		}
 
 		// <Keyword> - 
@@ -935,7 +938,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 
 		// <Genre> - 
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE:
+		case CG_REQUEST_SCHEDULE_TIME:
+		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// clause 6.10.5.2 -- 0..1 instances permitted 
 		case CG_REQUEST_PROGRAM:
 			// clause 6.10.5.3 -- 0..1 instances permitted 
@@ -950,7 +954,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 
 		// <ParentalGuidance> - 
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE:
+		case CG_REQUEST_SCHEDULE_TIME:
+		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// clause 6.10.5.2 -- 0..2 instances permitted - first must contain age 
 		case CG_REQUEST_PROGRAM:
 			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 
@@ -980,7 +985,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		
 		// <RelatedMaterial> - 
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE:
+		case CG_REQUEST_SCHEDULE_TIME:
+		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// clause 6.10.5.2 -- 0..1 instances permitted 
 			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 			break;
@@ -998,9 +1004,14 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				errs.push("<RelatedMaterial> not permitted in <BasicDescription> for this request type");
 			}
 		}
-		
-		
 	}
+	
+	// <ProgramInformation><OtherIdentifier>
+	
+	// <ProgramInformation><MemberOf>
+	
+	// <ProgramInformation><EpisodeOf>
+	
 }
 
 /**
@@ -1091,7 +1102,13 @@ function validateContentGuide(CGtext, requestType, errs) {
 		var progDescrLang=ProgramDescription.attr("lang") ? ProgramDescription.attr("lang").value() : tvaMainLang;
 
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE:
+		case CG_REQUEST_SCHEDULE_TIME:
+			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
+			
+			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			break;
+		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
 			
