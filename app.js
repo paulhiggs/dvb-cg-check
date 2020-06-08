@@ -68,13 +68,15 @@ const dirCS = "cs",
       TVA_ContentCSFilename=path.join(dirCS,"ContentCS.xml"),
       TVA_FormatCSFilename=path.join(dirCS,"FormatCS.xml"),
       DVBI_ContentSubjectFilename=path.join(dirCS,"DVBContentSubjectCS-2019.xml"),
-	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt");
+	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
+	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt");
 
 const REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
       TVA_ContentCSURL=REPO_RAW + "cs/" + "ContentCS.xml",
       TVA_FormatCSURL=REPO_RAW + "cs/" + "FormatCS.xml",
       DVBI_ContentSubjectURL=REPO_RAW + "cs/" + "DVBContentSubjectCS-2019.xml",
-	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt";
+	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt",
+	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt";
 
 var allowedGenres=[], allowedCreditItemRoles=[];
 
@@ -180,9 +182,8 @@ function addCSTerm(values,CSuri,term){
     if (term.name()==="Term") {
         values.push(CSuri+":"+term.attr("termID").value())
         var st=0, subTerm;
-        while (subTerm=term.child(st)) {
+        while (subTerm=term.child(st++)) {
             addCSTerm(values,CSuri,subTerm);
-            st++;
         }
     }
 }
@@ -198,9 +199,8 @@ function loadClassificationScheme(values, xmlCS) {
 	var CSnamespace = xmlCS.root().attr("uri");
 	if (!CSnamespace) return;
 	var t=0, term;
-	while (term=xmlCS.root().child(t)) {
+	while (term=xmlCS.root().child(t++)) {
 		addCSTerm(values,CSnamespace.value(),term);
-		t++;
 	}
 }
 
@@ -482,11 +482,10 @@ function NoHrefAttribute(errs, src, loc) {
  */
 function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
 	var i=1, elem;
-    while (elem=node.get(SCHEMA_PREFIX+":RelatedMaterial["+i+"]", CG_SCHEMA)) {
+    while (elem=node.get(SCHEMA_PREFIX+":RelatedMaterial[" + i++ + "]", CG_SCHEMA)) {
         var hr=elem.get(SCHEMA_PREFIX+":HowRelated", CG_SCHEMA);
 		if (hr && validServiceApplication(hr)) 
 			return true;			
-        i++;
     }
 
     return false;
@@ -512,12 +511,11 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
 	
 	// check that no additional child elements existance
 	var child, c=0;
-	while (child = parentElement.child(c)) {
+	while (child = parentElement.child(c++)) {
 		if (!isIn(childElements, child.name())) {
 			if (child.name() != 'text')
 				errs.push("Element <"+child.name()+"> not permitted");
 		}
-		c++;
 	}
 }
 
@@ -532,10 +530,9 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
  */
 function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
 	var c=0, Child;
-	while (Child=parentElement.child(c)) {
+	while (Child=parentElement.child(c++)) {
 		if (Child.name() == childElement)
 			return true;
-		c++;
 	}
 	return false;
 }
@@ -554,7 +551,7 @@ function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
 function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLengths, requestType, errs, parentLanguage) {
 	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
 	
-	while (Synopsis=BasicDescription.child(s)) {
+	while (Synopsis=BasicDescription.child(s++)) {
 		if (Synopsis.name()=="Synopsis") {
 			if (Synopsis.attr('length')) {
 				var len = Synopsis.attr('length').value();
@@ -589,7 +586,6 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLen
 			else 
 				errs.push("@length attribute is required for <Synopsis>");
 		}
-		s++;
 	}
 	
 }
@@ -607,7 +603,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLen
  */
 function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs) {
 	var k=0, Keyword, count=0;
-	while (Keyword=BasicDescription.child(k)) {
+	while (Keyword=BasicDescription.child(k++)) {
 		if (Keyword.name()=="Keyword") {
 			count++;
 			var keywordType = Keyword.attr('type') ? Keyword.attr('type').value() : "main";
@@ -616,7 +612,6 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 			if (unEntity(Keyword.text()).length > MAX_KEYWORD_LENGTH)
 				errs.push("<Keyword> length is greater than "+MAX_KEYWORD_LENGTH);
 		}
-		k++;
 	}
 	if (count > maxKeywords)
 		errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified");
@@ -634,7 +629,7 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
  */
 function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, maxGenres, errs) {
 	var g=0, Genre, count=0;
-	while (Genre=BasicDescription.child(g)) {
+	while (Genre=BasicDescription.child(g++)) {
 		if (Genre.name()=="Genre") {
 			count++;
 			var genreType = Genre.attr('type') ? Genre.attr('type').value() : "main";
@@ -645,7 +640,6 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 			if (!isIn(allowedGenres, genreValue))
 				errs.push("invalid value \""+genreValue+"\" for <Genre>");
 		}
-		g++;
 	}
 	if (count > maxGenres)
 		errs.push("More than "+maxGenres+" <Genre> element"+(maxGenres>1?"s":"")+" specified");
@@ -665,12 +659,12 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 	// first <ParentalGuidance> element must contain an <mpeg7:MinimumAge> element
 	var pg=0, ParentalGuidance, countParentalGuidance=0;
 	
-	while (ParentalGuidance=BasicDescription.child(pg)) {
+	while (ParentalGuidance=BasicDescription.child(pg++)) {
 		if (ParentalGuidance.name()=="ParentalGuidance") {
 			countParentalGuidance++;
 			
 			var pgc=0, pgChild, countExplanatoryText=0;
-			while (pgChild=ParentalGuidance.child(pgc)) {
+			while (pgChild=ParentalGuidance.child(pgc++)) {
 				
 				if (pgChild.name()!="text") {
 					
@@ -699,12 +693,10 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 							errs.push("length of <ExplanatoryText> cannot exceed "+MAX_EXPLANATORY_TEXT_LENGTH+"");
 					}
 				}
-				pgc++;
 			}
 			if (countExplanatoryText > 1)
 				errs.push("only a single <ExplanatoryText> element is premitted in <ParentalGuidance>")
 		}
-		pg++;
 	}
 	if (countParentalGuidance>maxPGelements)
 		errs.push("no more than "+maxPGelements+"<ParentalGuidance> elements are premitted");
@@ -727,7 +719,7 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs ) {
 	}
 	var se=0, subElem;
 	var familyNameCount=0, givenNameCount=0, otherElemCount=0;
-	while (subElem=elem.child(se)) {
+	while (subElem=elem.child(se++)) {
 		switch (subElem.name()) {
 			case "GivenName":
 				givenNameCount++;
@@ -740,7 +732,6 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs ) {
 			default:
 				otherElemCount++;			
 		}
-		se++;
 	}
 	if (givenNameCount==0)
 		errs.push("<GivenName> is mandatory in <"+elem.name()+">");
@@ -760,7 +751,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 	var CreditsList=BasicDescription.get(SCHEMA_PREFIX+":CreditsList", CG_SCHEMA);
 	if (CreditsList) {
 		var ci=0, CreditsItem;		
-		while (CreditsItem=CreditsList.child(ci)) {
+		while (CreditsItem=CreditsList.child(ci++)) {
 			if (CreditsItem.name()=="CreditsItem") {
 				if (CreditsItem.attr('role')) {
 					var CreditsItemRole = CreditsItem.attr('role').value();
@@ -771,7 +762,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 					errs.push("CreditsItem@role not specified")
 				var foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
 				var s=0, elem;
-				while (elem=CreditsItem.child(s)) {
+				while (elem=CreditsItem.child(s++)) {
 					switch (elem.name()) {
 						case "PersonName":
 							foundPersonName++;
@@ -802,7 +793,6 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 						errs.push("<CharacterName> in <CreditsItem> requires <PersonName>");
 					if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
 						errs.push("<OrganizationName> can only be present when <PersonName> is absent in <CreditsItem>");
-					s++;
 				}			
 				if (foundPersonName>1)
 					errs.push("only a single <PersonName> is permitted in <CreditsItem>")
@@ -811,7 +801,6 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 				if (foundOrganizationName>1)
 					errs.push("only a single <Organization> is permitted in <CreditsItem>")
 			}
-			ci++;
 		}
 	}
 }
@@ -828,14 +817,12 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
  */
 function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
 	var rm=0, RelatedMaterial, countRelatedMaterial=0;
-	while (RelatedMaterial=BasicDescription.child(rm)) {
+	while (RelatedMaterial=BasicDescription.child(rm++)) {
 		if (RelatedMaterial.name()=="RelatedMaterial") {
 			countRelatedMaterial++;
 			
 			// no additional checks are needed - DVB-I client should be robust to any siganlled RelatedMaterial
 		}
-		
-		rm++;
 	}
 	if (countRelatedMaterial > maxRMelements)
 		errs.push("a maximum of "+maxRMelements+" <RelatedMaterial> are permitted")
@@ -869,7 +856,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		//           requirements are the same for Schedule, Program and Box Set Contents response
 		var mainSet=[], secondarySet=[];
 		var t=0, Title;
-		while (Title=BasicDescription.child(t)) {
+		while (Title=BasicDescription.child(t++)) {
 			if (Title.name()=="Title") {
 				var TitleType=Title.attr('type') ? Title.attr('type').value() : "main"; // MPEG7 default type is "main"
 				var TitleLang=Title.attr('lang') ? Title.attr('lang').value() : bdLang; // use parent elements language if not specified
@@ -896,9 +883,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 						errs.push("@type=\"secondary\" specified without @type=\"main\"" + t);
 					}
 				})
-				
 			}
-			t++;
 		}
 
 		// <Synopsis> - validity depends on use
@@ -1007,10 +992,13 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	}
 	
 	// <ProgramInformation><OtherIdentifier>
-	
+	//TODO:
+
 	// <ProgramInformation><MemberOf>
-	
+	//TODO:
+
 	// <ProgramInformation><EpisodeOf>
+	//TODO:
 	
 }
 
@@ -1022,7 +1010,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
  * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
  * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
  * @param {string} requestType         the type of content guide request being checked
- * @param {Class} errs errors found in validaton
+ * @param {Class}  errs                errors found in validaton
  */
 function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
 	var pi=0, ProgramInformation;
@@ -1040,12 +1028,37 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		pi++;
 	}
 */
-	while (ProgramInformation=ProgramInformationTable.child(pi)) {
+	while (ProgramInformation=ProgramInformationTable.child(pi++)) {
 		if (ProgramInformation.name()=="ProgramInformation") {
 			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
 		}
-		pi++;
 	}
+}
+
+/**
+ * find and validate any <GroupInformation> elements in the <GroupInformationTable>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
+ * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ */
+function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
+}
+
+/**
+ * find and validate any <ProgramLocation> elements in the <ProgramLocationTable>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
+ * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class} errs errors found in validaton
+ */
+function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
 }
 
 
@@ -1107,12 +1120,14 @@ function validateContentGuide(CGtext, requestType, errs) {
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
 			
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
 			
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
@@ -1123,20 +1138,29 @@ function validateContentGuide(CGtext, requestType, errs) {
 		case CG_REQUEST_EPISODES:
 			// more episodes response (6/7/3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramInformationTable","GroupInformationTable"], requestType, errs);
+
+			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		case CG_REQUEST_BS_CATEGORIES:
 			// box set categories response (6.8.2.3) has <GroupInformationTable> element
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["GroupInformationTable"], requestType, errs);
+
+			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		case CG_REQUEST_BS_LISTS:
 			// box set lists response (6.8.3.3) has <GroupInformationTable> element
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["GroupInformationTable"], requestType, errs);
+
+			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		case CG_REQUEST_BS_CONTENTS:
 			// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramInformationTable","GroupInformationTable","ProgramLocationTable"], requestType, errs);
 			
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
 		}
 
@@ -1248,6 +1272,7 @@ function loadDataFiles(useURLs) {
 	console.log("loading CreditItem roles...");
 	allowedCreditItemRoles=[];
 	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
+	loadRoles(allowedCreditItemRoles, useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
 }
 
 
