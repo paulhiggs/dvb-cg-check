@@ -543,19 +543,20 @@ function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} BasicDescription    the element whose children should be checked
- * @param {array}  allowedLengths	   @length attributes permitted
+ * @param {array}  requiredLengths	   @length attributes that are required to be present
+ * @param {array}  optionalLengths	   @length attributes that can optionally be present
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
  */
-function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLengths, requestType, errs, parentLanguage) {
+function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage) {
 	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
 	
 	while (Synopsis=BasicDescription.child(s++)) {
 		if (Synopsis.name()=="Synopsis") {
 			if (Synopsis.attr('length')) {
 				var len = Synopsis.attr('length').value();
-				if (isIn(allowedLengths, len)) {
+				if (isIn(requiredLengths, len) || isIn(optionalLengths, len)) {
 					switch (len) {
 					case SYNOPSIS_SHORT_LABEL:
 						if ((unEntity(Synopsis.text()).length) > SYNOPSIS_SHORT_LENGTH)
@@ -587,7 +588,16 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLen
 				errs.push("@length attribute is required for <Synopsis>");
 		}
 	}
-	
+	// note that current DVB-I specifiction only mandates "medium" length, but all three are checked here
+	if (isIn(requiredLengths, SYNOPSIS_SHORT_LABEL) && !hasShort) {
+		errs.push("a synposis with @length=\""+SYNOPSIS_SHORT_LABEL+"\" is required");
+	}
+	if (isIn(requiredLengths, SYNOPSIS_MEDIUM_LABEL) && !hasMedium) {
+		errs.push("a synposis with @length=\""+SYNOPSIS_MEDIUM_LABEL+"\" is required");
+	}
+	if (isIn(requiredLengths, SYNOPSIS_LONG_LABEL) && !hasLong) {
+		errs.push("a synposis with @length=\""+SYNOPSIS_LONG_LABEL+"\" is required");
+	}
 }
 
 
@@ -600,21 +610,29 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowedLen
  * @param {integer} minKeywords         the minimum number of keywords
  * @param {integer} maxKeywords         the maximum number of keywords
  * @param {Class}   errs                errors found in validaton
+ * @param {string}  parentLanguage	    the xml:lang of the parent element to ProgramInformation
  */
-function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs) {
-	var k=0, Keyword, count=0;
+function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs, parentLanguage) {
+	var k=0, Keyword, counts=[];
 	while (Keyword=BasicDescription.child(k++)) {
 		if (Keyword.name()=="Keyword") {
-			count++;
 			var keywordType = Keyword.attr('type') ? Keyword.attr('type').value() : "main";
+			var KeywordLang = Keyword.attr('lang') ? Keyword.attr('lang').value() : parentLanguage;
+			
+			if (counts[KeywordLang] === undefined)
+				counts[KeywordLang] = 1
+			else counts[KeywordLang]++;
 			if (keywordType != "main" && keywordType != "other")
 				errs.push("@type=\""+keywordType+"\" not permitted for <Keyword>");
 			if (unEntity(Keyword.text()).length > MAX_KEYWORD_LENGTH)
 				errs.push("<Keyword> length is greater than "+MAX_KEYWORD_LENGTH);
 		}
 	}
-	if (count > maxKeywords)
-		errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified");
+	for (var i in counts) {
+        if (counts[i] != 0 && counts[i] > maxKeywords) {
+            errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified"+i==DEFAULT_LANGUAGE?"":" for language "+i);
+			}
+		}
 }
 
 /**
@@ -830,76 +848,102 @@ function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, min
 
 
 /**
- * validate the <ProgramInformation> element against the profile for the given request/response type
+ * validate the <Title> elements specified
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {string}  requestType         the type of content guide request being checked
+ * @param {Class}   errs                errors found in validaton
+ * @param {string}  parentLanguage	    the xml:lang of the parent element to ProgramInformation
+ */
+function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requestType, errs, parentLanguage) {
+	var mainSet=[], secondarySet=[];
+	var t=0, Title;
+	while (Title=BasicDescription.child(t++)) {
+		if (Title.name()=="Title") {
+			var TitleType=Title.attr('type') ? Title.attr('type').value() : "main"; // MPEG7 default type is "main"
+			var TitleLang=Title.attr('lang') ? Title.attr('lang').value() : parentLanguage; // use parent elements language if not specified
+			var titleStr=unEntity(Title.text());
+			
+			if (titleStr.length > MAX_TITLE_LENGTH)
+				errs.push("<Title> length exceeds "+MAX_TITLE_LENGTH+" characters")
+			if (TitleType=="main") {
+				if (isIn(mainSet, TitleLang))
+					errs.push("only a single language is permitted for @type=\"main\"")
+				else mainSet.push(TitleLang);
+			}
+			else if (TitleType="secondary") {
+				if (isIn(secondarySet, TitleLang))
+					errs.push("only a single language is permitted for @type=\"secondary\"")
+				else secondarySet.push(TitleLang);
+			}
+			else
+				errs.push("type=\""+TitleType+"\" is not permitted for <Title>");
+			
+			secondarySet.forEach(lang => {
+				if (!isIn(mainSet, lang)) {
+					var t = lang != DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
+					errs.push("@type=\"secondary\" specified without @type=\"main\"" + t);
+				}
+			})
+		}
+	}	
+	
+}
+
+/**
+ * validate the <BasicDescription> element against the profile for the given request/response type
  *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
- * @param {Object} ProgramInformation  the element whose children should be checked
+ * @param {Object} parentElement  	   the element whose children should be checked
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
- * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
+ * @param {string} parentLanguage	   the xml:lang of the parent element to parentElement
  */
-function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, parentLanguage) {
-	const ELEMENT_NAME="<ProgramInformation>";
-	if (!ProgramInformation.attr('programId')) {
-		errs.push("@programId not specified for "+ELEMENT_NAME);
-	}
-	var piLang=ProgramInformation.attr('lang') ? ProgramInformation.attr('lang').value() : parentLanguage;
-	var BasicDescription=ProgramInformation.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
+function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage) {
+	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
 	if (!BasicDescription) {
-		errs.push("<BasicDescription> not specified for "+ELEMENT_NAME)
+		errs.push("<BasicDescription> not specified for "+parentElement.name())
 	}
 	else {
-		var bdLang=BasicDescription.attr('lang') ? BasicDescription.attr('lang').value() : piLang;
+		var bdLang=BasicDescription.attr('lang') ? BasicDescription.attr('lang').value() : parentLanguage;
+		
 		
 		// <Title> - only 1..2 elements per language permitted with "main" and optional "secondary" 
 		//           requirements are the same for Schedule, Program and Box Set Contents response
-		var mainSet=[], secondarySet=[];
-		var t=0, Title;
-		while (Title=BasicDescription.child(t++)) {
-			if (Title.name()=="Title") {
-				var TitleType=Title.attr('type') ? Title.attr('type').value() : "main"; // MPEG7 default type is "main"
-				var TitleLang=Title.attr('lang') ? Title.attr('lang').value() : bdLang; // use parent elements language if not specified
-				var titleStr=unEntity(Title.text());
-				
-				if (titleStr.length > MAX_TITLE_LENGTH)
-					errs.push("<Title> length exceeds "+MAX_TITLE_LENGTH+" characters")
-				if (TitleType=="main") {
-					if (isIn(mainSet, TitleLang))
-						errs.push("only a single language is permitted for @type=\"main\"")
-					else mainSet.push(TitleLang);
+		switch (requestType) {
+			case CG_REQUEST_SCHEDULE_TIME:
+			case CG_REQUEST_SCHEDULE_NOWNEXT:
+			case CG_REQUEST_PROGRAM:
+			case CG_REQUEST_BS_CONTENTS:
+			case CG_REQUEST_BS_LISTS:
+				ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requestType, errs, bdLang);
+				break;
+			default:
+				// make sure <Title> elements are not in the Basic Description
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Title")) {
+					errs.push("<Title> not permitted in <BasicDescription> for this request type");
 				}
-				else if (TitleType="secondary") {
-					if (isIn(secondarySet, TitleLang))
-						errs.push("only a single language is permitted for @type=\"secondary\"")
-					else secondarySet.push(TitleLang);
-				}
-				else
-					errs.push("type=\""+TitleType+"\" is not permitted for <Title>");
-				
-				secondarySet.forEach(lang => {
-					if (!isIn(mainSet, lang)) {
-						var t = lang != DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
-						errs.push("@type=\"secondary\" specified without @type=\"main\"" + t);
-					}
-				})
-			}
 		}
+
 
 		// <Synopsis> - validity depends on use
 		switch (requestType) {
 			case CG_REQUEST_SCHEDULE_TIME:
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
-				// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and "medium"(250)
-				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+				// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and (required)"medium"(250)
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [SYNOPSIS_SHORT_LABEL],requestType, errs, bdLang);
 				break;
 			case CG_REQUEST_PROGRAM:
-				// clause 6.10.5.3 -- 1..3 instances permitted - one each of @length="short"(90), "medium"(250) and "long"(1200)
-				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_SHORT_LABEL,SYNOPSIS_MEDIUM_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
+				// clause 6.10.5.3 -- 1..3 instances permitted - one each of @length="short"(90), (required)"medium"(250) and "long"(1200)
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [SYNOPSIS_SHORT_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
 				break;
-			case CG_REQUEST_BS_CONTENTS:
-				// clause 6.10.5.4 -- only 1 instance permitted - @length="medium"(250)
-				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+			case CG_REQUEST_BS_LISTS:		// clause 6.10.5.5
+			case CG_REQUEST_BS_CONTENTS: 	// clause 6.10.5.4
+				// only 1 instance permitted - @length="medium"(250)
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
 				break;
 			default:
 				// make sure <Synopsis> elements are not in the Basic Description
@@ -910,14 +954,14 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 
 		// <Keyword> - 
 		switch (requestType) {
-		case CG_REQUEST_PROGRAM:
-			// clause 6.10.5.3 -- 0..20 instances permitted 
-			ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs);
-			break;
-		default:
-			// make sure <Keyword> elements are not in the Basic Description
-			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Keyword")) {
-				errs.push("<Keyword> not permitted in <BasicDescription> for this request type");
+			case CG_REQUEST_PROGRAM:	// clause 6.10.5.3 -- 0..20 instances permitted
+			case CG_REQUEST_BS_LISTS:   // clause 6.10.5.5 -- 0..20 instances permitted				 
+				ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
+				break;
+			default:
+				// make sure <Keyword> elements are not in the Basic Description
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Keyword")) {
+						errs.push("<Keyword> not permitted in <BasicDescription> for this request type");
 			}
 		}
 
@@ -983,13 +1027,38 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			// clause 6.10.5.4 -- 0..1 instances permitted - first must contain age
 			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 			break;
+		case CG_REQUEST_BS_LISTS:
+			// TODO: clause 6.10.5.5 -- 
+			break;
 		default:
 			// make sure <RelatedMaterial> elements are not in the Basic Description
 			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMaterial")) {
 				errs.push("<RelatedMaterial> not permitted in <BasicDescription> for this request type");
 			}
 		}
+	}	
+}
+
+
+/**
+ * validate the <ProgramInformation> element against the profile for the given request/response type
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} ProgramInformation  the element whose children should be checked
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
+ */
+function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, parentLanguage) {
+	if (!ProgramInformation.attr('programId')) {
+		errs.push("@programId not specified for <ProgramInformation>");
 	}
+	var piLang=ProgramInformation.attr('lang') ? ProgramInformation.attr('lang').value() : parentLanguage;
+
+	// <ProgramInformation><BasicDescription>
+	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang);
+
 	
 	// <ProgramInformation><OtherIdentifier>
 	//TODO:
@@ -1035,6 +1104,25 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 	}
 }
 
+
+/**
+ * validate the <GroupInformation> element against the profile for the given request/response type
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} GroupInformation    the element whose children should be checked
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ * @param {string} parentLanguage	   the xml:lang of the parent element to GroupInformation
+ */
+function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage) {
+	var piLang=GroupInformation.attr('lang') ? GroupInformation.attr('lang').value() : parentLanguage;
+
+	// <GroupInformation><BasicDescription>
+	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang);
+
+}
+
 /**
  * find and validate any <GroupInformation> elements in the <GroupInformationTable>
  *
@@ -1046,6 +1134,21 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  * @param {Class}  errs                errors found in validaton
  */
 function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
+	var gi=0, GroupInformation;
+	var GroupInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":GroupInformationTable", CG_SCHEMA);
+	
+	if (!GroupInformationTable) {
+		errs.push("<GroupInformationTable> not specified in <"+ProgramDescription.name()+">");
+		return;
+	}
+	var groupInfTabLang=GroupInformationTable.attr("lang") ? GroupInformationTable.attr("lang").value() : progDescrLang;
+
+	while (GroupInformation=GroupInformationTable.child(gi++)) {
+		if (GroupInformation.name()=="GroupInformation") {
+			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, groupInfTabLang);
+		}
+	}
+
 }
 
 /**
