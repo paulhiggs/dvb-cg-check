@@ -52,6 +52,18 @@ const SYNOPSIS_SHORT_LABEL = "short",
       SYNOPSIS_MEDIUM_LABEL = "medium", 
       SYNOPSIS_LONG_LABEL = "long"; 
 
+const JPEG_MIME = "image/jpeg", 
+      PNG_MIME =  "image/png";
+
+const TEMPLATE_AIT_CONTENT_TYPE = "application/vnd.dvb.ait+xml",
+      TEMPLATE_AIT_URI = "urn:fvc:metadata:cs:HowRelatedCS:2018:templateAIT";	
+
+const PAGINATION_FIRST_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:first",
+	  PAGINATION_PREV_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:prev",
+	  PAGINATION_NEXT_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:next",
+	  PAGINATION_LAST_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:last";
+const PROMOTIONAL_STILL_IMAGE_URI = "urn:tva:metadata:cs:HowRelatedCS:2012:19"; 
+
 
 // convenience/readability values
 const DEFAULT_LANGUAGE="***";
@@ -469,7 +481,6 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
  */
 function NoHrefAttribute(errs, src, loc) {
 	errs.push("no @href specified for "+src+" in "+loc);
-	errs.increment("no href");
 }
 
 /**
@@ -630,9 +641,9 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 	}
 	for (var i in counts) {
         if (counts[i] != 0 && counts[i] > maxKeywords) {
-            errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified"+i==DEFAULT_LANGUAGE?"":" for language "+i);
-			}
+            errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language \""+i+"\""));
 		}
+	}
 }
 
 /**
@@ -848,16 +859,300 @@ function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, min
 
 
 /**
+ * Add an error message when the @href contains an invalid value
+ *
+ * @param {Object} errs Errors buffer
+ * @param {String} value The invalid value for the href attribute
+ * @param {String} src The element missing the @href
+ * @param {String} loc The location of the element
+ */
+function InvalidHrefValue(errs, value, src, loc) {
+	errs.push("invalid @href=\""+value+"\" specified for "+src+" in "+loc);
+}
+
+/**
+ * Add an error message when the @href is not specified for an element
+ *
+ * @param {Object} errs Errors buffer
+ * @param {String} src The element missing the @href
+ * @param {String} loc The location of the element
+ */
+function NoHrefAttribute(errs, src, loc) {
+	errs.push("no @href specified for "+src+" in "+loc);
+}
+
+/**
+ * Add an error message when the MediaLocator does not contain a MediaUri sub-element
+ *
+ * @param {Object} errs Errors buffer
+ * @param {String} src The type of element with the <MediaLocator>
+ * @param {String} loc The location of the element
+ */
+function NoAuxiliaryURI(errs, src, loc) {
+	errs.push("<AuxiliaryURI> not specified for "+src+" <MediaLocator> in "+loc);
+}
+
+/**TemplateAITPromotional Still Image
+ *
+ * @param {Object} RelatedMaterial   the <RelatedMaterial> element (a libxmls ojbect tree) to be checked
+ * @param {Object} errs              The class where errors and warnings relating to the serivce list processing are stored 
+ * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
+ * @param {string} LocationType      The type of element containing the <RelatedMaterial> element. Different validation rules apply to different location types
+ 
+ 	<RelatedMaterial>
+		<HowRelated href="urn:fvc:metadata:cs:HowRelatedCS:2018:templateAIT"/>
+		<MediaLocator>
+			<MediaUri/>
+			<AuxiliaryURI contentType="application/vnd.dvb.ait+xml">
+				https://www.live.mybroadcastertvapps.co.uk/tap/iplayer/ait/launch/iplayer.aitx
+			</AuxiliaryURI>
+		</MediaLocator>
+	</RelatedMaterial>
+ */
+function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
+    var HowRelated=null, Format=null, MediaLocator=[];
+    var c=0, elem;
+    while (elem=RelatedMaterial.child(c++)) {
+        if (elem.name()==="HowRelated")
+            HowRelated=elem;
+        else if (elem.name()==="MediaLocator")
+            MediaLocator.push(elem);
+    }
+
+    if (!HowRelated) {
+        errs.push("<HowRelated> not specified for <RelatedMaterial> in "+Location);
+		return;
+    }
+	var HRhref=HowRelated.attr("href");
+	
+	if (HRhref) {
+		if (HRhref.value() != TEMPLATE_AIT_URI) {
+			errs.push("HowRelated@href=\""+HRhref+"\" does not designate a Template AIT");
+		}
+		else {		
+			if (MediaLocator.length != 0) {
+				MediaLocator.forEach(ml => {
+					var subElems=ml.childNodes(), hasAuxiliaryURI=false;
+					if (subElems) subElems.forEach(child => {
+						if (child.name()=="AuxiliaryURI") {
+							hasAuxiliaryURI=true;
+							if (!child.attr("contentType")) {
+								errs.push("@contentType not specified for Template IT <AuxiliaryURI> in "+Location);
+							}
+							else {
+								var contentType=child.attr("contentType").value();
+								if (contentType != TEMPLATE_AIT_CONTENT_TYPE) {
+									errs.push("invalid @contentType \""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
+								}
+							}
+						}
+					});	
+					if (!hasAuxiliaryURI) {
+						NoAuxiliaryURI(errs, "template AIT", Location);
+					}
+				});
+			}
+			else {
+				errs.push("MediaLocator not specified for <RelatedMaterial> in "+Location);
+			}			
+		}
+	}
+	else {
+		NoHrefAttribute(errs, "<RelatedMaterial><HowRelated>", Location);
+	}
+}
+
+/**
+ * determines if the value is a valid JPEG MIME type
+ *
+ * @param {String} val the MIME type
+ * @return {boolean} true is the MIME type represents a JPEG image, otherwise false
+ */
+function isJPEGmime(val) {
+	return val==JPEG_MIME
+}
+
+/**
+ * determines if the value is a valid PNG MIME type
+ *
+ * @param {String} val the MIME type
+ * @return {boolean} true is the MIME type represents a PNG image, otherwise false
+ */
+function isPNGmime(val) {
+	return val==PNG_MIME 
+}
+
+/**
+ * verifies if the specified RelatedMaterial contains a Promotional Still Image
+ *
+ * @param {Object} RelatedMaterial   the <RelatedMaterial> element (a libxmls ojbect tree) to be checked
+ * @param {Object} errs              The class where errors and warnings relating to the serivce list processing are stored 
+ * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
+ * @param {string} LocationType      The type of element containing the <RelatedMaterial> element. Different validation rules apply to different location types
+ */
+function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
+    var HowRelated=null, Format=null, MediaLocator=[];
+    var c=0, elem;
+    while (elem=RelatedMaterial.child(c++)) {
+        if (elem.name()==="HowRelated")
+            HowRelated=elem;
+        else if (elem.name()==="Format")
+            Format=elem;
+        else if (elem.name()==="MediaLocator")
+            MediaLocator.push(elem);
+    }
+
+    if (!HowRelated) {
+        errs.push("<HowRelated> not specified for <RelatedMaterial> in "+Location);
+		return;
+    }
+	var HRhref=HowRelated.attr("href");
+	if (HRhref) {
+		if (HRhref.value() != PROMOTIONAL_STILL_IMAGE_URI) {
+			errs.push("HowRelated@href=\""+HRhref.value()+"\" does not designate a Promotional Still Image");
+		}
+		else {
+			if (Format) {
+				var subElems=Format.childNodes(), hasStillPictureFormat=false;
+				if (subElems) subElems.forEach(child => {
+					if (child.name() == "StillPictureFormat") {
+						hasStillPictureFormat=true;
+						if (!child.attr("horizontalSize")) {
+							errs.push("@horizontalSize not specified for <RelatedMaterial><Format><StillPictureFormat> in "+Location );
+						}
+						if (!child.attr("verticalSize")) {
+							errs.push("@verticalSize not specified for <RelatedMaterial><Format><StillPictureFormat> in "+Location );
+						}
+						if (child.attr("href")) {
+							var href=child.attr("href").value();
+							if (href != JPEG_IMAGE_CS_VALUE && href != PNG_IMAGE_CS_VALUE) {
+								InvalidHrefValue(errs, href, "<RelatedMaterial><Format><StillPictureFormat>", Location)
+							}
+							if (href == JPEG_IMAGE_CS_VALUE) isJPEG=true;
+							if (href == PNG_IMAGE_CS_VALUE) isPNG=true;
+						}
+						else {
+							NoHrefAttribute(errs, "<RelatedMaterial><Format>", Location);
+						}
+					}
+				});
+				if (!hasStillPictureFormat) {
+					errs.push("<StillPictureFormat> not specified for <Format> in "+Location);
+				}
+			}
+
+			if (MediaLocator.length != 0) {
+				MediaLocator.forEach(ml => {
+					var subElems=ml.childNodes(), hasMediaURI=false;
+					if (subElems) subElems.forEach(child => {
+						if (child.name()=="MediaUri") {
+							hasMediaURI=true;
+							if (!child.attr("contentType")) {
+								errs.push("@contentType not specified for logo <MediaUri> in "+Location);
+							}
+							else {
+								var contentType=child.attr("contentType").value();
+								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) {
+									errs.push("invalid @contentType \""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
+								}
+								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) {
+									errs.push("conflicting media types in <Format> and <MediaUri> for "+Location);
+								}
+							}
+						}
+					});
+					if (!hasMediaURI) {
+						NoMediaLocator(errs, "logo", Location);
+					}
+				});
+			}
+			else {
+				errs.push("MediaLocator not specified for <RelatedMaterial> in "+Location);
+			}			
+		}
+	}
+	else {
+		NoHrefAttribute(errs, "<RelatedMaterial><HowRelated>", Location);
+	}
+}
+
+/**
+ * validate the <RelatedMaterial> elements specified in a Box Set List
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {integer} minRMelements       the minimum number of RelatedMaterial elements
+ * @param {integer} maxRMelements       the maximum number of RelatedMaterial elements
+ * @param {Class}   errs                errors found in validaton
+ */
+function ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
+	var countImage=0, countTemplateAIT=0, countPaginationFirst=0, countPaginationPrev=0, countPaginationNext=0, countPaginationLast=0;
+	var rm=0, RelatedMaterial;
+	while (RelatedMaterial=BasicDescription.child(rm++)) {
+		if (RelatedMaterial.name()=="RelatedMaterial") {
+			var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":HowRelated", CG_SCHEMA);
+			if (!HowRelated) {
+				errs.push("<HowRelated> element not specified for <RelatedMaterial>");
+			}
+			else {				
+				if (!HowRelated.attr('href')) {
+					errs.push("@href not specified for <HowRelated> element in <RelatedMaterial>");
+				}
+				else {
+					var hrHref=HowRelated.attr('href').value();
+					switch (hrHref) {
+						case TEMPLATE_AIT_URI:
+							countTemplateAIT++;
+							ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">")
+							break;
+						case PAGINATION_FIRST_URI:
+							countPaginationFirst++;
+							break;
+						case PAGINATION_PREV_URI:
+							countPaginationPrev++;
+							break;
+						case PAGINATION_NEXT_URI:
+							countPaginationNext++;
+							break;
+						case PAGINATION_LAST_URI:
+							countPaginationLast++;
+							break;
+						case PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
+							countImage++;
+							//TODO:: check that this is signalled as a JPEG of PNG image
+							ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">");
+							break;
+						default:
+							errs.push("HowRelated@href=\""+hrHref+"\" is not valid for <RelatedMaterial> in Box Set List");
+					}	
+				}
+			}
+		}
+	}
+	if (countTemplateAIT == 0)
+		errs.push("a <RelatedMaterial> element signalling the Template XML AIT must be specified for a Box Set List");
+	if (countTemplateAIT > 1)
+		errs.push("only one <RelatedMaterial> element signalling the Template XML AIT can be specified for a Box Set List");
+	if (countImage > 1)
+		errs.push("only one <RelatedMaterial> element signalling the promotional still image can be specified for a Box Set List");
+	var numPaginations=countPaginationFirst+countPaginationPrev+countPaginationNext+countPaginationLast;
+	if (numPaginations != 0 && numPaginations != 2 && numPaginations != 4)
+		errs.push("only 0, 2 or 4 paginations links may be siganlled in <RelatedMaterial> elements for a Box Ser List");
+}
+
+
+/**
  * validate the <Title> elements specified
  *
  * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
  * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object}  BasicDescription    the element whose children should be checked
- * @param {string}  requestType         the type of content guide request being checked
+ * @param {boolean} allowSecondary      indicates if  Title with @type="secondary" is permitted
  * @param {Class}   errs                errors found in validaton
  * @param {string}  parentLanguage	    the xml:lang of the parent element to ProgramInformation
  */
-function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requestType, errs, parentLanguage) {
+function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondary, errs, parentLanguage) {
 	var mainSet=[], secondarySet=[];
 	var t=0, Title;
 	while (Title=BasicDescription.child(t++)) {
@@ -874,9 +1169,13 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requestType, 
 				else mainSet.push(TitleLang);
 			}
 			else if (TitleType="secondary") {
-				if (isIn(secondarySet, TitleLang))
-					errs.push("only a single language is permitted for @type=\"secondary\"")
-				else secondarySet.push(TitleLang);
+				if (allowSecondary) {
+					if (isIn(secondarySet, TitleLang))
+						errs.push("only a single language is permitted for @type=\"secondary\"")
+					else secondarySet.push(TitleLang);
+				}
+				else 
+					errs.push("Title@type=\"secondary\" is not permitted for this <"+BasicDescription.name()+">");
 			}
 			else
 				errs.push("type=\""+TitleType+"\" is not permitted for <Title>");
@@ -886,7 +1185,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requestType, 
 					var t = lang != DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
 					errs.push("@type=\"secondary\" specified without @type=\"main\"" + t);
 				}
-			})
+			});
 		}
 	}	
 	
@@ -901,8 +1200,9 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requestType, 
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  * @param {string} parentLanguage	   the xml:lang of the parent element to parentElement
+ * @param {boolean} isParentGroup      flag that denotes this BasicDescription element is in the "category" group of a Box Set List response
  */
-function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage) {
+function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage, isParentGroup) {
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
 	if (!BasicDescription) {
 		errs.push("<BasicDescription> not specified for "+parentElement.name())
@@ -910,16 +1210,18 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	else {
 		var bdLang=BasicDescription.attr('lang') ? BasicDescription.attr('lang').value() : parentLanguage;
 		
-		
-		// <Title> - only 1..2 elements per language permitted with "main" and optional "secondary" 
-		//           requirements are the same for Schedule, Program and Box Set Contents response
+		// <Title> - 
 		switch (requestType) {
 			case CG_REQUEST_SCHEDULE_TIME:
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
 			case CG_REQUEST_PROGRAM:
 			case CG_REQUEST_BS_CONTENTS:
+				// only 1..2 elements per language permitted with "main" and optional "secondary" 
+				ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
+				break;
 			case CG_REQUEST_BS_LISTS:
-				ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requestType, errs, bdLang);
+				// only 1 elements per language permitted with "main" 
+				ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);
 				break;
 			default:
 				// make sure <Title> elements are not in the Basic Description
@@ -927,7 +1229,6 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 					errs.push("<Title> not permitted in <BasicDescription> for this request type");
 				}
 		}
-
 
 		// <Synopsis> - validity depends on use
 		switch (requestType) {
@@ -941,6 +1242,12 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [SYNOPSIS_SHORT_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
 				break;
 			case CG_REQUEST_BS_LISTS:		// clause 6.10.5.5
+				// only 1 instance permitted - @length="medium"(250)
+				if (!isParentGroup)
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
+				else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Synopsis"))
+					errs.push("<Synopsis> not permitted in \"category group\" for this request type");
+				break;
 			case CG_REQUEST_BS_CONTENTS: 	// clause 6.10.5.4
 				// only 1 instance permitted - @length="medium"(250)
 				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
@@ -955,86 +1262,88 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 		// <Keyword> - 
 		switch (requestType) {
 			case CG_REQUEST_PROGRAM:	// clause 6.10.5.3 -- 0..20 instances permitted
-			case CG_REQUEST_BS_LISTS:   // clause 6.10.5.5 -- 0..20 instances permitted				 
 				ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
 				break;
+			case CG_REQUEST_BS_LISTS:   // clause 6.10.5.5 -- 0..20 instances permitted		
+				if (!isParentGroup)
+					ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
+				else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Keyword"))
+					errs.push("<Keyword> not permitted in \"category group\" for this request type");
+				break;			
 			default:
 				// make sure <Keyword> elements are not in the Basic Description
 				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Keyword")) {
-						errs.push("<Keyword> not permitted in <BasicDescription> for this request type");
-			}
+					errs.push("<Keyword> not permitted in <BasicDescription> for this request type");
+				}
 		}
 
 		// <Genre> - 
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE_TIME:
-		case CG_REQUEST_SCHEDULE_NOWNEXT:
-			// clause 6.10.5.2 -- 0..1 instances permitted 
-		case CG_REQUEST_PROGRAM:
-			// clause 6.10.5.3 -- 0..1 instances permitted 
-			ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-			break;
-		default:
-			// make sure <Genre> elements are not in the Basic Description
-			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Genre")) {
-				errs.push("<Genre> not permitted in <BasicDescription> for this request type");
-			}
+			case CG_REQUEST_SCHEDULE_TIME:		// clause 6.10.5.2 -- 0..1 instances permitted
+			case CG_REQUEST_SCHEDULE_NOWNEXT:	// clause 6.10.5.2 -- 0..1 instances permitted		 
+			case CG_REQUEST_PROGRAM:			// clause 6.10.5.3 -- 0..1 instances permitted 			
+				ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+				break;
+			default:
+				// make sure <Genre> elements are not in the Basic Description
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Genre")) {
+					errs.push("<Genre> not permitted in <BasicDescription> for this request type");
+				}
 		}
 
 		// <ParentalGuidance> - 
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE_TIME:
-		case CG_REQUEST_SCHEDULE_NOWNEXT:
-			// clause 6.10.5.2 -- 0..2 instances permitted - first must contain age 
-		case CG_REQUEST_PROGRAM:
-			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 
-		case CG_REQUEST_BS_CONTENTS:
-			// clause 6.10.5.4 -- 0..2 instances permitted - first must contain age
-			ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
-			break;
-		default:
-			// make sure <ParentalGuidance> elements are not in the Basic Description
-			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "ParentalGuidance")) {
-				errs.push("<ParentalGuidance> not permitted in <BasicDescription> for this request type");
-			}
+			case CG_REQUEST_SCHEDULE_TIME:		// clause 6.10.5.2 -- 0..2 instances permitted - first must contain age
+			case CG_REQUEST_SCHEDULE_NOWNEXT:	// clause 6.10.5.2 -- 0..2 instances permitted - first must contain age			 
+			case CG_REQUEST_PROGRAM:			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 		
+			case CG_REQUEST_BS_CONTENTS:		// clause 6.10.5.4 -- 0..2 instances permitted - first must contain age	
+				ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
+				break;
+			default:
+				// make sure <ParentalGuidance> elements are not in the Basic Description
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "ParentalGuidance")) {
+					errs.push("<ParentalGuidance> not permitted in <BasicDescription> for this request type");
+				}
 		}
 		
 		// <CreditsList> - 
 		switch (requestType) {
-		case CG_REQUEST_PROGRAM:
-			// clause 6.10.5.3 -- 
-			ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);
-			break;
-		default:
-			// make sure <CreditsList> elements are not in the Basic Description
-			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "CreditsList")) {
-				errs.push("<CreditsList> not permitted in <BasicDescription> for this request type");
-			}
-		}
-		
+			case CG_REQUEST_PROGRAM:
+				// clause 6.10.5.3 -- 
+				ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);
+				break;
+			default:
+				// make sure <CreditsList> elements are not in the Basic Description
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "CreditsList")) {
+					errs.push("<CreditsList> not permitted in <BasicDescription> for this request type");
+				}
+		}		
 		// <RelatedMaterial> - 
 		switch (requestType) {
-		case CG_REQUEST_SCHEDULE_TIME:
-		case CG_REQUEST_SCHEDULE_NOWNEXT:
-			// clause 6.10.5.2 -- 0..1 instances permitted 
-			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
-			break;
-		case CG_REQUEST_PROGRAM:
-			// clause 6.10.5.3 -- 0..1 instances permitted - first must contain age 
-			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
-			break;
-		case CG_REQUEST_BS_CONTENTS:
-			// clause 6.10.5.4 -- 0..1 instances permitted - first must contain age
-			ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
-			break;
-		case CG_REQUEST_BS_LISTS:
-			// TODO: clause 6.10.5.5 -- 
-			break;
-		default:
-			// make sure <RelatedMaterial> elements are not in the Basic Description
-			if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMaterial")) {
-				errs.push("<RelatedMaterial> not permitted in <BasicDescription> for this request type");
-			}
+			case CG_REQUEST_SCHEDULE_TIME:
+			case CG_REQUEST_SCHEDULE_NOWNEXT:
+				// clause 6.10.5.2 -- 0..1 instances permitted 
+				ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+				break;
+			case CG_REQUEST_PROGRAM:
+				// clause 6.10.5.3 -- 0..1 instances permitted - first must contain age 
+				ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+				break;
+			case CG_REQUEST_BS_CONTENTS:
+				// clause 6.10.5.4 -- 0..1 instances permitted - first must contain age
+				ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+				break;
+			case CG_REQUEST_BS_LISTS:			// clause 6.10.5.5 - three cases
+				if (!isParentGroup)
+					ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+				else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMterial"))
+					errs.push("<RelatedMaterial> not permitted in \"category group\" for this request type");
+				break;
+			default:
+				// make sure <RelatedMaterial> elements are not in the Basic Description
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMaterial")) {
+					errs.push("<RelatedMaterial> not permitted in <BasicDescription> for this request type");
+				}
 		}
 	}	
 }
@@ -1057,7 +1366,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	var piLang=ProgramInformation.attr('lang') ? ProgramInformation.attr('lang').value() : parentLanguage;
 
 	// <ProgramInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang);
+	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, false);
 
 	
 	// <ProgramInformation><OtherIdentifier>
@@ -1119,8 +1428,17 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 	var piLang=GroupInformation.attr('lang') ? GroupInformation.attr('lang').value() : parentLanguage;
 
 	// <GroupInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang);
-
+	var countMemberOf=0;
+	if (requestType == CG_REQUEST_BS_LISTS) {
+		// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
+		var e=0, elem;
+		while (elem=GroupInformation.child(e++)) {
+			if (elem.name()=="MemberOf")
+				countMemberOf++
+		}
+	}
+	
+	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang, countMemberOf==0);
 }
 
 /**
@@ -1177,7 +1495,6 @@ function validateContentGuide(CGtext, requestType, errs) {
 		CG = libxml.parseXmlString(CGtext);
 	} catch (err) {
 		errs.push("XML parsing failed: "+err.message);
-		errs.increment("malformed XML");
 	}
 	if (!CG) return;
 	
