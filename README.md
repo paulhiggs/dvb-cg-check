@@ -16,7 +16,7 @@ Checks performed:
 &lt;server&gt;/checkFile gives a basic/primitive UI. Select the file containing a DVB-I content guide metadata fragment and the type of response from the endpoint. Press "Submit" button and await results!
 
 ## Installation
-1. Clone this repository `git clone https://github.com/paulhiggs/dvb-gc-check.git`
+1. Clone this repository `git clone https://github.com/paulhiggs/dvb-gc-check.git --recurse-submodules`
 1. Install necessary libraries (express, libxmljs, morgan)  `npm install`
 1. run it - `node app`
 
