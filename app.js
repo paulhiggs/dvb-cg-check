@@ -3,12 +3,11 @@
 const express = require("express");
 var app = express();
 
-/* TODO:
-
- - also look for TODO in the code itself
-*/
-
-
+const ErrorList = require("./dvb-common/ErrorList.js");
+const dvbi = require("./dvb-common/DVB-I_definitions.js");
+const {isJPEGmime, isPNGmime} = require("./dvb-common/MIME_checks.js");
+const {isCRIDURI} = require("./dvb-common/URI_checks.js");
+const {loadCS} = require("./dvb-common/CS_handler.js");
 
 // libxmljs - https://github.com/libxmljs/libxmljs
 const libxml = require("libxmljs");
@@ -38,32 +37,6 @@ const { parse } = require("querystring");
 var sprintf = require("sprintf-js").sprintf,
     vsprintf = require("sprintf-js").vsprintf
 
-// constraints from the DVB-I specification
-const MAX_TITLE_LENGTH=80,
-      MAX_KEYWORD_LENGTH=32;
-const MAX_ORGANIZATION_NAME_LENGTH=32;
-const MAX_NAME_PART_LENGTH=32;
-const MAX_EXPLANATORY_TEXT_LENGTH=160;
-
-const SYNOPSIS_SHORT_LENGTH = 90,
-      SYNOPSIS_MEDIUM_LENGTH = 250, 
-      SYNOPSIS_LONG_LENGTH = 1200; 
-const SYNOPSIS_SHORT_LABEL = "short",
-      SYNOPSIS_MEDIUM_LABEL = "medium", 
-      SYNOPSIS_LONG_LABEL = "long"; 
-
-const JPEG_MIME = "image/jpeg", 
-      PNG_MIME =  "image/png";
-
-const TEMPLATE_AIT_CONTENT_TYPE = "application/vnd.dvb.ait+xml",
-      TEMPLATE_AIT_URI = "urn:fvc:metadata:cs:HowRelatedCS:2018:templateAIT";	
-
-const PAGINATION_FIRST_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:first",
-	  PAGINATION_PREV_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:prev",
-	  PAGINATION_NEXT_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:next",
-	  PAGINATION_LAST_URI = "urn:fvc:metadata:cs:HowRelatedCS:2015-12:pagination:last";
-const PROMOTIONAL_STILL_IMAGE_URI = "urn:tva:metadata:cs:HowRelatedCS:2012:19"; 
-
 
 // convenience/readability values
 const DEFAULT_LANGUAGE="***";
@@ -91,38 +64,6 @@ const REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/maste
 	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt";
 
 var allowedGenres=[], allowedCreditItemRoles=[];
-
-class ErrorList {
-/**
- * Manages errors and warnings for the application
- * 
- */
-    counts=[]; messages=[]; countsWarn=[]; messagesWarn=[];
-    
-    increment(key) {
-        if (this.counts[key]===undefined)
-            this.set(key,1);
-        else this.counts[key]++;
-    }
-    set(key,value) {
-        this.counts[key]=value;
-    }
-    incrementW(key) {
-        if (this.countsWarn[key]===undefined)
-            this.setW(key,1);
-        else this.countsWarn[key]++;
-    }
-    setW(key,value) {
-        this.countsWarn[key]=value;
-    }
-    push(message) {
-        this.messages.push(message);
-    }
-    pushW(message) {
-        this.messagesWarn.push(message);
-    }
-}
-
 
 morgan.token("protocol", function getProtocol(req) {
     return req.protocol;
@@ -182,93 +123,7 @@ function HTMLize(str) {
 	return str.replace(/</g,"&lt;").replace(/>/g,"&gt;");              
 }
 
-//---------------- CLASSIFICATION SCHEME LOADING ---------------- 
-/**
- * Constructs a linear list of terms from a heirarical clssification schemes which are read from an XML document and parsed by libxmljs
- *
- * @param {Array} values The array to push classification scheme values into
- * @param {String} CSuri The classification scheme domian
- * @param {Object} term The classification scheme term that may include nested subterms
- */
-function addCSTerm(values,CSuri,term){
-    if (term.name()==="Term") {
-        values.push(CSuri+":"+term.attr("termID").value())
-        var st=0, subTerm;
-        while (subTerm=term.child(st++)) {
-            addCSTerm(values,CSuri,subTerm);
-        }
-    }
-}
 
-/**
- * load the hierarical values from an XML classification scheme document into a linear list 
- *
- * @param {Array} values The linear list of values within the classification scheme
- * @param {String} xmlCS the XML document  of the classification scheme
- */
-function loadClassificationScheme(values, xmlCS) {
-	if (!xmlCS) return;
-	var CSnamespace = xmlCS.root().attr("uri");
-	if (!CSnamespace) return;
-	var t=0, term;
-	while (term=xmlCS.root().child(t++)) {
-		addCSTerm(values,CSnamespace.value(),term);
-	}
-}
-
-/**
- * read a classification scheme from a local file and load its hierarical values into a linear list 
- *
- * @param {Array} values The linear list of values within the classification scheme
- * @param {String} classificationScheme the filename of the classification scheme
- */
-function loadCSfromFile(values, classificationScheme) {
-	console.log("reading CS from", classificationScheme);
-    fs.readFile(classificationScheme, {encoding: "utf-8"}, function(err,data){
-        if (!err) {
-			loadClassificationScheme(values, libxml.parseXmlString(data.replace(/(\r\n|\n|\r|\t)/gm,"")));
-        } else {
-            console.log(err);
-        }
-    });
-}
-
-/**
- * read a classification scheme from a URL and load its hierarical values into a linear list 
- *
- * @param {Array} values The linear list of values within the classification scheme
- * @param {String} csURL URL to the classification scheme
- */
-function loadCSfromURL(values, csURL) { 
-	console.log("retrieving CS from", csURL);
-	var xhttp = new XmlHttpRequest();
-	xhttp.onreadystatechange = function() {
-		if (this.readyState == 4) {
-			if (this.status == 200) {
-				loadClassificationScheme(values, libxml.parseXmlString(xhttp.responseText));
-			}
-			else console.log("error ("+this.status+") retrieving "+csURL);	
-		}
-	};
-	xhttp.open("GET", csURL, true);
-	xhttp.send();
-} 
- 
-/**
- * loads classification scheme values from either a local file or an URL based location
- *
- * @param {Array} values The linear list of values within the classification scheme
- * @param {boolean} useURL if true use the URL loading method else use the local file
- * @param {String} CSfilename the filename of the classification scheme
- * @param {String} CSurl URL to the classification scheme
- * 
- */ 
-function loadCS(values, useURL, CSfilename, CSurl) {
-	if (useURL)
-		loadCSfromURL(values,CSurl);
-	else loadCSfromFile(values, CSfilename);	
-} 
-//--------------------------------------------------------------- 
  
 //---------------- CreditsItem@role LOADING ----------------
 
@@ -569,25 +424,25 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 				var len = Synopsis.attr('length').value();
 				if (isIn(requiredLengths, len) || isIn(optionalLengths, len)) {
 					switch (len) {
-					case SYNOPSIS_SHORT_LABEL:
-						if ((unEntity(Synopsis.text()).length) > SYNOPSIS_SHORT_LENGTH)
-							errs.push("length of <Synopsis length=\""+SYNOPSIS_SHORT_LABEL+"\"> exceeds "+SYNOPSIS_SHORT_LENGTH+" characters");
+					case dvbi.SYNOPSIS_SHORT_LABEL:
+						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
+							errs.push("length of <Synopsis length=\""+dvbi.SYNOPSIS_SHORT_LABEL+"\"> exceeds "+dvbi.SYNOPSIS_SHORT_LENGTH+" characters");
 						if (hasShort)
-							errs.push("only a single instance of <Synopsis length=\""+SYNOPSIS_SHORT_LABEL+"\"> is permitted");
+							errs.push("only a single instance of <Synopsis length=\""+dvbi.SYNOPSIS_SHORT_LABEL+"\"> is permitted");
 						hasShort=true;
 						break;
-					case SYNOPSIS_MEDIUM_LABEL:
-						if ((unEntity(Synopsis.text()).length) > SYNOPSIS_MEDIUM_LENGTH)
-							errs.push("length of <Synopsis length=\""+SYNOPSIS_MEDIUM_LABEL+"\"> exceeds "+SYNOPSIS_MEDIUM_LENGTH+" characters");
+					case dvbi.SYNOPSIS_MEDIUM_LABEL:
+						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
+							errs.push("length of <Synopsis length=\""+dvbi.SYNOPSIS_MEDIUM_LABEL+"\"> exceeds "+dvbi.SYNOPSIS_MEDIUM_LENGTH+" characters");
 						if (hasMedium)
-							errs.push("only a single instance of <Synopsis length=\""+SYNOPSIS_MEDIUM_LABEL+"\"> is permitted");
+							errs.push("only a single instance of <Synopsis length=\""+dvbi.SYNOPSIS_MEDIUM_LABEL+"\"> is permitted");
 						hasMedium=true;
 						break;
-					case SYNOPSIS_LONG_LABEL:
-						if ((unEntity(Synopsis.text()).length) > SYNOPSIS_LONG_LENGTH)
-							errs.push("length of <Synopsis length=\""+SYNOPSIS_LONG_LABEL+"\"> exceeds "+SYNOPSIS_LONG_LENGTH+" characters");
+					case dvbi.SYNOPSIS_LONG_LABEL:
+						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
+							errs.push("length of <Synopsis length=\""+dvbi.SYNOPSIS_LONG_LABEL+"\"> exceeds "+dvbi.SYNOPSIS_LONG_LENGTH+" characters");
 						if (hasLong)
-							errs.push("only a single instance of <Synopsis length=\""+SYNOPSIS_LONG_LABEL+"\"> is permitted");
+							errs.push("only a single instance of <Synopsis length=\""+dvbi.SYNOPSIS_LONG_LABEL+"\"> is permitted");
 						hasLong=true;
 						break;						
 					}
@@ -600,14 +455,14 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 		}
 	}
 	// note that current DVB-I specifiction only mandates "medium" length, but all three are checked here
-	if (isIn(requiredLengths, SYNOPSIS_SHORT_LABEL) && !hasShort) {
-		errs.push("a synposis with @length=\""+SYNOPSIS_SHORT_LABEL+"\" is required");
+	if (isIn(requiredLengths, dvbi.SYNOPSIS_SHORT_LABEL) && !hasShort) {
+		errs.push("a synposis with @length=\""+dvbi.SYNOPSIS_SHORT_LABEL+"\" is required");
 	}
-	if (isIn(requiredLengths, SYNOPSIS_MEDIUM_LABEL) && !hasMedium) {
-		errs.push("a synposis with @length=\""+SYNOPSIS_MEDIUM_LABEL+"\" is required");
+	if (isIn(requiredLengths, dvbi.SYNOPSIS_MEDIUM_LABEL) && !hasMedium) {
+		errs.push("a synposis with @length=\""+dvbi.SYNOPSIS_MEDIUM_LABEL+"\" is required");
 	}
-	if (isIn(requiredLengths, SYNOPSIS_LONG_LABEL) && !hasLong) {
-		errs.push("a synposis with @length=\""+SYNOPSIS_LONG_LABEL+"\" is required");
+	if (isIn(requiredLengths, dvbi.SYNOPSIS_LONG_LABEL) && !hasLong) {
+		errs.push("a synposis with @length=\""+dvbi.SYNOPSIS_LONG_LABEL+"\" is required");
 	}
 }
 
@@ -635,8 +490,8 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 			else counts[KeywordLang]++;
 			if (keywordType != "main" && keywordType != "other")
 				errs.push("@type=\""+keywordType+"\" not permitted for <Keyword>");
-			if (unEntity(Keyword.text()).length > MAX_KEYWORD_LENGTH)
-				errs.push("<Keyword> length is greater than "+MAX_KEYWORD_LENGTH);
+			if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
+				errs.push("<Keyword> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
 		}
 	}
 	for (var i in counts) {
@@ -718,8 +573,8 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						else 
 							errs.push("@length=\"long\" is required for <ExplanatoryText>");
 						
-						if (unEntity(pgChild.text()).length > MAX_EXPLANATORY_TEXT_LENGTH)
-							errs.push("length of <ExplanatoryText> cannot exceed "+MAX_EXPLANATORY_TEXT_LENGTH+"");
+						if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
+							errs.push("length of <ExplanatoryText> cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+"");
 					}
 				}
 			}
@@ -743,8 +598,8 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs ) {
 	
 	function checkNamePart(elem, parentElem, errs) {
-		if (unEntity(elem.text()).length > MAX_NAME_PART_LENGTH)	
-			errs.push("<"+elem.name()+"> in <"+parentElem.name()+"> is longer than "+MAX_NAME_PART_LENGTH+" characters");
+		if (unEntity(elem.text()).length > dvbi.MAX_NAME_PART_LENGTH)	
+			errs.push("<"+elem.name()+"> in <"+parentElem.name()+"> is longer than "+dvbi.MAX_NAME_PART_LENGTH+" characters");
 	}
 	var se=0, subElem;
 	var familyNameCount=0, givenNameCount=0, otherElemCount=0;
@@ -805,8 +660,8 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 							break;
 						case "OrganizationName":
 							foundOrganizationName++;
-							if (unEntity(elem.text()).length > MAX_ORGANIZATION_NAME_LENGTH)
-								errs.push("length of <OrganizationName> in <CreditsItem> exceeds "+MAX_ORGANIZATION_NAME_LENGTH+" characters")
+							if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
+								errs.push("length of <OrganizationName> in <CreditsItem> exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
 							break;
 						default:
 							if (elem.name() != "text")
@@ -926,7 +781,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 	var HRhref=HowRelated.attr("href");
 	
 	if (HRhref) {
-		if (HRhref.value() != TEMPLATE_AIT_URI) {
+		if (HRhref.value() != dvbi.TEMPLATE_AIT_URI) {
 			errs.push("HowRelated@href=\""+HRhref+"\" does not designate a Template AIT");
 		}
 		else {		
@@ -941,7 +796,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 							}
 							else {
 								var contentType=child.attr("contentType").value();
-								if (contentType != TEMPLATE_AIT_CONTENT_TYPE) {
+								if (contentType != dvbi.TEMPLATE_AIT_CONTENT_TYPE) {
 									errs.push("invalid @contentType \""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
 								}
 							}
@@ -962,25 +817,6 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 	}
 }
 
-/**
- * determines if the value is a valid JPEG MIME type
- *
- * @param {String} val the MIME type
- * @return {boolean} true is the MIME type represents a JPEG image, otherwise false
- */
-function isJPEGmime(val) {
-	return val==JPEG_MIME
-}
-
-/**
- * determines if the value is a valid PNG MIME type
- *
- * @param {String} val the MIME type
- * @return {boolean} true is the MIME type represents a PNG image, otherwise false
- */
-function isPNGmime(val) {
-	return val==PNG_MIME 
-}
 
 /**
  * verifies if the specified RelatedMaterial contains a Promotional Still Image
@@ -1008,7 +844,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     }
 	var HRhref=HowRelated.attr("href");
 	if (HRhref) {
-		if (HRhref.value() != PROMOTIONAL_STILL_IMAGE_URI) {
+		if (HRhref.value() != dvbi.PROMOTIONAL_STILL_IMAGE_URI) {
 			errs.push("HowRelated@href=\""+HRhref.value()+"\" does not designate a Promotional Still Image");
 		}
 		else {
@@ -1102,25 +938,24 @@ function ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescri
 				else {
 					var hrHref=HowRelated.attr('href').value();
 					switch (hrHref) {
-						case TEMPLATE_AIT_URI:
+						case dvbi.TEMPLATE_AIT_URI:
 							countTemplateAIT++;
 							ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">")
 							break;
-						case PAGINATION_FIRST_URI:
+						case dvbi.PAGINATION_FIRST_URI:
 							countPaginationFirst++;
 							break;
-						case PAGINATION_PREV_URI:
+						case dvbi.PAGINATION_PREV_URI:
 							countPaginationPrev++;
 							break;
-						case PAGINATION_NEXT_URI:
+						case dvbi.PAGINATION_NEXT_URI:
 							countPaginationNext++;
 							break;
-						case PAGINATION_LAST_URI:
+						case dvbi.PAGINATION_LAST_URI:
 							countPaginationLast++;
 							break;
-						case PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
+						case dvbi.PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
 							countImage++;
-							//TODO:: check that this is signalled as a JPEG of PNG image
 							ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">");
 							break;
 						default:
@@ -1161,8 +996,8 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 			var TitleLang=Title.attr('lang') ? Title.attr('lang').value() : parentLanguage; // use parent elements language if not specified
 			var titleStr=unEntity(Title.text());
 			
-			if (titleStr.length > MAX_TITLE_LENGTH)
-				errs.push("<Title> length exceeds "+MAX_TITLE_LENGTH+" characters")
+			if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
+				errs.push("<Title> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 			if (TitleType=="main") {
 				if (isIn(mainSet, TitleLang))
 					errs.push("only a single language is permitted for @type=\"main\"")
@@ -1200,10 +1035,12 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  * @param {string} parentLanguage	   the xml:lang of the parent element to parentElement
- * @param {boolean} isParentGroup      flag that denotes this BasicDescription element is in the "category" group of a Box Set List response
+ * @param {object} categoryGroup       the GroupInformationElement that others must refer to through <MemberOf>
  */
-function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage, isParentGroup) {
+function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage, categoryGroup) {
+	var isParentGroup = parentElement == categoryGroup;
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
+
 	if (!BasicDescription) {
 		errs.push("<BasicDescription> not specified for "+parentElement.name())
 	}
@@ -1235,22 +1072,22 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 			case CG_REQUEST_SCHEDULE_TIME:
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
 				// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and (required)"medium"(250)
-				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [SYNOPSIS_SHORT_LABEL],requestType, errs, bdLang);
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL],requestType, errs, bdLang);
 				break;
 			case CG_REQUEST_PROGRAM:
 				// clause 6.10.5.3 -- 1..3 instances permitted - one each of @length="short"(90), (required)"medium"(250) and "long"(1200)
-				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [SYNOPSIS_SHORT_LABEL,SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL,dvbi.SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
 				break;
 			case CG_REQUEST_BS_LISTS:		// clause 6.10.5.5
 				// only 1 instance permitted - @length="medium"(250)
 				if (!isParentGroup)
-					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
 				else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Synopsis"))
 					errs.push("<Synopsis> not permitted in \"category group\" for this request type");
 				break;
 			case CG_REQUEST_BS_CONTENTS: 	// clause 6.10.5.4
 				// only 1 instance permitted - @length="medium"(250)
-				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
 				break;
 			default:
 				// make sure <Synopsis> elements are not in the Basic Description
@@ -1366,7 +1203,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	var piLang=ProgramInformation.attr('lang') ? ProgramInformation.attr('lang').value() : parentLanguage;
 
 	// <ProgramInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, false);
+	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
 
 	
 	// <ProgramInformation><OtherIdentifier>
@@ -1423,22 +1260,69 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  * @param {string} parentLanguage	   the xml:lang of the parent element to GroupInformation
+ * @param {object} categoryGroup       the GroupInformationElement that others must refer to through <MemberOf>
  */
-function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage) {
+function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup) {
+	var isCategoryGroup=GroupInformation==categoryGroup;
 	var piLang=GroupInformation.attr('lang') ? GroupInformation.attr('lang').value() : parentLanguage;
 
 	// <GroupInformation><BasicDescription>
-	var countMemberOf=0;
-	if (requestType == CG_REQUEST_BS_LISTS) {
-		// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
-		var e=0, elem;
-		while (elem=GroupInformation.child(e++)) {
-			if (elem.name()=="MemberOf")
-				countMemberOf++
+
+	if (GroupInformation.attr('groupId')) {
+		var groupId = GroupInformation.attr('groupId').value();
+		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT) {
+			if (groupId != dvbi.CRID_NOW && groupId != dvbi.CRID_LATER && groupId != dvbi.CRID_EARLIER )
+				errs.push("GroupInformation@groupId value \""+groupId+"\" is valid for this request type")
+		}
+		else {
+		if (!isCRIDURI(groupId))
+			errs.push("GroupInformation@groupId value \""+groupId+"\" is not a CRID")
 		}
 	}
+	else errs.push("GroupInformation@groupId attribute is mandatory");
+
+	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CONTENTS) {
+		if (!isCategoryGroup && GroupInformation.attr("ordered")) {
+			errs.push("GroupInformation@ordered is only permitted in the \"category group\"");
+		}
+		if (isCategoryGroup && !GroupInformation.attr("ordered")) {
+			errs.push("GroupInformation@ordered is required for this request type")
+		}
+		if (!isCategoryGroup && GroupInformation.attr("numOfItems")) {
+			errs.push("GroupInformation@numofItems is only permitted in the \"category group\"");
+		}
+		if (isCategoryGroup && !GroupInformation.attr("numOfItems")) {
+			errs.push("GroupInformation@numOfItems is required for this request type")
+		}
+	}
+	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT) {
+		if (GroupInformation.attr("ordered")) {
+			if (GroupInformation.attr("ordered").value()!="true")
+					errs.push("GroupInformation@ordered must be \"true\" for this response type");
+		}
+		else errs.push("GroupInformation@ordered is required for this response type");
+		if (!GroupInformation.attr("numOfItems")) 
+			errs.push("GroupInformation@numOfItems is required for this request type")
+	}
 	
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang, countMemberOf==0);
+	// @serviceIDRef is required for Box Set Lists and Box Set Contents
+	if (GroupInformation.attr('serviceIDRef') && requestType!=CG_REQUEST_BS_LISTS && requestType!=CG_REQUEST_BS_CONTENTS) {
+		errs.push("GroupInformation@serviceIDRef is not permitted for this request type")
+	}
+	
+	var elem=GroupInformation.get(SCHEMA_PREFIX+":GroupType", CG_SCHEMA);
+	if (elem) {
+		if (!(elem.attr('type') && elem.attr('type').value()=="ProgramGroupTypeType")) {
+			errs.push("GroupType@xsi:type=\"ProgramGroupTypeType\" is required")
+		}
+		if (!(elem.attr('value') && elem.attr('value').value()=="otherCollection")) {
+			errs.push("GroupType@value=\"otherCollection\" is required")
+		}
+	}
+	else
+		errs.push("<GroupType> is required in <GroupInformation>"); // this should be checked in valdidation against the schema
+	
+	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang, categoryGroup);
 }
 
 /**
@@ -1461,9 +1345,32 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 	}
 	var groupInfTabLang=GroupInformationTable.attr("lang") ? GroupInformationTable.attr("lang").value() : progDescrLang;
 
+	// find which GroupInformation element is the "category group"
+	var categoryGroup=null;
+	if (requestType == CG_REQUEST_BS_LISTS || requestType == CG_REQUEST_BS_CATEGORIES) {
+		while (GroupInformation=GroupInformationTable.child(gi++)) {
+			var countMemberOf=0;
+			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
+			var e=0, elem;
+			while (elem=GroupInformation.child(e++)) {
+				if (elem.name()=="MemberOf")
+					countMemberOf++
+			}
+			if (countMemberOf == 0) {
+				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
+				if (categoryGroup)
+					errs.push("only a single \"category group\" can be present in <"+GroupInformationTable.name()+">")
+				else categoryGroup = GroupInformation;
+			}
+		}
+		if (!categoryGroup)
+			errs.push("a \"category group\" must be specified in <"+GroupInformationTable.name()+"> for this request type")
+	}
+	
+	gi=0;
 	while (GroupInformation=GroupInformationTable.child(gi++)) {
 		if (GroupInformation.name()=="GroupInformation") {
-			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, groupInfTabLang);
+			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, groupInfTabLang, categoryGroup);
 		}
 	}
 
@@ -1745,7 +1652,7 @@ function readmyfile(filename) {
         var stats=fs.statSync(filename);
         if (stats.isFile()) return fs.readFileSync(filename); 
     }
-    catch (err) {console.log(err);}
+    catch (err) {console.log(err.code,err.path);}
     return null;
 }
 
