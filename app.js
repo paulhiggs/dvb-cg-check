@@ -143,9 +143,8 @@ if(typeof(String.prototype.trim) === "undefined")
  */
 function addRoles(values, data) {
 	var lines = data.split('\n');
-	for (var line=0; line<lines.length; line++) {
-		values.push(lines[line].trim());
-	}	
+	for (var line=0; line<lines.length; line++) 
+		values.push(lines[line].trim());	
 }
 
 /**
@@ -157,11 +156,10 @@ function addRoles(values, data) {
 function loadRolesFromFile(values, rolesFilename) {
 	console.log("reading CS from", rolesFilename);
     fs.readFile(rolesFilename, {encoding: "utf-8"}, function(err,data){
-        if (!err) {
+        if (!err) 
 			addRoles(values, data);
-        } else {
+        else 
             console.log(err);
-        }
     });
 }
 
@@ -176,9 +174,8 @@ function loadRolesFromURL(values, rolesURL) {
 	var xhttp = new XmlHttpRequest();
 	xhttp.onreadystatechange = function() {
 		if (this.readyState == 4) {
-			if (this.status == 200) {
+			if (this.status == 200) 
 				addRoles(values, xhttp.responseText);
-			}
 			else console.log("error ("+this.status+") retrieving "+csURL);	
 		}
 	};
@@ -384,9 +381,8 @@ function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
 function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, childElements, requestType, errs) {
 	// check that each of the specifid childElements exists
 	childElements.forEach(elem => {
-		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) {
+		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
 			errs.push("Element <"+elem+"> not specified in <"+parentElement.name()+">");
-		} 
 	});
 	
 	// check that no additional child elements existance
@@ -429,61 +425,83 @@ function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
  * @param {Class}  errs                errors found in validaton
  * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
  */
-//TODO: allow length-per-language
 function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage) {
 	
 	function synopsisLengthError(label, length) {
 		return "length of <Synopsis length=\""+label+"\"> exceeds "+length+" characters"; }
 	function multipleSynopsisLengths(label) {
 		return "only a single instance of <Synopsis length=\""+label+"\"> is permitted"; }	
-		
+	function singleLengthLangError(length, lang) {
+		return "only a single Synopsis is permitted per length ("+length+") and language ("+lang+")"; }
+	function requiredSynopsisError(length) {
+		return "a synposis with @length=\""+length+"\" is required"; }
+	
 	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
+	var shortLangs=[], mediumLangs=[], longLangs=[];
 	while (Synopsis=BasicDescription.child(s++)) {
 		if (Synopsis.name()=="Synopsis") {
-			if (Synopsis.attr('length')) {
-				var len = Synopsis.attr('length').value();
-				if (isIn(requiredLengths, len) || isIn(optionalLengths, len)) {
-					switch (len) {
+			var synopsisLang=Synopsis.attr('lang')?Synopsis.attr('lang').value():parentLanguage;
+			var synopsisLength=Synopsis.attr('length')?Synopsis.attr('length').value():null;
+			if (synopsisLength) {
+				if (isIn(requiredLengths, synopsisLength) || isIn(optionalLengths, synopsisLength)) {
+					switch (synopsisLength) {
 					case dvbi.SYNOPSIS_SHORT_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
 							errs.push(synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
-						if (hasShort)
-							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_SHORT_LABEL));
+//						if (hasShort)
+//							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_SHORT_LABEL));
 						hasShort=true;
 						break;
 					case dvbi.SYNOPSIS_MEDIUM_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
 							errs.push(synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
-						if (hasMedium)
-							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_MEDIUM_LABEL));
+//						if (hasMedium)
+//							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_MEDIUM_LABEL));
 						hasMedium=true;
 						break;
 					case dvbi.SYNOPSIS_LONG_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
 							errs.push(synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
-						if (hasLong)
-							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_LONG_LABEL));
+//						if (hasLong)
+//							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_LONG_LABEL));
 						hasLong=true;
 						break;						
 					}
 				}
 				else
-					errs.push("@length=\""+len+"\" is not permitted for this request type");
+					errs.push("@length=\""+synopsisLength+"\" is not permitted for this request type");
 			}
 			else 
 				errs.push("@length attribute is required for <Synopsis>");
+			
+			if (synopsisLang && synopsisLength) {
+				switch (synopsisLength) {
+					case dvbi.SYNOPSIS_SHORT_LABEL:
+						if (isIn(shortLangs, synopsisLang)) 
+							errs.push(singleLengthLangError(synopsisLength, synopsisLang));
+						else shortLangs.push(synopsisLang);
+						break;
+					case dvbi.SYNOPSIS_MEDIUM_LABEL:
+						if (isIn(mediumLangs, synopsisLang)) 
+							errs.push(singleLengthLangError(synopsisLength, synopsisLang));
+						else mediumLangs.push(synopsisLang);
+						break;
+					case dvbi.SYNOPSIS_LONG_LABEL:
+						if (isIn(longLangs, synopsisLang)) 
+							errs.push(singleLengthLangError(synopsisLength, synopsisLang));
+						else longLangs.push(synopsisLang);
+						break;
+				}
+			}
 		}
 	}
 	// note that current DVB-I specifiction only mandates "medium" length, but all three are checked here
-	if (isIn(requiredLengths, dvbi.SYNOPSIS_SHORT_LABEL) && !hasShort) {
-		errs.push("a synposis with @length=\""+dvbi.SYNOPSIS_SHORT_LABEL+"\" is required");
-	}
-	if (isIn(requiredLengths, dvbi.SYNOPSIS_MEDIUM_LABEL) && !hasMedium) {
-		errs.push("a synposis with @length=\""+dvbi.SYNOPSIS_MEDIUM_LABEL+"\" is required");
-	}
-	if (isIn(requiredLengths, dvbi.SYNOPSIS_LONG_LABEL) && !hasLong) {
-		errs.push("a synposis with @length=\""+dvbi.SYNOPSIS_LONG_LABEL+"\" is required");
-	}
+	if (isIn(requiredLengths, dvbi.SYNOPSIS_SHORT_LABEL) && !hasShort)
+		errs.push(requiredSynopsisError(dvbi.SYNOPSIS_SHORT_LABEL));	
+	if (isIn(requiredLengths, dvbi.SYNOPSIS_MEDIUM_LABEL) && !hasMedium)
+		errs.push(requiredSynopsisError(dvbi.SYNOPSIS_MEDIUM_LABEL));	
+	if (isIn(requiredLengths, dvbi.SYNOPSIS_LONG_LABEL) && !hasLong)
+		errs.push(requiredSynopsisError(dvbi.SYNOPSIS_LONG_LABEL));	
 }
 
 
@@ -515,9 +533,8 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 		}
 	}
 	for (var i in counts) {
-        if (counts[i] != 0 && counts[i] > maxKeywords) {
+        if (counts[i] != 0 && counts[i] > maxKeywords) 
             errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language \""+i+"\""));
-		}
 	}
 }
 
@@ -773,17 +790,7 @@ function NoAuxiliaryURI(errs, src, loc) {
  * @param {Object} errs              The class where errors and warnings relating to the serivce list processing are stored 
  * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
  * @param {string} LocationType      The type of element containing the <RelatedMaterial> element. Different validation rules apply to different location types
- 
- 	<RelatedMaterial>
-		<HowRelated href="urn:fvc:metadata:cs:HowRelatedCS:2018:templateAIT"/>
-		<MediaLocator>
-			<MediaUri/>
-			<AuxiliaryURI contentType="application/vnd.dvb.ait+xml">
-				https://www.live.mybroadcastertvapps.co.uk/tap/iplayer/ait/launch/iplayer.aitx
-			</AuxiliaryURI>
-		</MediaLocator>
-	</RelatedMaterial>
- */
+  */
 function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
@@ -801,40 +808,33 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 	var HRhref=HowRelated.attr("href");
 	
 	if (HRhref) {
-		if (HRhref.value() != dvbi.TEMPLATE_AIT_URI) {
+		if (HRhref.value() != dvbi.TEMPLATE_AIT_URI) 
 			errs.push("HowRelated@href=\""+HRhref+"\" does not designate a Template AIT");
-		}
 		else {		
-			if (MediaLocator.length != 0) {
+			if (MediaLocator.length != 0) 
 				MediaLocator.forEach(ml => {
 					var subElems=ml.childNodes(), hasAuxiliaryURI=false;
 					if (subElems) subElems.forEach(child => {
 						if (child.name()=="AuxiliaryURI") {
 							hasAuxiliaryURI=true;
-							if (!child.attr("contentType")) {
+							if (!child.attr("contentType")) 
 								errs.push("@contentType not specified for Template IT <AuxiliaryURI> in "+Location);
-							}
 							else {
 								var contentType=child.attr("contentType").value();
-								if (contentType != dvbi.XML_AIT_CONTENT_TYPE) {
+								if (contentType != dvbi.XML_AIT_CONTENT_TYPE) 
 									errs.push("invalid @contentType \""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
-								}
 							}
 						}
 					});	
-					if (!hasAuxiliaryURI) {
+					if (!hasAuxiliaryURI) 
 						NoAuxiliaryURI(errs, "template AIT", Location);
-					}
 				});
-			}
-			else {
+			else 
 				errs.push("MediaLocator not specified for <RelatedMaterial> in "+Location);
-			}			
 		}
 	}
-	else {
+	else 
 		NoHrefAttribute(errs, "<RelatedMaterial><HowRelated>", Location);
-	}
 }
 
 
@@ -864,72 +864,59 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     }
 	var HRhref=HowRelated.attr("href");
 	if (HRhref) {
-		if (HRhref.value() != dvbi.PROMOTIONAL_STILL_IMAGE_URI) {
+		if (HRhref.value() != dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
 			errs.push("HowRelated@href=\""+HRhref.value()+"\" does not designate a Promotional Still Image");
-		}
 		else {
 			if (Format) {
 				var subElems=Format.childNodes(), hasStillPictureFormat=false;
 				if (subElems) subElems.forEach(child => {
 					if (child.name() == "StillPictureFormat") {
 						hasStillPictureFormat=true;
-						if (!child.attr("horizontalSize")) {
+						if (!child.attr("horizontalSize")) 
 							errs.push("@horizontalSize not specified for <RelatedMaterial><Format><StillPictureFormat> in "+Location );
-						}
-						if (!child.attr("verticalSize")) {
+						if (!child.attr("verticalSize")) 
 							errs.push("@verticalSize not specified for <RelatedMaterial><Format><StillPictureFormat> in "+Location );
-						}
 						if (child.attr("href")) {
 							var href=child.attr("href").value();
-							if (href != JPEG_IMAGE_CS_VALUE && href != PNG_IMAGE_CS_VALUE) {
+							if (href != JPEG_IMAGE_CS_VALUE && href != PNG_IMAGE_CS_VALUE) 
 								InvalidHrefValue(errs, href, "<RelatedMaterial><Format><StillPictureFormat>", Location)
-							}
 							if (href == JPEG_IMAGE_CS_VALUE) isJPEG=true;
 							if (href == PNG_IMAGE_CS_VALUE) isPNG=true;
 						}
-						else {
+						else 
 							NoHrefAttribute(errs, "<RelatedMaterial><Format>", Location);
-						}
 					}
 				});
-				if (!hasStillPictureFormat) {
+				if (!hasStillPictureFormat) 
 					errs.push("<StillPictureFormat> not specified for <Format> in "+Location);
-				}
 			}
 
-			if (MediaLocator.length != 0) {
+			if (MediaLocator.length != 0) 
 				MediaLocator.forEach(ml => {
 					var subElems=ml.childNodes(), hasMediaURI=false;
 					if (subElems) subElems.forEach(child => {
 						if (child.name()=="MediaUri") {
 							hasMediaURI=true;
-							if (!child.attr("contentType")) {
+							if (!child.attr("contentType")) 
 								errs.push("@contentType not specified for logo <MediaUri> in "+Location);
-							}
 							else {
 								var contentType=child.attr("contentType").value();
-								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) {
+								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
 									errs.push("invalid @contentType \""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
-								}
-								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) {
+								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) 
 									errs.push("conflicting media types in <Format> and <MediaUri> for "+Location);
-								}
 							}
 						}
 					});
-					if (!hasMediaURI) {
+					if (!hasMediaURI) 
 						NoMediaLocator(errs, "logo", Location);
-					}
 				});
-			}
-			else {
+			else 
 				errs.push("MediaLocator not specified for <RelatedMaterial> in "+Location);
-			}			
 		}
 	}
-	else {
+	else 
 		NoHrefAttribute(errs, "<RelatedMaterial><HowRelated>", Location);
-	}
 }
 
 /**
@@ -948,13 +935,11 @@ function ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescri
 	while (RelatedMaterial=BasicDescription.child(rm++)) {
 		if (RelatedMaterial.name()=="RelatedMaterial") {
 			var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":HowRelated", CG_SCHEMA);
-			if (!HowRelated) {
+			if (!HowRelated) 
 				errs.push("<HowRelated> element not specified for <RelatedMaterial>");
-			}
 			else {				
-				if (!HowRelated.attr('href')) {
+				if (!HowRelated.attr('href')) 
 					errs.push("@href not specified for <HowRelated> element in <RelatedMaterial>");
-				}
 				else {
 					var hrHref=HowRelated.attr('href').value();
 					switch (hrHref) {
@@ -1061,9 +1046,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	var isParentGroup = parentElement == categoryGroup;
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
 
-	if (!BasicDescription) {
+	if (!BasicDescription) 
 		errs.push("<BasicDescription> not specified for "+parentElement.name())
-	}
 	else {
 		var bdLang=BasicDescription.attr('lang') ? BasicDescription.attr('lang').value() : parentLanguage;
 		
@@ -1082,9 +1066,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;
 			default:
 				// make sure <Title> elements are not in the Basic Description
-				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Title")) {
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Title")) 
 					errs.push("<Title> not permitted in <BasicDescription> for this request type");
-				}
 		}
 
 		// <Synopsis> - validity depends on use
@@ -1111,9 +1094,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;
 			default:
 				// make sure <Synopsis> elements are not in the Basic Description
-				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Synopsis")) {
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Synopsis")) 
 					errs.push("<Synopsis> not permitted in <BasicDescription> for this request type");
-				}
 		}
 
 		// <Keyword> - 
@@ -1129,9 +1111,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;			
 			default:
 				// make sure <Keyword> elements are not in the Basic Description
-				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Keyword")) {
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Keyword")) 
 					errs.push("<Keyword> not permitted in <BasicDescription> for this request type");
-				}
 		}
 
 		// <Genre> - 
@@ -1143,9 +1124,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;
 			default:
 				// make sure <Genre> elements are not in the Basic Description
-				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Genre")) {
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "Genre")) 
 					errs.push("<Genre> not permitted in <BasicDescription> for this request type");
-				}
 		}
 
 		// <ParentalGuidance> - 
@@ -1158,9 +1138,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;
 			default:
 				// make sure <ParentalGuidance> elements are not in the Basic Description
-				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "ParentalGuidance")) {
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "ParentalGuidance")) 
 					errs.push("<ParentalGuidance> not permitted in <BasicDescription> for this request type");
-				}
 		}
 		
 		// <CreditsList> - 
@@ -1171,9 +1150,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;
 			default:
 				// make sure <CreditsList> elements are not in the Basic Description
-				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "CreditsList")) {
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "CreditsList")) 
 					errs.push("<CreditsList> not permitted in <BasicDescription> for this request type");
-				}
 		}		
 		// <RelatedMaterial> - 
 		switch (requestType) {
@@ -1198,9 +1176,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;
 			default:
 				// make sure <RelatedMaterial> elements are not in the Basic Description
-				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMaterial")) {
+				if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMaterial")) 
 					errs.push("<RelatedMaterial> not permitted in <BasicDescription> for this request type");
-				}
 		}
 	}	
 }
@@ -1217,9 +1194,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
  * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
  */
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, parentLanguage) {
-	if (!ProgramInformation.attr('programId')) {
+	if (!ProgramInformation.attr('programId')) 
 		errs.push("@programId not specified for <ProgramInformation>");
-	}
 	var piLang=ProgramInformation.attr('lang') ? ProgramInformation.attr('lang').value() : parentLanguage;
 
 	// <ProgramInformation><BasicDescription>
@@ -1263,11 +1239,9 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		pi++;
 	}
 */
-	while (ProgramInformation=ProgramInformationTable.child(pi++)) {
-		if (ProgramInformation.name()=="ProgramInformation") {
+	while (ProgramInformation=ProgramInformationTable.child(pi++)) 
+		if (ProgramInformation.name()=="ProgramInformation") 
 			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
-		}
-	}
 }
 
 
@@ -1350,7 +1324,6 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 			if (elem.attr("index")) {
 				var index = valUnsignedInt(elem.attr("index").value());
 				if (index >= 1) {
-					//TODO: check if the @index is already used in this response
 					if (indexes) {
 						if (isIn(indexes, index)) {
 							errs.push("duplicated GroupInformation.MemberOf@index values ("+index+")");
