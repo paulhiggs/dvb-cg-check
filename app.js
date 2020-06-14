@@ -429,8 +429,6 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 	
 	function synopsisLengthError(label, length) {
 		return "length of <Synopsis length=\""+label+"\"> exceeds "+length+" characters"; }
-	function multipleSynopsisLengths(label) {
-		return "only a single instance of <Synopsis length=\""+label+"\"> is permitted"; }	
 	function singleLengthLangError(length, lang) {
 		return "only a single Synopsis is permitted per length ("+length+") and language ("+lang+")"; }
 	function requiredSynopsisError(length) {
@@ -448,22 +446,16 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 					case dvbi.SYNOPSIS_SHORT_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
 							errs.push(synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
-//						if (hasShort)
-//							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_SHORT_LABEL));
 						hasShort=true;
 						break;
 					case dvbi.SYNOPSIS_MEDIUM_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
 							errs.push(synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
-//						if (hasMedium)
-//							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_MEDIUM_LABEL));
 						hasMedium=true;
 						break;
 					case dvbi.SYNOPSIS_LONG_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
 							errs.push(synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
-//						if (hasLong)
-//							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_LONG_LABEL));
 						hasLong=true;
 						break;						
 					}
