@@ -49,17 +49,17 @@ const CG_REQUEST_BS_CATEGORIES="bsCategories";
 const CG_REQUEST_BS_LISTS="bsLists";
 const CG_REQUEST_BS_CONTENTS="bsContents";
 
-const dirCS = "cs",
-      TVA_ContentCSFilename=path.join(dirCS,"ContentCS.xml"),
-      TVA_FormatCSFilename=path.join(dirCS,"FormatCS.xml"),
-      DVBI_ContentSubjectFilename=path.join(dirCS,"DVBContentSubjectCS-2019.xml"),
+const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
+      TVA_FormatCSFilename=path.join("dvb-common/tva","FormatCS.xml"),
+      DVBI_ContentSubjectFilename=path.join("dvb-common/dvbi","DVBContentSubjectCS-2019.xml"),
 	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
 	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt");
 
 const REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
-      TVA_ContentCSURL=REPO_RAW + "cs/" + "ContentCS.xml",
-      TVA_FormatCSURL=REPO_RAW + "cs/" + "FormatCS.xml",
-      DVBI_ContentSubjectURL=REPO_RAW + "cs/" + "DVBContentSubjectCS-2019.xml",
+      COMMON_REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
+      TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
+      TVA_FormatCSURL=COMMON_REPO_RAW + "tva/" + "FormatCS.xml",
+      DVBI_ContentSubjectURL=COMMON_REPO_RAW + "dvbi/" + "DVBContentSubjectCS-2019.xml",
 	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt",
 	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt";
 
@@ -214,28 +214,19 @@ function isEmpty(obj) {
 
 
 
-const FORM_TOP="<html><head><title>DVB-I Content Guide Validator</title></head><body>";
+/**
+ * converts a decimal representation of a string to a number
+ *
+ * @param {string} str        string contining the decimal value
+ * @returns {integer}  the decimal representation of the string, or 0 is non-digits are included
+ * 
+ */
+function valUnsignedInt(str) {
+	var intRegex=/[\d]+/g;
+	var s=str.match(intRegex);
+	return s[0]===str ? parseInt(str, 10) : 0;
+}
 
-const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
-const ENTRY_FORM_URL="<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
-
-const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"%s\"><input type=\"submit\" value=\"submit\">";
-
-const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
-
-const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
-const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE_TIME,"label":"Schedule Info (time stamp)"},
-	                              {"value":CG_REQUEST_SCHEDULE_NOWNEXT,"label":"Schedule Info (now/next)"},
-	                              {"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
-	                              {"value":CG_REQUEST_EPISODES,"label":"More Episodes"},
-	                              {"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
-	                              {"value":CG_REQUEST_BS_LISTS,"label":"Box Set Lists"},
-	                              {"value":CG_REQUEST_BS_CONTENTS,"label":"Box Set Contents"}];
-const FORM_END="</form>";
-								  
-const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
-const SUMMARY_FORM_HEADER = "<table><tr><th>item</th><th>count</th></tr>";
-const FORM_BOTTOM="</body></html>";
 
 /**
  * constructs HTML output of the errors found in the content guide analysis
@@ -246,6 +237,29 @@ const FORM_BOTTOM="</body></html>";
  * @param {Object} o the errors and warnings found during the content guide validation
  */
 function drawForm(URLmode, res, lastInput, lastType, o) {
+	
+	const FORM_TOP="<html><head><title>DVB-I Content Guide Validator</title></head><body>";
+	const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
+	const ENTRY_FORM_URL="<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"%s\"><input type=\"submit\" value=\"submit\"></form>";
+
+	const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"%s\"><input type=\"submit\" value=\"submit\">";
+
+	const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
+
+	const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
+	const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE_TIME,"label":"Schedule Info (time stamp)"},
+									  {"value":CG_REQUEST_SCHEDULE_NOWNEXT,"label":"Schedule Info (now/next)"},
+									  {"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
+									  {"value":CG_REQUEST_EPISODES,"label":"More Episodes"},
+									  {"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
+									  {"value":CG_REQUEST_BS_LISTS,"label":"Box Set Lists"},
+									  {"value":CG_REQUEST_BS_CONTENTS,"label":"Box Set Contents"}];
+	const FORM_END="</form>";
+									  
+	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
+	const SUMMARY_FORM_HEADER = "<table><tr><th>item</th><th>count</th></tr>";
+	const FORM_BOTTOM="</body></html>";	
+	
     res.write(FORM_TOP);    
     res.write(PAGE_HEADING);
    
@@ -415,9 +429,15 @@ function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
  * @param {Class}  errs                errors found in validaton
  * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
  */
+//TODO: allow length-per-language
 function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage) {
-	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
 	
+	function synopsisLengthError(label, length) {
+		return "length of <Synopsis length=\""+label+"\"> exceeds "+length+" characters"; }
+	function multipleSynopsisLengths(label) {
+		return "only a single instance of <Synopsis length=\""+label+"\"> is permitted"; }	
+		
+	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
 	while (Synopsis=BasicDescription.child(s++)) {
 		if (Synopsis.name()=="Synopsis") {
 			if (Synopsis.attr('length')) {
@@ -426,23 +446,23 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 					switch (len) {
 					case dvbi.SYNOPSIS_SHORT_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
-							errs.push("length of <Synopsis length=\""+dvbi.SYNOPSIS_SHORT_LABEL+"\"> exceeds "+dvbi.SYNOPSIS_SHORT_LENGTH+" characters");
+							errs.push(synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
 						if (hasShort)
-							errs.push("only a single instance of <Synopsis length=\""+dvbi.SYNOPSIS_SHORT_LABEL+"\"> is permitted");
+							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_SHORT_LABEL));
 						hasShort=true;
 						break;
 					case dvbi.SYNOPSIS_MEDIUM_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
-							errs.push("length of <Synopsis length=\""+dvbi.SYNOPSIS_MEDIUM_LABEL+"\"> exceeds "+dvbi.SYNOPSIS_MEDIUM_LENGTH+" characters");
+							errs.push(synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
 						if (hasMedium)
-							errs.push("only a single instance of <Synopsis length=\""+dvbi.SYNOPSIS_MEDIUM_LABEL+"\"> is permitted");
+							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_MEDIUM_LABEL));
 						hasMedium=true;
 						break;
 					case dvbi.SYNOPSIS_LONG_LABEL:
 						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
-							errs.push("length of <Synopsis length=\""+dvbi.SYNOPSIS_LONG_LABEL+"\"> exceeds "+dvbi.SYNOPSIS_LONG_LENGTH+" characters");
+							errs.push(synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
 						if (hasLong)
-							errs.push("only a single instance of <Synopsis length=\""+dvbi.SYNOPSIS_LONG_LABEL+"\"> is permitted");
+							errs.push(multipleSynopsisLengths(dvbi.SYNOPSIS_LONG_LABEL));
 						hasLong=true;
 						break;						
 					}
@@ -796,7 +816,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 							}
 							else {
 								var contentType=child.attr("contentType").value();
-								if (contentType != dvbi.TEMPLATE_AIT_CONTENT_TYPE) {
+								if (contentType != dvbi.XML_AIT_CONTENT_TYPE) {
 									errs.push("invalid @contentType \""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
 								}
 							}
@@ -1262,8 +1282,9 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  * @param {string} parentLanguage	   the xml:lang of the parent element to GroupInformation
  * @param {object} categoryGroup       the GroupInformationElement that others must refer to through <MemberOf>
  */
-function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup) {
+function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes) {
 	var isCategoryGroup=GroupInformation==categoryGroup;
+	var categoryCRID=(categoryGroup && categoryGroup.attr("groupId")) ? categoryGroup.attr("groupId").value() : "";
 	var piLang=GroupInformation.attr('lang') ? GroupInformation.attr('lang').value() : parentLanguage;
 
 	// <GroupInformation><BasicDescription>
@@ -1278,22 +1299,19 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 		if (!isCRIDURI(groupId))
 			errs.push("GroupInformation@groupId value \""+groupId+"\" is not a CRID")
 		}
+		
 	}
 	else errs.push("GroupInformation@groupId attribute is mandatory");
 
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CONTENTS) {
-		if (!isCategoryGroup && GroupInformation.attr("ordered")) {
+		if (!isCategoryGroup && GroupInformation.attr("ordered")) 
 			errs.push("GroupInformation@ordered is only permitted in the \"category group\"");
-		}
-		if (isCategoryGroup && !GroupInformation.attr("ordered")) {
+		if (isCategoryGroup && !GroupInformation.attr("ordered")) 
 			errs.push("GroupInformation@ordered is required for this request type")
-		}
-		if (!isCategoryGroup && GroupInformation.attr("numOfItems")) {
-			errs.push("GroupInformation@numofItems is only permitted in the \"category group\"");
-		}
-		if (isCategoryGroup && !GroupInformation.attr("numOfItems")) {
+		if (!isCategoryGroup && GroupInformation.attr("numOfItems")) 
+			errs.push("GroupInformation@numOfItems is only permitted in the \"category group\"");
+		if (isCategoryGroup && !GroupInformation.attr("numOfItems")) 
 			errs.push("GroupInformation@numOfItems is required for this request type")
-		}
 	}
 	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT) {
 		if (GroupInformation.attr("ordered")) {
@@ -1306,21 +1324,56 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 	}
 	
 	// @serviceIDRef is required for Box Set Lists and Box Set Contents
-	if (GroupInformation.attr('serviceIDRef') && requestType!=CG_REQUEST_BS_LISTS && requestType!=CG_REQUEST_BS_CONTENTS) {
+	if (GroupInformation.attr('serviceIDRef') && requestType!=CG_REQUEST_BS_LISTS && requestType!=CG_REQUEST_BS_CONTENTS) 
 		errs.push("GroupInformation@serviceIDRef is not permitted for this request type")
-	}
 	
 	var elem=GroupInformation.get(SCHEMA_PREFIX+":GroupType", CG_SCHEMA);
 	if (elem) {
-		if (!(elem.attr('type') && elem.attr('type').value()=="ProgramGroupTypeType")) {
-			errs.push("GroupType@xsi:type=\"ProgramGroupTypeType\" is required")
-		}
-		if (!(elem.attr('value') && elem.attr('value').value()=="otherCollection")) {
-			errs.push("GroupType@value=\"otherCollection\" is required")
-		}
+		if (!(elem.attr('type') && elem.attr('type').value()=="ProgramGroupTypeType")) 
+			errs.push("GroupType@xsi:type=\"ProgramGroupTypeType\" is required");
+		if (!(elem.attr('value') && elem.attr('value').value()=="otherCollection")) 
+			errs.push("GroupType@value=\"otherCollection\" is required");
 	}
 	else
 		errs.push("<GroupType> is required in <GroupInformation>"); // this should be checked in valdidation against the schema
+	
+	if (!isCategoryGroup) {
+		elem=GroupInformation.get(SCHEMA_PREFIX+":MemberOf", CG_SCHEMA);
+		if (elem) {
+			if (elem.attr("type")) {
+				if (elem.attr("type").value() != "MemberOfType")
+					errs.push("GroupInformation.MemberOf@type is invalid (\""+elem.attr("type").value()+"\")");
+			}
+			else
+				errs.push("GroupInformation.MemberOf requires @xsi:type=\"MemberOfType\" attribute");
+			
+			if (elem.attr("index")) {
+				var index = valUnsignedInt(elem.attr("index").value());
+				if (index >= 1) {
+					//TODO: check if the @index is already used in this response
+					if (indexes) {
+						if (isIn(indexes, index)) {
+							errs.push("duplicated GroupInformation.MemberOf@index values ("+index+")");
+						}
+						else indexes.push(index);
+					}
+				}
+				else 
+					errs.push("GroupInformation.MemberOfType@index must be an integer >= 1 (parsed "+index+")")
+			}
+			else
+				errs.push("GroupInformation.MemberOfType requires @index attribute");
+			
+			if (elem.attr("crid")) {
+				if (elem.attr("crid").value() != categoryCRID)
+					errs.push("GroupInformation.Memberof@crid ("+elem.attr("crid").value()+") does not match the \"caregory group\" crid ("+categoryCRID+")");
+			}
+			else
+				errs.push("GroupInformation.MemberOfType requires @crid attribute");
+ 		}
+		else
+			errs.push("<GroupInformation> requires a <MemberOf> element referring to the \"category group\" ("+categoryCRID+")");
+	}
 	
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang, categoryGroup);
 }
@@ -1367,13 +1420,20 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 			errs.push("a \"category group\" must be specified in <"+GroupInformationTable.name()+"> for this request type")
 	}
 	
+	var indexes=[], giCount=0;
 	gi=0;
 	while (GroupInformation=GroupInformationTable.child(gi++)) {
 		if (GroupInformation.name()=="GroupInformation") {
-			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, groupInfTabLang, categoryGroup);
+			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, groupInfTabLang, categoryGroup, indexes);
+			if (GroupInformation != categoryGroup) 
+				giCount++;
 		}
 	}
-
+	if (categoryGroup) {
+		var numOfItems = (categoryGroup.attr("numOfItems") ? valUnsignedInt(categoryGroup.attr("numOfItems").value()) : 0);
+		if (numOfItems != giCount)
+			errs.push("GroupInformation@numOfItems specified in \"category group\" ("+numOfItems+") does match the number of items ("+giCount+")");		
+	}
 }
 
 /**
