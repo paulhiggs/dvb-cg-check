@@ -3,11 +3,21 @@
 const express = require("express");
 var app = express();
 
+
+const fs=require("fs"), path=require("path");
+
 const ErrorList = require("./dvb-common/ErrorList.js");
 const dvbi = require("./dvb-common/DVB-I_definitions.js");
 const {isJPEGmime, isPNGmime} = require("./dvb-common/MIME_checks.js");
 const {isCRIDURI} = require("./dvb-common/URI_checks.js");
 const {loadCS} = require("./dvb-common/CS_handler.js");
+
+const ISOcountries = require("./dvb-common/ISOcountries.js");
+
+// curl from https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
+const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-registry");
+const IANAlanguages = require("./dvb-common/IANAlanguages.js");
+
 
 // libxmljs - https://github.com/libxmljs/libxmljs
 const libxml = require("libxmljs");
@@ -18,12 +28,12 @@ const libxml = require("libxmljs");
 // morgan - https://github.com/expressjs/morgan
 const morgan = require("morgan")
 
-const fs=require("fs"), path=require("path");
 
 //const request = require("request");
 
 // sync-request - https://github.com/ForbesLindesay/sync-request
 const syncRequest = require("sync-request");
+
 //var XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
 const https=require("https");
@@ -63,6 +73,10 @@ const REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/maste
       DVBI_ContentSubjectURL=COMMON_REPO_RAW + "dvbi/" + "DVBContentSubjectCS-2019.xml",
 	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt",
 	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt";
+
+const ISO3166_URL=COMMON_REPO_RAW + "iso3166-countries.json",
+	  ISO3166_Filename=path.join("dvb-common","iso3166-countries.json");
+      
 
 var allowedGenres=[], allowedCreditItemRoles=[];
 
@@ -124,6 +138,27 @@ function HTMLize(str) {
 	return str.replace(/</g,"&lt;").replace(/>/g,"&gt;");              
 }
 
+
+/**
+ * validate the language specified record any errors
+ *
+ * @param {object} validator  the validation class to use
+ * @param {Class}  errs       errors found in validaton
+ * @param {Object} node       the XML node whose @lang attribute should be checked
+ * @param {string} parentLang the language of the XML element which is the parent of node
+ * @returns {string} the @lang attribute of the node element of the parentLang if it does not exist of is not specified
+ */
+function GetLanguage(validator, errs, node, parentLang) {
+	if (!node && !node.attr('lang'))
+		return parentLang;
+
+	var localLang = node.attr('lang').value();
+	if (!validator)
+		errs.push("cannot validate language \""+localLang+"\" for \""+node.name()+"\"");
+	else if (!validator.isKnown(localLang)) 
+		errs.push("language \""+localLang+"\" specified for \""+node.name()+"\" is invalid");
+	return localLang;
+}
 
  
 //---------------- CreditsItem@role LOADING ----------------
@@ -440,8 +475,9 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 	var shortLangs=[], mediumLangs=[], longLangs=[];
 	while (Synopsis=BasicDescription.child(s++)) {
 		if (Synopsis.name()=="Synopsis") {
-			var synopsisLang=Synopsis.attr('lang')?Synopsis.attr('lang').value():parentLanguage;
+			var synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage);
 			var synopsisLength=Synopsis.attr('length')?Synopsis.attr('length').value():null;
+			
 			if (synopsisLength) {
 				if (isIn(requiredLengths, synopsisLength) || isIn(optionalLengths, synopsisLength)) {
 					switch (synopsisLength) {
@@ -515,11 +551,11 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 	while (Keyword=BasicDescription.child(k++)) {
 		if (Keyword.name()=="Keyword") {
 			var keywordType = Keyword.attr('type') ? Keyword.attr('type').value() : "main";
-			var KeywordLang = Keyword.attr('lang') ? Keyword.attr('lang').value() : parentLanguage;
-			
-			if (counts[KeywordLang] === undefined)
-				counts[KeywordLang] = 1
-			else counts[KeywordLang]++;
+			var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage);
+
+			if (counts[keywordLang] === undefined)
+				counts[keywordLang] = 1
+			else counts[keywordLang]++;
 			if (keywordType != "main" && keywordType != "other")
 				errs.push("@type=\""+keywordType+"\" not permitted for <Keyword>");
 			if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
@@ -991,28 +1027,29 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 	var t=0, Title;
 	while (Title=BasicDescription.child(t++)) {
 		if (Title.name()=="Title") {
-			var TitleType=Title.attr('type') ? Title.attr('type').value() : "main"; // MPEG7 default type is "main"
-			var TitleLang=Title.attr('lang') ? Title.attr('lang').value() : parentLanguage; // use parent elements language if not specified
+			var titleType=Title.attr('type') ? Title.attr('type').value() : "main"; // MPEG7 default type is "main"
+			var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage);
+
 			var titleStr=unEntity(Title.text());
 			
 			if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
 				errs.push("<Title> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
-			if (TitleType=="main") {
-				if (isIn(mainSet, TitleLang))
+			if (titleType=="main") {
+				if (isIn(mainSet, titleLang))
 					errs.push("only a single language is permitted for @type=\"main\"")
-				else mainSet.push(TitleLang);
+				else mainSet.push(titleLang);
 			}
-			else if (TitleType="secondary") {
+			else if (titleType="secondary") {
 				if (allowSecondary) {
-					if (isIn(secondarySet, TitleLang))
+					if (isIn(secondarySet, titleLang))
 						errs.push("only a single language is permitted for @type=\"secondary\"")
-					else secondarySet.push(TitleLang);
+					else secondarySet.push(titleLang);
 				}
 				else 
 					errs.push("Title@type=\"secondary\" is not permitted for this <"+BasicDescription.name()+">");
 			}
 			else
-				errs.push("type=\""+TitleType+"\" is not permitted for <Title>");
+				errs.push("type=\""+titleType+"\" is not permitted for <Title>");
 			
 			secondarySet.forEach(lang => {
 				if (!isIn(mainSet, lang)) {
@@ -1048,8 +1085,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	if (!BasicDescription) 
 		errs.push("<BasicDescription> not specified for "+parentElement.name())
 	else {
-		var bdLang=BasicDescription.attr('lang') ? BasicDescription.attr('lang').value() : parentLanguage;
-		
+		var bdLang=GetLanguage(knownLanguages, errs, BasicDescription, parentLanguage);
+
 		// <Title> - 
 		switch (requestType) {
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
@@ -1205,7 +1242,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, parentLanguage) {
 	if (!ProgramInformation.attr('programId')) 
 		errs.push("@programId not specified for <ProgramInformation>");
-	var piLang=ProgramInformation.attr('lang') ? ProgramInformation.attr('lang').value() : parentLanguage;
+	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage);
 
 	// <ProgramInformation><BasicDescription>
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
@@ -1240,17 +1277,19 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		errs.push("<ProgramInformationTable> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
-	var progInfTabLang=ProgramInformationTable.attr("lang") ? ProgramInformationTable.attr("lang").value() : progDescrLang;
+	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, progDescrLang);
+
+
 /*	UURGH: this loop style is not working		
 	while (ProgramInformation = ProgramInformationTable.get(SCHEMA_PREFIX+":ProgramInformation["+pi+"]", CG_SCHEMA)) {
 		console.log("--ProgramInformation", pi);
-		ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
+		ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, pitLang);
 		pi++;
 	}
 */
 	while (ProgramInformation=ProgramInformationTable.child(pi++)) 
 		if (ProgramInformation.name()=="ProgramInformation") 
-			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, progInfTabLang);
+			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, pitLang);
 }
 
 
@@ -1269,7 +1308,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes) {
 	var isCategoryGroup=GroupInformation==categoryGroup;
 	var categoryCRID=(categoryGroup && categoryGroup.attr("groupId")) ? categoryGroup.attr("groupId").value() : "";
-	var piLang=GroupInformation.attr('lang') ? GroupInformation.attr('lang').value() : parentLanguage;
+	var giLang=GetLanguage(knownLanguages, errs, GroupInformation, parentLanguage);
 
 	if (GroupInformation.attr('groupId')) {
 		var groupId = GroupInformation.attr('groupId').value();
@@ -1357,7 +1396,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 	}
 	
 	// <GroupInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang, categoryGroup);
+	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, giLang, categoryGroup);
 }
 
 /**
@@ -1378,7 +1417,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 		errs.push("<GroupInformationTable> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
-	var groupInfTabLang=GroupInformationTable.attr("lang") ? GroupInformationTable.attr("lang").value() : progDescrLang;
+	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, progDescrLang);
 
 	// find which GroupInformation element is the "category group"
 	var categoryGroup=null;
@@ -1406,7 +1445,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 	gi=0;
 	while (GroupInformation=GroupInformationTable.child(gi++)) {
 		if (GroupInformation.name()=="GroupInformation") {
-			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, groupInfTabLang, categoryGroup, indexes);
+			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, categoryGroup, indexes);
 			if (GroupInformation != categoryGroup) 
 				giCount++;
 		}
@@ -1497,7 +1536,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 		errs.push("<GroupInformationTable> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
-	var gitLanguage=GroupInformationTable.attr("lang")?GroupInformationTable.attr("lang").value():progDescrLang;
+	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, progDescrLang);
 	
 	var gi=0, GroupInformation, cridsFound=[];
 	while (GroupInformation=GroupInformationTable.child(gi++)) {
@@ -1505,17 +1544,14 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 			
 			switch (requestType) {
 				case CG_REQUEST_SCHEDULE_NOWNEXT:
-					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLanguage, null, 1, 1, cridsFound);
+					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, null, 1, 1, cridsFound);
 					break;
 				case CG_REQUEST_SCHEDULE_WINDOW:
-					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLanguage, 10, 1, 10, cridsFound);
+					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, cridsFound);
 					break;
 			}
 		}
 	}
-
-	
-
 }
 
 
@@ -1531,6 +1567,9 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
  */
 function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
 }
+
+
+
 
 
 /**
@@ -1575,14 +1614,14 @@ function validateContentGuide(CGtext, requestType, errs) {
 			SCHEMA_NAMESPACE=CG.root().namespace().href();
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
-		var tvaMainLang=CG.root().attr("lang") ? CG.root().attr("lang").value() : DEFAULT_LANGUAGE;
+		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE);
 		
 		var ProgramDescription=CG.get(SCHEMA_PREFIX+":ProgramDescription", CG_SCHEMA);
 		if (!ProgramDescription) {
 			errs.push("No <ProgramDescription> element specified.");
 			return;
 		}
-		var progDescrLang=ProgramDescription.attr("lang") ? ProgramDescription.attr("lang").value() : tvaMainLang;
+		var progDescrLang=GetLanguage(knownLanguages, errs, ProgramDescription, tvaMainLang);
 
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE_TIME:
@@ -1738,7 +1777,8 @@ function processFile(req,res) {
 }
 
 
-
+var knownCountries = new ISOcountries(false, true);
+var knownLanguanges = new IANAlanguages();
 
 function loadDataFiles(useURLs) {
 	console.log("loading classification schemes...");
@@ -1746,7 +1786,13 @@ function loadDataFiles(useURLs) {
 	loadCS(allowedGenres, useURLs, TVA_ContentCSFilename, TVA_ContentCSURL);
 	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
 	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
+
+	console.log("loading countries...");
+	knownCountries.loadCountriesFromFile(ISO3166_Filename, true);
   
+    console.log("loading languages...");
+	knownLanguanges.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
+	
 	console.log("loading CreditItem roles...");
 	allowedCreditItemRoles=[];
 	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
