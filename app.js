@@ -43,6 +43,7 @@ const DEFAULT_LANGUAGE="***";
 
 const CG_REQUEST_SCHEDULE_TIME="schedInfo-time";
 const CG_REQUEST_SCHEDULE_NOWNEXT="schedInfo-now";
+const CG_REQUEST_SCHEDULE_WINDOW="schedInfo-window";
 const CG_REQUEST_PROGRAM="progInfo";
 const CG_REQUEST_EPISODES="moreEpisodes";
 const CG_REQUEST_BS_CATEGORIES="bsCategories";
@@ -246,6 +247,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
 	const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
 	const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE_TIME,"label":"Schedule Info (time stamp)"},
 									  {"value":CG_REQUEST_SCHEDULE_NOWNEXT,"label":"Schedule Info (now/next)"},
+									  {"value":CG_REQUEST_SCHEDULE_WINDOW,"label":"Schedule Info (window)"},
 									  {"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
 									  {"value":CG_REQUEST_EPISODES,"label":"More Episodes"},
 									  {"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
@@ -1035,6 +1037,11 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
  * @param {object} categoryGroup       the GroupInformationElement that others must refer to through <MemberOf>
  */
 function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage, categoryGroup) {
+
+	// TODO: need to determine if Now/Next and Prev/Now/Next (windowed) is needed for these request types (see A177v2 6.10.16.2)
+	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW)
+		return;
+
 	var isParentGroup = parentElement == categoryGroup;
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
 
@@ -1045,8 +1052,10 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 		
 		// <Title> - 
 		switch (requestType) {
-			case CG_REQUEST_SCHEDULE_TIME:
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
+			case CG_REQUEST_SCHEDULE_WINDOW:
+				break;
+			case CG_REQUEST_SCHEDULE_TIME:
 			case CG_REQUEST_PROGRAM:
 			case CG_REQUEST_BS_CONTENTS:
 				// only 1..2 elements per language permitted with "main" and optional "secondary" 
@@ -1064,8 +1073,10 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 
 		// <Synopsis> - validity depends on use
 		switch (requestType) {
-			case CG_REQUEST_SCHEDULE_TIME:
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
+			case CG_REQUEST_SCHEDULE_WINDOW:
+				break;
+			case CG_REQUEST_SCHEDULE_TIME:
 				// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and (required)"medium"(250)
 				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL],requestType, errs, bdLang);
 				break;
@@ -1109,8 +1120,10 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 
 		// <Genre> - 
 		switch (requestType) {
+			case CG_REQUEST_SCHEDULE_NOWNEXT:
+			case CG_REQUEST_SCHEDULE_WINDOW:		 
+				break;
 			case CG_REQUEST_SCHEDULE_TIME:		// clause 6.10.5.2 -- 0..1 instances permitted
-			case CG_REQUEST_SCHEDULE_NOWNEXT:	// clause 6.10.5.2 -- 0..1 instances permitted		 
 			case CG_REQUEST_PROGRAM:			// clause 6.10.5.3 -- 0..1 instances permitted 			
 				ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 				break;
@@ -1122,8 +1135,10 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 
 		// <ParentalGuidance> - 
 		switch (requestType) {
+			case CG_REQUEST_SCHEDULE_NOWNEXT:
+			case CG_REQUEST_SCHEDULE_WINDOW:
+				break;
 			case CG_REQUEST_SCHEDULE_TIME:		// clause 6.10.5.2 -- 0..2 instances permitted - first must contain age
-			case CG_REQUEST_SCHEDULE_NOWNEXT:	// clause 6.10.5.2 -- 0..2 instances permitted - first must contain age			 
 			case CG_REQUEST_PROGRAM:			// clause 6.10.5.3 -- 0..2 instances permitted - first must contain age 		
 			case CG_REQUEST_BS_CONTENTS:		// clause 6.10.5.4 -- 0..2 instances permitted - first must contain age	
 				ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
@@ -1147,8 +1162,10 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 		}		
 		// <RelatedMaterial> - 
 		switch (requestType) {
-			case CG_REQUEST_SCHEDULE_TIME:
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
+			case CG_REQUEST_SCHEDULE_WINDOW:
+				break;
+			case CG_REQUEST_SCHEDULE_TIME:
 				// clause 6.10.5.2 -- 0..1 instances permitted 
 				ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 				break;
@@ -1247,17 +1264,16 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  * @param {Class}  errs                errors found in validaton
  * @param {string} parentLanguage	   the xml:lang of the parent element to GroupInformation
  * @param {object} categoryGroup       the GroupInformationElement that others must refer to through <MemberOf>
+ * @param {array}  indexes			   an accumulation of the @index values found
  */
 function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes) {
 	var isCategoryGroup=GroupInformation==categoryGroup;
 	var categoryCRID=(categoryGroup && categoryGroup.attr("groupId")) ? categoryGroup.attr("groupId").value() : "";
 	var piLang=GroupInformation.attr('lang') ? GroupInformation.attr('lang').value() : parentLanguage;
 
-	// <GroupInformation><BasicDescription>
-
 	if (GroupInformation.attr('groupId')) {
 		var groupId = GroupInformation.attr('groupId').value();
-		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT) {
+		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
 			if (groupId != dvbi.CRID_NOW && groupId != dvbi.CRID_LATER && groupId != dvbi.CRID_EARLIER )
 				errs.push("GroupInformation@groupId value \""+groupId+"\" is valid for this request type")
 		}
@@ -1265,7 +1281,6 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 		if (!isCRIDURI(groupId))
 			errs.push("GroupInformation@groupId value \""+groupId+"\" is not a CRID")
 		}
-		
 	}
 	else errs.push("GroupInformation@groupId attribute is mandatory");
 
@@ -1279,7 +1294,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 		if (isCategoryGroup && !GroupInformation.attr("numOfItems")) 
 			errs.push("GroupInformation@numOfItems is required for this request type")
 	}
-	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT) {
+	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
 		if (GroupInformation.attr("ordered")) {
 			if (GroupInformation.attr("ordered").value()!="true")
 					errs.push("GroupInformation@ordered must be \"true\" for this response type");
@@ -1303,7 +1318,8 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 	else
 		errs.push("<GroupType> is required in <GroupInformation>"); // this should be checked in valdidation against the schema
 	
-	if (!isCategoryGroup) {
+	if (!isCategoryGroup && (requestType != CG_REQUEST_SCHEDULE_NOWNEXT && requestType != CG_REQUEST_SCHEDULE_WINDOW)) {
+		elem=GroupInformation.get(SCHEMA_PREFIX+":MemberOf", CG_SCHEMA);
 		elem=GroupInformation.get(SCHEMA_PREFIX+":MemberOf", CG_SCHEMA);
 		if (elem) {
 			if (elem.attr("type")) {
@@ -1340,6 +1356,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 			errs.push("<GroupInformation> requires a <MemberOf> element referring to the \"category group\" ("+categoryCRID+")");
 	}
 	
+	// <GroupInformation><BasicDescription>
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, piLang, categoryGroup);
 }
 
@@ -1400,6 +1417,108 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 			errs.push("GroupInformation@numOfItems specified in \"category group\" ("+numOfItems+") does match the number of items ("+giCount+")");		
 	}
 }
+
+
+/**
+ * validate the <GroupInformation> element against the profile for the given request/response type
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} GroupInformation    the element whose children should be checked
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ * @param {string} parentLanguage	   the xml:lang of the parent element to GroupInformation
+ * @param {int}    numEarlier		   maximum number of <GroupInformation> elements that are earlier
+ * @param {int}    numNow			   maximum number of <GroupInformation> elements that are now
+ * @param {int}    numLater			   maximum number of <GroupInformation> elements that are later
+ * @param {array}  cridsFound          list of structural crids already found in this response
+ */
+function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, numEarlier, numNow, numLater, cridsFound) {
+
+	function ValidValues(errs, numOfItems, numAllowed, grp) {
+		if (numOfItems <= 0)
+			errs.push("GroupInformation@numOfItems must be > 0 for \""+grp+"\"");			
+		if (numOfItems > numAllowed)
+			errs.push("GroupInformation@numOfItems must be <= "+numAllowed+" for \""+grp+"\"");
+	}
+	
+	function notPermittedCRID(grp) {
+		return "structural CRID \""+grp+"\" is not permitted in this request type"}
+
+	// NOWNEXT and WINDOW GroupInformationElements contains the sme syntac as other GroupInformationElements
+	ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, null, null );
+	
+	if (GroupInformation.attr('groupId')) {
+		var grp=GroupInformation.attr('groupId').value();
+		var validCRID=false, numOfItems=-1;
+		
+		if ((grp==dvbi.CRID_EARLIER && numEarlier>0) || (grp==dvbi.CRID_NOW && numNow>0) || (grp==dvbi.CRID_LATER && numLater>0)) {
+
+			numOfItems=GroupInformation.attr('numOfItems')? valUnsignedInt(GroupInformation.attr('numOfItems').value()): -1;
+			switch (grp) {
+				case dvbi.CRID_EARLIER:
+					ValidValues(errs, numOfItems, numEarlier, grp);
+					break;
+				case dvbi.CRID_NOW:
+					ValidValues(errs, numOfItems, numNow, grp);
+					break;
+				case dvbi.CRID_LATER:
+					ValidValues(errs, numOfItems, numLater, grp);
+					break;
+			}
+			validCRID=true;
+		}
+		else 
+			errs.push("GroupInformation for \""+grp+"\" is not permitted for this request type");
+			
+		if (validCRID) {
+			if (isIn(cridsFound, grp))
+				errs.push("only a single "+grp+" structural CRID is premitted in this request");
+			else 
+				cridsFound.push(grp);
+		}
+	}
+}
+
+/**
+ * find and validate any <GroupInformation> elements used for now/next in the <GroupInformationTable>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
+ * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ */
+function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
+	
+	var GroupInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":GroupInformationTable", CG_SCHEMA);
+	
+	if (!GroupInformationTable) {
+		errs.push("<GroupInformationTable> not specified in <"+ProgramDescription.name()+">");
+		return;
+	}
+	var gitLanguage=GroupInformationTable.attr("lang")?GroupInformationTable.attr("lang").value():progDescrLang;
+	
+	var gi=0, GroupInformation, cridsFound=[];
+	while (GroupInformation=GroupInformationTable.child(gi++)) {
+		if (GroupInformation.name()=="GroupInformation") {
+			
+			switch (requestType) {
+				case CG_REQUEST_SCHEDULE_NOWNEXT:
+					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLanguage, null, 1, 1, cridsFound);
+					break;
+				case CG_REQUEST_SCHEDULE_WINDOW:
+					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLanguage, 10, 1, 10, cridsFound);
+					break;
+			}
+		}
+	}
+
+	
+
+}
+
 
 /**
  * find and validate any <ProgramLocation> elements in the <ProgramLocationTable>
@@ -1476,8 +1595,16 @@ function validateContentGuide(CGtext, requestType, errs) {
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable", "GroupInformationTable"], requestType, errs);
 			
+			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			break;
+		case CG_REQUEST_SCHEDULE_WINDOW:
+			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable", "GroupInformationTable"], requestType, errs);
+			
+			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
 			break;
