@@ -1,3 +1,0 @@
-[submodule "dvb-common"]
-	path = dvb-common
-	url = https://github.com/paulhiggs/dvb-common
