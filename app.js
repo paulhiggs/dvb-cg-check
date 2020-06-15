@@ -1450,11 +1450,11 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	
 	if (GroupInformation.attr('groupId')) {
 		var grp=GroupInformation.attr('groupId').value();
-		var validCRID=false, numOfItems=-1;
 		
 		if ((grp==dvbi.CRID_EARLIER && numEarlier>0) || (grp==dvbi.CRID_NOW && numNow>0) || (grp==dvbi.CRID_LATER && numLater>0)) {
 
-			numOfItems=GroupInformation.attr('numOfItems')? valUnsignedInt(GroupInformation.attr('numOfItems').value()): -1;
+			var numOfItems=GroupInformation.attr('numOfItems')? valUnsignedInt(GroupInformation.attr('numOfItems').value()): -1;
+
 			switch (grp) {
 				case dvbi.CRID_EARLIER:
 					ValidValues(errs, numOfItems, numEarlier, grp);
@@ -1466,17 +1466,16 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 					ValidValues(errs, numOfItems, numLater, grp);
 					break;
 			}
-			validCRID=true;
-		}
-		else 
-			errs.push("GroupInformation for \""+grp+"\" is not permitted for this request type");
-			
-		if (validCRID) {
+
 			if (isIn(cridsFound, grp))
 				errs.push("only a single "+grp+" structural CRID is premitted in this request");
 			else 
 				cridsFound.push(grp);
+
 		}
+		else 
+			errs.push("GroupInformation for \""+grp+"\" is not permitted for this request type");
+			
 	}
 }
 
