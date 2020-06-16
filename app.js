@@ -1,47 +1,47 @@
 // node.js - https://nodejs.org/en/
 // express framework - https://expressjs.com/en/4x/api.html
-const express = require("express");
-var app = express();
+const express=require("express");
+var app=express();
 
 
 const fs=require("fs"), path=require("path");
 
-const ErrorList = require("./dvb-common/ErrorList.js");
-const dvbi = require("./dvb-common/DVB-I_definitions.js");
-const {isJPEGmime, isPNGmime} = require("./dvb-common/MIME_checks.js");
-const {isCRIDURI} = require("./dvb-common/URI_checks.js");
-const {loadCS} = require("./dvb-common/CS_handler.js");
+const ErrorList=require("./dvb-common/ErrorList.js");
+const dvbi=require("./dvb-common/DVB-I_definitions.js");
+const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js");
+const {isCRIDURI}=require("./dvb-common/URI_checks.js");
+const {loadCS}=require("./dvb-common/CS_handler.js");
 
-const ISOcountries = require("./dvb-common/ISOcountries.js");
+const ISOcountries=require("./dvb-common/ISOcountries.js");
 
 // curl from https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
 const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-registry");
-const IANAlanguages = require("./dvb-common/IANAlanguages.js");
+const IANAlanguages=require("./dvb-common/IANAlanguages.js");
 
 
 // libxmljs - https://github.com/libxmljs/libxmljs
-const libxml = require("libxmljs");
+const libxml=require("libxmljs");
 
 //TODO: validation against schema
-//const xmllint = require("xmllint");
+//const xmllint=require("xmllint");
 
 // morgan - https://github.com/expressjs/morgan
-const morgan = require("morgan")
+const morgan=require("morgan")
 
 
 // sync-request - https://github.com/ForbesLindesay/sync-request
-const syncRequest = require("sync-request");
+const syncRequest=require("sync-request");
 
 const https=require("https");
-const HTTP_SERVICE_PORT = 3020;
+const HTTP_SERVICE_PORT=3020;
 const HTTPS_SERVICE_PORT=HTTP_SERVICE_PORT+1;
 const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt");
 
-const { parse } = require("querystring");
+const { parse }=require("querystring");
 
 // https://github.com/alexei/sprintf.js
-var sprintf = require("sprintf-js").sprintf,
-    vsprintf = require("sprintf-js").vsprintf
+var sprintf=require("sprintf-js").sprintf,
+    vsprintf=require("sprintf-js").vsprintf
 
 
 // convenience/readability values
@@ -62,8 +62,8 @@ const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
 	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
 	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt");
 
-const REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
-      COMMON_REPO_RAW = "https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
+const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
+      COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
       TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
       TVA_FormatCSURL=COMMON_REPO_RAW + "tva/" + "FormatCS.xml",
       DVBI_ContentSubjectURL=COMMON_REPO_RAW + "dvbi/" + "DVBContentSubjectCS-2019.xml",
@@ -103,12 +103,12 @@ app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length]
  * @return {boolean} if value is in the set of values
  */
 function isIn(values, value){
-    if (typeof(values) == "string")
+    if (typeof(values)=="string")
         return values==value;
     
-    if (typeof(values) == "object") {
+    if (typeof(values)=="object") {
         for (var x=0; x<values.length; x++) 
-            if (values[x] == value)
+            if (values[x]==value)
                 return true;
     }
     return false;
@@ -152,7 +152,7 @@ function GetLanguage(validator, errs, node, parentLang, isRequired) {
 		return parentLang;		
 	}
 
-	var localLang = node.attr('lang').value();
+	var localLang=node.attr('lang').value();
 	if (!validator)
 		errs.push("cannot validate language \""+localLang+"\" for \""+node.name()+"\"");
 	else if (!validator.isKnown(localLang)) 
@@ -163,9 +163,9 @@ function GetLanguage(validator, errs, node, parentLang, isRequired) {
  
 //---------------- CreditsItem@role LOADING ----------------
 
-if(typeof(String.prototype.trim) === "undefined")
+if(typeof(String.prototype.trim)==="undefined")
 {
-    String.prototype.trim = function() 
+    String.prototype.trim=function() 
     {
         return String(this).replace(/^\s+|\s+$/g, '');
     };
@@ -178,7 +178,7 @@ if(typeof(String.prototype.trim) === "undefined")
  * @param {String} data   the list of values, 1 per line
  */
 function addRoles(values, data) {
-	var lines = data.split('\n');
+	var lines=data.split('\n');
 	for (var line=0; line<lines.length; line++) 
 		values.push(lines[line].trim());	
 }
@@ -207,10 +207,10 @@ function loadRolesFromFile(values, rolesFilename) {
  */
 function loadRolesFromURL(values, rolesURL) { 
 	console.log("retrieving @roles from", rolesURL);
-	var xhttp = new XmlHttpRequest();
-	xhttp.onreadystatechange = function() {
-		if (this.readyState == 4) {
-			if (this.status == 200) 
+	var xhttp=new XmlHttpRequest();
+	xhttp.onreadystatechange=function() {
+		if (this.readyState==4) {
+			if (this.status==200) 
 				addRoles(values, xhttp.responseText);
 			else console.log("error ("+this.status+") retrieving "+csURL);	
 		}
@@ -280,18 +280,18 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
 	const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
 
 	const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
-	const ENTRY_FORM_REQUEST_TYPES = [{"value":CG_REQUEST_SCHEDULE_TIME,"label":"Schedule Info (time stamp)"},
-									  {"value":CG_REQUEST_SCHEDULE_NOWNEXT,"label":"Schedule Info (now/next)"},
-									  {"value":CG_REQUEST_SCHEDULE_WINDOW,"label":"Schedule Info (window)"},
-									  {"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
-									  {"value":CG_REQUEST_EPISODES,"label":"More Episodes"},
-									  {"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
-									  {"value":CG_REQUEST_BS_LISTS,"label":"Box Set Lists"},
-									  {"value":CG_REQUEST_BS_CONTENTS,"label":"Box Set Contents"}];
+	const ENTRY_FORM_REQUEST_TYPES=[{"value":CG_REQUEST_SCHEDULE_TIME,"label":"Schedule Info (time stamp)"},
+									{"value":CG_REQUEST_SCHEDULE_NOWNEXT,"label":"Schedule Info (now/next)"},
+									{"value":CG_REQUEST_SCHEDULE_WINDOW,"label":"Schedule Info (window)"},
+									{"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
+									{"value":CG_REQUEST_EPISODES,"label":"More Episodes"},
+									{"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
+									{"value":CG_REQUEST_BS_LISTS,"label":"Box Set Lists"},
+									{"value":CG_REQUEST_BS_CONTENTS,"label":"Box Set Contents"}];
 	const FORM_END="</form>";
 									  
 	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
-	const SUMMARY_FORM_HEADER = "<table><tr><th>item</th><th>count</th></tr>";
+	const SUMMARY_FORM_HEADER="<table><tr><th>item</th><th>count</th></tr>";
 	const FORM_BOTTOM="</body></html>";	
 	
     res.write(FORM_TOP);    
@@ -321,7 +321,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
         if (o.errors) {
             var tableHeader=false;
             for (var i in o.errors.counts) {
-                if (o.errors.counts[i] != 0) {
+                if (o.errors.counts[i]!=0) {
                     if (!tableHeader) {
                         res.write(SUMMARY_FORM_HEADER);
                         tableHeader=true;
@@ -331,7 +331,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
                 }
             }
             for (var i in o.errors.countsWarn) {
-                if (o.errors.countsWarn[i] != 0) {
+                if (o.errors.countsWarn[i]!=0) {
                     if (!tableHeader) {
                         res.write(SUMMARY_FORM_HEADER);
                         tableHeader=true;
@@ -414,10 +414,10 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
 	});
 	
 	// check that no additional child elements existance
-	var child, c=0;
-	while (child = parentElement.child(c++)) {
+	var c=0, child;
+	while (child=parentElement.child(c++)) {
 		if (!isIn(childElements, child.name())) {
-			if (child.name() != 'text')
+			if (child.name()!='text')
 				errs.push("Element <"+child.name()+"> not permitted");
 		}
 	}
@@ -433,9 +433,9 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
  * @returns {boolean}  true if the parentElement contains an element with the name specified in childElement else false
  */
 function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
-	var c=0, Child;
-	while (Child=parentElement.child(c++)) {
-		if (Child.name() == childElement)
+	var c=0, child;
+	while (child=parentElement.child(c++)) {
+		if (child.name()==childElement)
 			return true;
 	}
 	return false;
@@ -493,7 +493,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 					errs.push("@length=\""+synopsisLength+"\" is not permitted for this request type");
 			}
 			else 
-				errs.push("@length attribute is required for <Synopsis>");
+				errs.push("@length attribute is required for <Synopsis>"); //!!!!
 			
 			if (synopsisLang && synopsisLength) {
 				switch (synopsisLength) {
@@ -541,20 +541,20 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 	var k=0, Keyword, counts=[];
 	while (Keyword=BasicDescription.child(k++)) {
 		if (Keyword.name()=="Keyword") {
-			var keywordType = Keyword.attr('type') ? Keyword.attr('type').value() : "main";
+			var keywordType=Keyword.attr('type') ? Keyword.attr('type').value() : "main";
 			var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage);
 
-			if (counts[keywordLang] === undefined)
-				counts[keywordLang] = 1
+			if (counts[keywordLang]===undefined)
+				counts[keywordLang]=1
 			else counts[keywordLang]++;
-			if (keywordType != "main" && keywordType != "other")
+			if (keywordType!="main" && keywordType!="other")
 				errs.push("@type=\""+keywordType+"\" not permitted for <Keyword>");
 			if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
 				errs.push("<Keyword> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
 		}
 	}
 	for (var i in counts) {
-        if (counts[i] != 0 && counts[i] > maxKeywords) 
+        if (counts[i]!=0 && counts[i]>maxKeywords) 
             errs.push("More than "+maxKeywords+" <Keyword> element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language \""+i+"\""));
 	}
 }
@@ -574,16 +574,16 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 	while (Genre=BasicDescription.child(g++)) {
 		if (Genre.name()=="Genre") {
 			count++;
-			var genreType = Genre.attr('type') ? Genre.attr('type').value() : "main";
-			if (genreType != "main")
+			var genreType=Genre.attr('type') ? Genre.attr('type').value() : "main";
+			if (genreType!="main")
 				errs.push("@type=\""+genreType+"\" not permitted for <Genre>");
 			
-			var genreValue = Genre.attr('href') ? Genre.attr('href').value() : "";
+			var genreValue=Genre.attr('href') ? Genre.attr('href').value() : "";
 			if (!isIn(allowedGenres, genreValue))
 				errs.push("invalid value \""+genreValue+"\" for <Genre>");
 		}
 	}
-	if (count > maxGenres)
+	if (count>maxGenres)
 		errs.push("More than "+maxGenres+" <Genre> element"+(maxGenres>1?"s":"")+" specified");
 }
 
@@ -614,7 +614,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						if (countParentalGuidance==1 && pgChild.name()!="MinimumAge")
 							errs.push("first <ParentalGuidance> element must contain <mpeg7:MinimumAge>");
 						
-						if (pgChild.name()=="MinimumAge" && countParentalGuidance != 1)
+						if (pgChild.name()=="MinimumAge" && countParentalGuidance!=1)
 							errs.push("<MinimumAge> must be in the first <ParentalGuidance> element");
 						
 						if (pgChild.name()=="ParentalRating") {
@@ -696,7 +696,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 		while (CreditsItem=CreditsList.child(ci++)) {
 			if (CreditsItem.name()=="CreditsItem") {
 				if (CreditsItem.attr('role')) {
-					var CreditsItemRole = CreditsItem.attr('role').value();
+					var CreditsItemRole=CreditsItem.attr('role').value();
 					if (!isIn(allowedCreditItemRoles, CreditsItemRole))
 						errs.push("\""+CreditsItemRole+"\" is not valid for CreditsItem@role");
 				}
@@ -722,7 +722,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 								errs.push("length of <OrganizationName> in <CreditsItem> exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
 							break;
 						default:
-							if (elem.name() != "text")
+							if (elem.name()!="text")
 								errs.push("extra element <"+elem.name()+"> found in <CreditsItem>");
 					}
 					if (foundPersonName>1)
@@ -843,10 +843,10 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 	var HRhref=HowRelated.attr("href");
 	
 	if (HRhref) {
-		if (HRhref.value() != dvbi.TEMPLATE_AIT_URI) 
+		if (HRhref.value()!=dvbi.TEMPLATE_AIT_URI) 
 			errs.push("HowRelated@href=\""+HRhref.value()+"\" does not designate a Template AIT");
 		else {		
-			if (MediaLocator.length != 0) 
+			if (MediaLocator.length!=0) 
 				MediaLocator.forEach(ml => {
 					var subElems=ml.childNodes(), hasAuxiliaryURI=false;
 					if (subElems) subElems.forEach(child => {
@@ -856,7 +856,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 								NoChildElement(errs, "@contentType", "Template IT <AuxiliaryURI>", Location);
 							else {
 								var contentType=child.attr("contentType").value();
-								if (contentType != dvbi.XML_AIT_CONTENT_TYPE) 
+								if (contentType!=dvbi.XML_AIT_CONTENT_TYPE) 
 									errs.push("invalid @contentType \""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
 							}
 						}
@@ -899,13 +899,13 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     }
 	var HRhref=HowRelated.attr("href");
 	if (HRhref) {
-		if (HRhref.value() != dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
+		if (HRhref.value()!=dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
 			errs.push("HowRelated@href=\""+HRhref.value()+"\" does not designate a Promotional Still Image");
 		else {
 			if (Format) {
 				var subElems=Format.childNodes(), hasStillPictureFormat=false;
 				if (subElems) subElems.forEach(child => {
-					if (child.name() == "StillPictureFormat") {
+					if (child.name()=="StillPictureFormat") {
 						hasStillPictureFormat=true;
 						if (!child.attr("horizontalSize")) 
 							NoChildElement(errs, "@horizontalSize", "<RelatedMaterial><Format><StillPictureFormat>", Location);
@@ -913,10 +913,10 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 							NoChildElement(errs, "@verticalSize", "<RelatedMaterial><Format><StillPictureFormat>", Location);
 						if (child.attr("href")) {
 							var href=child.attr("href").value();
-							if (href != JPEG_IMAGE_CS_VALUE && href != PNG_IMAGE_CS_VALUE) 
+							if (href!=JPEG_IMAGE_CS_VALUE && href!=PNG_IMAGE_CS_VALUE) 
 								InvalidHrefValue(errs, href, "<RelatedMaterial><Format><StillPictureFormat>", Location)
-							if (href == JPEG_IMAGE_CS_VALUE) isJPEG=true;
-							if (href == PNG_IMAGE_CS_VALUE) isPNG=true;
+							if (href==JPEG_IMAGE_CS_VALUE) isJPEG=true;
+							if (href==PNG_IMAGE_CS_VALUE) isPNG=true;
 						}
 						else 
 							NoHrefAttribute(errs, "<RelatedMaterial><Format>", Location);
@@ -926,7 +926,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					NoChildElement(errs, "<StillPictureFormat>", "<Format>",Location);
 			}
 
-			if (MediaLocator.length != 0) 
+			if (MediaLocator.length!=0) 
 				MediaLocator.forEach(ml => {
 					var subElems=ml.childNodes(), hasMediaURI=false;
 					if (subElems) subElems.forEach(child => {
@@ -1005,14 +1005,14 @@ function ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescri
 			}
 		}
 	}
-	if (countTemplateAIT == 0)
+	if (countTemplateAIT==0)
 		errs.push("a <RelatedMaterial> element signalling the Template XML AIT must be specified for a Box Set List");
-	if (countTemplateAIT > 1)
+	if (countTemplateAIT>1)
 		errs.push("only one <RelatedMaterial> element signalling the Template XML AIT can be specified for a Box Set List");
-	if (countImage > 1)
+	if (countImage>1)
 		errs.push("only one <RelatedMaterial> element signalling the promotional still image can be specified for a Box Set List");
 	var numPaginations=countPaginationFirst+countPaginationPrev+countPaginationNext+countPaginationLast;
-	if (numPaginations != 0 && numPaginations != 2 && numPaginations != 4)
+	if (numPaginations!=0 && numPaginations!=2 && numPaginations!=4)
 		errs.push("only 0, 2 or 4 paginations links may be siganlled in <RelatedMaterial> elements for a Box Ser List");
 }
 
@@ -1058,8 +1058,8 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 			
 			secondarySet.forEach(lang => {
 				if (!isIn(mainSet, lang)) {
-					var t = lang != DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
-					errs.push("@type=\"secondary\" specified without @type=\"main\"" + t);
+					var t=lang!=DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
+					errs.push("@type=\"secondary\" specified without @type=\"main\""+t);
 				}
 			});
 		}
@@ -1084,7 +1084,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW)
 		return;
 
-	var isParentGroup = parentElement == categoryGroup;
+	var isParentGroup=parentElement==categoryGroup;
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
 
 	if (!BasicDescription) 
@@ -1286,7 +1286,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 
 
 /*	UURGH: this loop style is not working		
-	while (ProgramInformation = ProgramInformationTable.get(SCHEMA_PREFIX+":ProgramInformation["+pi+"]", CG_SCHEMA)) {
+	while (ProgramInformation=ProgramInformationTable.get(SCHEMA_PREFIX+":ProgramInformation["+pi+"]", CG_SCHEMA)) {
 		console.log("--ProgramInformation", pi);
 		ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, pitLang);
 		pi++;
@@ -1316,9 +1316,9 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 	var giLang=GetLanguage(knownLanguages, errs, GroupInformation, parentLanguage);
 
 	if (GroupInformation.attr('groupId')) {
-		var groupId = GroupInformation.attr('groupId').value();
+		var groupId=GroupInformation.attr('groupId').value();
 		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
-			if (groupId != dvbi.CRID_NOW && groupId != dvbi.CRID_LATER && groupId != dvbi.CRID_EARLIER )
+			if (groupId!=dvbi.CRID_NOW && groupId!=dvbi.CRID_LATER && groupId!=dvbi.CRID_EARLIER )
 				errs.push("GroupInformation@groupId value \""+groupId+"\" is valid for this request type")
 		}
 		else {
@@ -1362,20 +1362,20 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 	else
 		errs.push("<GroupType> is required in <GroupInformation>"); // this should be checked in valdidation against the schema
 	
-	if (!isCategoryGroup && (requestType != CG_REQUEST_SCHEDULE_NOWNEXT && requestType != CG_REQUEST_SCHEDULE_WINDOW)) {
+	if (!isCategoryGroup && (requestType!=CG_REQUEST_SCHEDULE_NOWNEXT && requestType!=CG_REQUEST_SCHEDULE_WINDOW)) {
 		elem=GroupInformation.get(SCHEMA_PREFIX+":MemberOf", CG_SCHEMA);
 		elem=GroupInformation.get(SCHEMA_PREFIX+":MemberOf", CG_SCHEMA);
 		if (elem) {
 			if (elem.attr("type")) {
-				if (elem.attr("type").value() != "MemberOfType")
+				if (elem.attr("type").value()!="MemberOfType")
 					errs.push("GroupInformation.MemberOf@type is invalid (\""+elem.attr("type").value()+"\")");
 			}
 			else
 				errs.push("GroupInformation.MemberOf requires @xsi:type=\"MemberOfType\" attribute");
 			
 			if (elem.attr("index")) {
-				var index = valUnsignedInt(elem.attr("index").value());
-				if (index >= 1) {
+				var index=valUnsignedInt(elem.attr("index").value());
+				if (index>=1) {
 					if (indexes) {
 						if (isIn(indexes, index)) {
 							errs.push("duplicated GroupInformation.MemberOf@index values ("+index+")");
@@ -1390,7 +1390,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 				errs.push("GroupInformation.MemberOfType requires @index attribute");
 			
 			if (elem.attr("crid")) {
-				if (elem.attr("crid").value() != categoryCRID)
+				if (elem.attr("crid").value()!=categoryCRID)
 					errs.push("GroupInformation.Memberof@crid ("+elem.attr("crid").value()+") does not match the \"caregory group\" crid ("+categoryCRID+")");
 			}
 			else
@@ -1426,7 +1426,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 
 	// find which GroupInformation element is the "category group"
 	var categoryGroup=null;
-	if (requestType == CG_REQUEST_BS_LISTS || requestType == CG_REQUEST_BS_CATEGORIES) {
+	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES) {
 		while (GroupInformation=GroupInformationTable.child(gi++)) {
 			var countMemberOf=0;
 			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
@@ -1435,11 +1435,11 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 				if (elem.name()=="MemberOf")
 					countMemberOf++
 			}
-			if (countMemberOf == 0) {
+			if (countMemberOf==0) {
 				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
 				if (categoryGroup)
 					errs.push("only a single \"category group\" can be present in <"+GroupInformationTable.name()+">")
-				else categoryGroup = GroupInformation;
+				else categoryGroup=GroupInformation;
 			}
 		}
 		if (!categoryGroup)
@@ -1451,13 +1451,13 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 	while (GroupInformation=GroupInformationTable.child(gi++)) {
 		if (GroupInformation.name()=="GroupInformation") {
 			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, categoryGroup, indexes);
-			if (GroupInformation != categoryGroup) 
+			if (GroupInformation!=categoryGroup) 
 				giCount++;
 		}
 	}
 	if (categoryGroup) {
-		var numOfItems = (categoryGroup.attr("numOfItems") ? valUnsignedInt(categoryGroup.attr("numOfItems").value()) : 0);
-		if (numOfItems != giCount)
+		var numOfItems=(categoryGroup.attr("numOfItems") ? valUnsignedInt(categoryGroup.attr("numOfItems").value()) : 0);
+		if (numOfItems!=giCount)
 			errs.push("GroupInformation@numOfItems specified in \"category group\" ("+numOfItems+") does match the number of items ("+giCount+")");		
 	}
 }
@@ -1480,9 +1480,9 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, numEarlier, numNow, numLater, cridsFound) {
 
 	function ValidValues(errs, numOfItems, numAllowed, grp) {
-		if (numOfItems <= 0)
+		if (numOfItems<=0)
 			errs.push("GroupInformation@numOfItems must be > 0 for \""+grp+"\"");			
-		if (numOfItems > numAllowed)
+		if (numOfItems>numAllowed)
 			errs.push("GroupInformation@numOfItems must be <= "+numAllowed+" for \""+grp+"\"");
 	}
 	
@@ -1586,7 +1586,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 function validateContentGuide(CGtext, requestType, errs) {
 	var CG=null;
 	if (CGtext) try {
-		CG = libxml.parseXmlString(CGtext);
+		CG=libxml.parseXmlString(CGtext);
 	} catch (err) {
 		errs.push("XML parsing failed: "+err.message);
 	}
@@ -1610,11 +1610,11 @@ function validateContentGuide(CGtext, requestType, errs) {
 		SL.validationErrors.forEach(err => console.log("validation error:", err));
 	};
 */
-	if (CG.root().name() !== "TVAMain") {
+	if (CG.root().name()!=="TVAMain") {
 		errs.push("Root element is not <TVAMain>.");
 	}
 	else {
-		var CG_SCHEMA = {}, 
+		var CG_SCHEMA={}, 
 			SCHEMA_PREFIX=CG.root().namespace().prefix(), 
 			SCHEMA_NAMESPACE=CG.root().namespace().href();
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
@@ -1717,7 +1717,7 @@ function processQuery(req,res) {
         var CGxml=null;
         var errs=new ErrorList();
         try {
-            CGxml = syncRequest("GET", req.query.CGurl);
+            CGxml=syncRequest("GET", req.query.CGurl);
         }
         catch (err) {
             errs.push("retrieval of URL ("+req.query.CGurl+") failed");
@@ -1732,7 +1732,7 @@ function processQuery(req,res) {
 }
 
 
-const fileUpload = require('express-fileupload');
+const fileUpload=require('express-fileupload');
 //middleware
 app.use(express.static(__dirname));
 app.set('view engine', 'ejs');
@@ -1767,7 +1767,7 @@ function processFile(req,res) {
 		var fname="***";
 		if (req && req.files && req.files.CGfile) fname=req.files.CGfile.name;
         try {
-            CGxml = req.files.CGfile.data;
+            CGxml=req.files.CGfile.data;
         }
         catch (err) {
             errs.push("retrieval of FILE ("+fname+") failed");
@@ -1782,8 +1782,8 @@ function processFile(req,res) {
 }
 
 
-var knownCountries = new ISOcountries(false, true);
-var knownLanguanges = new IANAlanguages();
+var knownCountries=new ISOcountries(false, true);
+var knownLanguanges=new IANAlanguages();
 
 function loadDataFiles(useURLs) {
 	console.log("loading classification schemes...");
@@ -1841,7 +1841,7 @@ app.get("*", function(req,res) {
 
 // start the HTTP server
 
-var http_server = app.listen(HTTP_SERVICE_PORT, function() {
+var http_server=app.listen(HTTP_SERVICE_PORT, function() {
     console.log("HTTP listening on port number", http_server.address().port);
 });
 
@@ -1858,13 +1858,13 @@ function readmyfile(filename) {
     return null;
 }
 
-var https_options = {
+var https_options={
     key:readmyfile(keyFilename),
     cert:readmyfile(certFilename)
 };
 
 if (https_options.key && https_options.cert) {
-    var https_server = https.createServer(https_options, app);
+    var https_server=https.createServer(https_options, app);
     https_server.listen(HTTPS_SERVICE_PORT, function(){
         console.log("HTTPS listening on port number", https_server.address().port);
     });
