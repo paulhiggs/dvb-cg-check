@@ -29,12 +29,8 @@ const libxml = require("libxmljs");
 const morgan = require("morgan")
 
 
-//const request = require("request");
-
 // sync-request - https://github.com/ForbesLindesay/sync-request
 const syncRequest = require("sync-request");
-
-//var XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
 const https=require("https");
 const HTTP_SERVICE_PORT = 3020;
@@ -148,9 +144,13 @@ function HTMLize(str) {
  * @param {string} parentLang the language of the XML element which is the parent of node
  * @returns {string} the @lang attribute of the node element of the parentLang if it does not exist of is not specified
  */
-function GetLanguage(validator, errs, node, parentLang) {
-	if (!node && !node.attr('lang'))
+function GetLanguage(validator, errs, node, parentLang, isRequired) {
+	if (!node) 
 		return parentLang;
+	if (!node.attr('lang') && isRequired) {
+		errs.push("@lang is required for \""+node.name()+"\""));
+		return parentLang;		
+	}
 
 	var localLang = node.attr('lang').value();
 	if (!validator)
@@ -375,16 +375,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
 
 
 
-/**
- * Add an error message when the @href is not specified for an element
- *
- * @param {Object} errs Errors buffer
- * @param {String} src The element missing the @href
- * @param {String} loc The location of the element
- */
-function NoHrefAttribute(errs, src, loc) {
-	errs.push("no @href specified for "+src+" in "+loc);
-}
+
 
 /**
  * check if the node provided contains an RelatedMaterial element for a signalled application
@@ -628,14 +619,14 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						
 						if (pgChild.name()=="ParentalRating") {
 							if (!pgChild.attr('href'))
-								errs.push("@href not specified in <ParentalRating>");
+								NoHrefAttribute(errs, "<ParentalRating>", "<ParentalGuidance>")
 						}
 					}
 					if (pgChild.name()=="ExplanatoryText") {
 						countExplanatoryText++;
-						if (pgChild.attr("length")) {
-							if (pgChild.attr("length").value()!="long")
-								errs.push("@length=\""+pgChild.attr("length").value()+"\" is not allowed for <ExplanatoryText>")
+						if (pgChild.attr('length')) {
+							if (pgChild.attr('length').value()!="long")
+								errs.push("@length=\""+pgChild.attr('length').value()+"\" is not allowed for <ExplanatoryText>")
 						}
 						else 
 							errs.push("@length=\"long\" is required for <ExplanatoryText>");
@@ -780,6 +771,19 @@ function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, min
 }
 
 
+//------------------------------- ERROR TEMPLATES -------------------------------
+/**
+ * Add an error message when the a required element is not present
+ *
+ * @param {Object} errs Errors buffer
+ * @param {String} missingElement Name of the missing element
+ * @param {string} parentElement Name of the element which should contain the missingElement
+ * @param {String} schemaLoctation The location in the schema of the element
+ */
+function NoChildElement(errs, missingElement, parentElement, schemaLocation=null) {
+	errs.push(missingElement+" element not specified for "+parentElem + (schemalocation)?" in "+schemalocation:"");
+}
+
 /**
  * Add an error message when the @href contains an invalid value
  *
@@ -811,8 +815,9 @@ function NoHrefAttribute(errs, src, loc) {
  * @param {String} loc The location of the element
  */
 function NoAuxiliaryURI(errs, src, loc) {
-	errs.push("<AuxiliaryURI> not specified for "+src+" <MediaLocator> in "+loc);
+	NoChilsElement(errs, "<AuxiliaryURI>", src+" <MediaLocator>", loc )
 }
+
 
 /**TemplateAITPromotional Still Image
  *
@@ -832,14 +837,14 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
     }
 
     if (!HowRelated) {
-        errs.push("<HowRelated> not specified for <RelatedMaterial> in "+Location);
+		NoChildElement(errs, "<HowRelated>", "<RelatedMaterial>", Location);
 		return;
     }
 	var HRhref=HowRelated.attr("href");
 	
 	if (HRhref) {
 		if (HRhref.value() != dvbi.TEMPLATE_AIT_URI) 
-			errs.push("HowRelated@href=\""+HRhref+"\" does not designate a Template AIT");
+			errs.push("HowRelated@href=\""+HRhref.value()+"\" does not designate a Template AIT");
 		else {		
 			if (MediaLocator.length != 0) 
 				MediaLocator.forEach(ml => {
@@ -848,7 +853,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 						if (child.name()=="AuxiliaryURI") {
 							hasAuxiliaryURI=true;
 							if (!child.attr("contentType")) 
-								errs.push("@contentType not specified for Template IT <AuxiliaryURI> in "+Location);
+								NoChildElement(errs, "@contentType", "Template IT <AuxiliaryURI>", Location);
 							else {
 								var contentType=child.attr("contentType").value();
 								if (contentType != dvbi.XML_AIT_CONTENT_TYPE) 
@@ -860,7 +865,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 						NoAuxiliaryURI(errs, "template AIT", Location);
 				});
 			else 
-				errs.push("MediaLocator not specified for <RelatedMaterial> in "+Location);
+				NoChildElement(errs, "<MediaLocator>", "<RelatedMaterial>", Location);
 		}
 	}
 	else 
@@ -889,7 +894,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     }
 
     if (!HowRelated) {
-        errs.push("<HowRelated> not specified for <RelatedMaterial> in "+Location);
+		NochildElement(errs, "<HowRelated>", "<RelatedMaterial>", Location);
 		return;
     }
 	var HRhref=HowRelated.attr("href");
@@ -903,9 +908,9 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					if (child.name() == "StillPictureFormat") {
 						hasStillPictureFormat=true;
 						if (!child.attr("horizontalSize")) 
-							errs.push("@horizontalSize not specified for <RelatedMaterial><Format><StillPictureFormat> in "+Location );
+							NoChildElement(errs, "@horizontalSize", "<RelatedMaterial><Format><StillPictureFormat>", Location);
 						if (!child.attr("verticalSize")) 
-							errs.push("@verticalSize not specified for <RelatedMaterial><Format><StillPictureFormat> in "+Location );
+							NoChildElement(errs, "@verticalSize", "<RelatedMaterial><Format><StillPictureFormat>", Location);
 						if (child.attr("href")) {
 							var href=child.attr("href").value();
 							if (href != JPEG_IMAGE_CS_VALUE && href != PNG_IMAGE_CS_VALUE) 
@@ -918,7 +923,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					}
 				});
 				if (!hasStillPictureFormat) 
-					errs.push("<StillPictureFormat> not specified for <Format> in "+Location);
+					NoChildElement(errs, "<StillPictureFormat>", "<Format>",Location);
 			}
 
 			if (MediaLocator.length != 0) 
@@ -928,7 +933,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						if (child.name()=="MediaUri") {
 							hasMediaURI=true;
 							if (!child.attr("contentType")) 
-								errs.push("@contentType not specified for logo <MediaUri> in "+Location);
+								NoChildElement(errs, "@contentType", "logo <MediaURI>", Location);
 							else {
 								var contentType=child.attr("contentType").value();
 								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
@@ -942,7 +947,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						NoMediaLocator(errs, "logo", Location);
 				});
 			else 
-				errs.push("MediaLocator not specified for <RelatedMaterial> in "+Location);
+				NoChildElement(errs, "<MediaLocator>", "<RelatedMaterial>", Location);
 		}
 	}
 	else 
@@ -966,10 +971,10 @@ function ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescri
 		if (RelatedMaterial.name()=="RelatedMaterial") {
 			var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":HowRelated", CG_SCHEMA);
 			if (!HowRelated) 
-				errs.push("<HowRelated> element not specified for <RelatedMaterial>");
+				NoChildElement(errs, "<HowRelated>", "<RelatedMaterial>")
 			else {				
 				if (!HowRelated.attr('href')) 
-					errs.push("@href not specified for <HowRelated> element in <RelatedMaterial>");
+					NoHrefAttribute(errs, "<HowRelated>", "<RelatedMaterial>");
 				else {
 					var hrHref=HowRelated.attr('href').value();
 					switch (hrHref) {
@@ -994,7 +999,7 @@ function ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescri
 							ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">");
 							break;
 						default:
-							errs.push("HowRelated@href=\""+hrHref+"\" is not valid for <RelatedMaterial> in Box Set List");
+							InvalidHrefValue(errs, +hrHref, "<HowRelated>", "<RelatedMaterial> in Box Set List");
 					}	
 				}
 			}
@@ -1083,7 +1088,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":BasicDescription", CG_SCHEMA);
 
 	if (!BasicDescription) 
-		errs.push("<BasicDescription> not specified for "+parentElement.name())
+		NoChildElement(errs, "<BasicDescription>", parentElement.name());
 	else {
 		var bdLang=GetLanguage(knownLanguages, errs, BasicDescription, parentLanguage);
 
@@ -1241,7 +1246,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
  */
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, parentLanguage) {
 	if (!ProgramInformation.attr('programId')) 
-		errs.push("@programId not specified for <ProgramInformation>");
+		NoChildElement(errs, "@progrsmId", "<ProgramInformation>")
 	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage);
 
 	// <ProgramInformation><BasicDescription>
@@ -1614,7 +1619,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 			SCHEMA_NAMESPACE=CG.root().namespace().href();
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
-		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE);
+		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true);
 		
 		var ProgramDescription=CG.get(SCHEMA_PREFIX+":ProgramDescription", CG_SCHEMA);
 		if (!ProgramDescription) {
