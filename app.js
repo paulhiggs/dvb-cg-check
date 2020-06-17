@@ -1807,25 +1807,56 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
  * @param {Class}  errs                errors found in validaton
  */
 function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, parentLanguage, programCRIDs, requestType, errs) {
-	
+
+	function isRestartIndicator(str) {
+		return str==dvbi.RESTART_AVAILABLE
+		    || str==dvbi.RESTART_CHECK
+			|| str==dvbi.RESTART_PENDING;
+	}
+
+	function isMediaAvailability(str) { return str==dvbi.MEDIA_AVAILABLE || str==dvbi.MEDIA_AVAILABLE; }
+	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
+	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
+
 	if (VerifyType=="OnDemandProgram") {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, ["Genre"], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier"], requestType, errs);
 	} else if (VerifyType=="ScheduleEvent") {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier", "Genre", "HowRelated"], requestType, errs);	
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier", "Genre", "RelatedMaterial"], requestType, errs);	
 	}
 	else
 		errs.push("--> ValidateInstanceDescription called with VerifyType="+VerifyType);
 	
 	// <Genre>
 	if (VerifyType=="OnDemandProgram") {
+		// A177ve Table 54 - must be 2 elements
+		var Genre1=InstanceDescription.get(SCHEMA_PREFIX+":Genre[0]", CG_SCHEMA);
+		var Genre2=InstanceDescription.get(SCHEMA_PREFIX+":Genre[1]", CG_SCHEMA);
+		var Genre3=InstanceDescription.get(SCHEMA_PREFIX+":Genre[2]", CG_SCHEMA);
+		
+		if (Genre3 || !Genre2 || !Genre1)
+			errs.push("exactly 2 <"+InstanceDescription.name()+".Genre> element are required for "+VerifyType);
+		
+		if (Genre1 && !isAvailability(Genre1.text()))
+			errs.push(InstanceDescription.name()+"."+Genre1.name()+"must contain an availability indicator");
+		if (Genre2 && !isAvailability(Genre2.text()))
+			errs.push(InstanceDescription.name()+"."+Genre2.name()+"must contain an availability indicator");
+		if (Genre1 && Genre2) {
+			if ((isMediaAvailability(Genre1.text()) && isMediaAvailability(Genre2.text()))
+			 || (isMEPGAvailability(Genre1.text()) && isEPGAvailability(Genre2.text())))
+				errs.push(InstanceDescripton.name()+"."+Genre1.name()+" elements must indicate different availabilities")
+		}
 		
 	} else if (VerifyType=="ScheduleEvent") {
-		
+		var Genre=InstanceDescription.get(SCHEMA_PREFIX+":Genre", CG_SCHEMA);
+		if (Genre && !isRestartGenre(Genre.text()))
+			errs.push(InstanceDescription.name()+"."+Genre.name()+" must contain a restart indictor")
 	}
 	
 	// <CaptionLanguage>
+	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":CaptionLanguage", CG_SCHEMA);
 	
 	// <SignLanguage>
+	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":SignLanguage", CG_SCHEMA);
 	
 	// <AVAttributes>
 	
@@ -1836,7 +1867,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		
 	}
 	
-	// <HowRelated>
+	// <RelatedMaterial>
 	if (VerifyType=="ScheduleEvent") {
 		
 	}
