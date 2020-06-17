@@ -14,8 +14,7 @@ const {loadCS}=require("./dvb-common/CS_handler.js");
 
 const ISOcountries=require("./dvb-common/ISOcountries.js");
 
-// curl from https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
-const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-registry");
+
 const IANAlanguages=require("./dvb-common/IANAlanguages.js");
 
 
@@ -74,7 +73,13 @@ const ISO3166_URL=COMMON_REPO_RAW + "iso3166-countries.json",
 	  ISO3166_Filename=path.join("dvb-common","iso3166-countries.json");
       
 
+// curl from https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
+const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-registry"),
+      IANA_Subtag_Registry_URL="https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry";
+
 var allowedGenres=[], allowedCreditItemRoles=[];
+var knownCountries=new ISOcountries(false, true);
+var knownLanguages=new IANAlanguages();
 
 morgan.token("protocol", function getProtocol(req) {
     return req.protocol;
@@ -152,6 +157,9 @@ function GetLanguage(validator, errs, node, parentLang, isRequired) {
 		return parentLang;		
 	}
 
+	if (!node.attr('lang'))
+		return parentLang;
+	
 	var localLang=node.attr('lang').value();
 	if (!validator)
 		errs.push("cannot validate language \""+localLang+"\" for \""+node.name()+"\"");
@@ -184,7 +192,7 @@ function addRoles(values, data) {
 }
 
 /**
- * read a the list of valid roles from a file 
+ * read the list of valid roles from a file 
  *
  * @param {Array} values         the linear list of values 
  * @param {String} rolesFilename the filename to load
@@ -200,7 +208,7 @@ function loadRolesFromFile(values, rolesFilename) {
 }
 
 /**
- * read a the list of valid roles from a network location referenced by a REL  
+ * read the list of valid roles from a network location referenced by a REL  
  *
  * @param {Array} values 	The linear list of values
  * @param {String} rolesURL URL to the load
@@ -252,12 +260,98 @@ function isEmpty(obj) {
  *
  * @param {string} str        string contining the decimal value
  * @returns {integer}  the decimal representation of the string, or 0 is non-digits are included
- * 
  */
 function valUnsignedInt(str) {
 	var intRegex=/[\d]+/g;
 	var s=str.match(intRegex);
 	return s[0]===str ? parseInt(str, 10) : 0;
+}
+
+/**
+ * checks if the argument complies to an XML representation of UTC time
+ *
+ * @param {string} str string contining the UTC time
+ * @returns {boolean}  true is the argment is formatted according to UTC ("Zulu") time
+ */ /*
+function isUTCTime(str) {
+	//	<pattern value="(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z"/>
+	const UTCregex=/(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z/g;
+	var s=str.match(UTCregex);
+	return s?s[0]===str:false;
+} */
+
+/**
+ * checks if the argument complies to an XML representation of UTC time
+ *
+ * @param {string} str string contining the UTC time
+ * @returns {boolean}  true is the argment is formatted according to UTC ("Zulu") time
+ */
+function isUTCDateTime(str) {
+	const UTCregex=/^[\d]{4}-((0[1-9])|(1[0-2]))-((0[1-9])|1\d|2\d|(3[0-1]))T(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z$/;
+	var s=str.match(UTCregex);
+	return s?s[0]===str:false;
+}
+
+/**
+ * checks if the argument complies to an XML representation of UTC time
+ *
+ * @param {string} duration string contining the UTC time
+ * @returns {boolean}  true is the argment is formatted according to UTC ("Zulu") time
+ */
+function isISODuration(duration) {
+	const isoRegex = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
+	var s=duration.match(isoRegex);
+	return s?s[0]===duration:false;
+}
+ 
+function parseISOduration(duration) {
+	var durationRegex = /^(-)?P(?:(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?|(\d+)W)$/;
+	var parsed;
+	duration && duration.replace(durationRegex, function (_, sign, year, month, day, hour, minute, second, week) {
+		sign = sign ? -1 : 1;
+		// parse number for each unit
+		var units = [year, month, day, hour, minute, second, week].map(function (num) { return parseInt(num, 10) * sign || 0; });
+		parsed = {year: units[0], month: units[1], week: units[6], day: units[2], hour: units[3], minute: units[4], second: units[5]};
+	});
+	// no regexp match
+	if (!parsed) { throw new Error('Invalid duration "' + duration + '"'); }
+	/**
+	 * Sum or substract parsed duration to date
+	 *
+	 * @param {Date} date: A valid date instance
+	 * @throws {TypeError} When date is not valid
+	 * @returns {Date} Date plus or minus duration, according duration sign
+	 */
+	parsed.add = function add (date) {
+		if (Object.prototype.toString.call(date) !== '[object Date]' || isNaN(date.valueOf())) {
+			throw new TypeError('Invalid date');
+		}
+		return new Date(Date.UTC(
+			date.getUTCFullYear() + parsed.year,
+			date.getUTCMonth() + parsed.month,
+			date.getUTCDate() + parsed.day + parsed.week * 7,
+			date.getUTCHours() + parsed.hour,
+			date.getUTCMinutes() + parsed.minute,
+			date.getUTCSeconds() + parsed.second,
+			date.getUTCMilliseconds()
+		));
+	};
+	
+	return parsed;	
+}
+
+
+/**
+ * checks if the argument complies to a DVB locator according to clause 6.4.2 of ETSI TS 102 851 
+ * i.e. dvb://<original_network_id>..<service_id> ;<event_id>
+ *
+ * @param {string} locator string contining the DVB locator
+ * @returns {boolean}  true is the argment is formatted as a DVB locator
+ */
+function isDVBLocator(locator) {
+	const locatorRegex = /^dvb:\/\/[\dA-Fa-f]+\.[\dA-Fa-f]*\.[\dA-Fa-f]+;[\dA-Fa-f]+$/;
+	var s=locator.match(locatorRegex);
+	return s?s[0]===locator:false;
 }
 
 
@@ -409,6 +503,7 @@ function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
 function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, childElements, requestType, errs) {
 	// check that each of the specifid childElements exists
 	childElements.forEach(elem => {
+//DEB console.log("-->check: ", SCHEMA_PREFIX+":"+elem)
 		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
 			errs.push("Element <"+elem+"> not specified in <"+parentElement.name()+">");
 	});
@@ -422,6 +517,83 @@ function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, child
 		}
 	}
 }
+
+
+/**
+ * check that the specified child elements are in the parent element
+ *
+ * @param {string} CG_SCHEMA     Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
+ * @param {Object} parentElement the element whose children should be checked
+ * @param {Array}  childElements the element names permitted within the parent
+ * @param {string} requestType   the type of content guide request being checked
+ * @param {Class}  errs          errors found in validaton
+ */
+function checkRequiredTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, childElements, requestType, errs) {
+	// check that each of the specifid childElements exists
+	childElements.forEach(elem => {
+		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
+			errs.push("Element <"+elem+"> not specified in <"+parentElement.name()+">");
+	});
+}
+
+
+/**
+ * check that the specified child elements are in the parent element
+ *
+ * @param {string} CG_SCHEMA              Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX          Used when constructing Xpath queries
+ * @param {Object} parentElement          the element whose children should be checked
+ * @param {Array}  mandatoryChildElements the names of elements that are required within the element
+ * @param {Array}  optionalChildElements  the names of elements that are optional within the element
+ * @param {string} requestType            the type of content guide request being checked
+ * @param {Class}  errs                   errors found in validaton
+ */
+function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChildElements, optionalChildElements, requestType, errs) {
+	// check that each of the specifid childElements exists
+	mandatoryChildElements.forEach(elem => {
+		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
+			errs.push("Mandatory element <"+elem+"> not specified in <"+parentElement.name()+">");
+	});
+	
+	// check that no additional child elements existance
+	var c=0, child;
+	while (child=parentElement.child(c++)) {
+		var childName=child.name();
+		if (!isIn(mandatoryChildElements, childName) &&!isIn(optionalChildElements, childName)) {
+			if (childName!='text')
+				errs.push("Element <"+childName+"> is not permitted in <"+parentElement.name()+">");
+		}
+	}
+}
+
+
+
+/**
+ * check that the specified child elements are in the parent element
+ *
+ * @param {string} CG_SCHEMA          Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX      Used when constructing Xpath queries
+ * @param {Object} Element            the element whose attributes should be checked
+ * @param {Array}  requiredAttributes the element names permitted within the parent
+ * @param {Array}  optionalAttributes the element names permitted within the parent
+ * @param {string} requestType        the type of content guide request being checked
+ * @param {Class}  errs               errors found in validaton
+ */
+function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Element, requiredAttributes, optionalAttributes, requestType, errs)
+{
+	requiredAttributes.forEach(attributeName => {
+		if (!Element.attr(attributeName))
+			errs.push(Element.name()+"@"+attributeName+" is a required attribute");
+		
+	});
+	
+	Element.attrs().forEach(attribute => {
+		if (!isIn(requiredAttributes, attribute.name()) && !isIn(optionalAttributes, attribute.name()))
+			errs.push("@"+attribute.name()+"is not permitted in <"+Element.name()+">");
+	});
+}
+
 
 /**
  * see if the named child element exists in the parent
@@ -1240,13 +1412,22 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} ProgramInformation  the element whose children should be checked
+ * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
+ * @param {array}  programCRIDs        array to record CRIDs for later use 
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
- * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
  */
-function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, parentLanguage) {
-	if (!ProgramInformation.attr('programId')) 
-		NoChildElement(errs, "@progrsmId", "<ProgramInformation>")
+function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, requestType, errs) {
+	if (ProgramInformation.attr('programId')) {
+		var programCRID=ProgramInformation.attr('programId').value();
+		if (!isCRIDURI(programCRID)) 
+			errs.push(ProgramInformation.name()+"@programId is not a valid CRID ("+programCRID+")");
+		if (isIn(programCRIDs, programCRID))
+			errs.push(ProgramInformation.name()+"@programId=\""+programCRID+"\" is already used");
+		else programCRIDs.push(programCRID);
+	}
+	else NoChildElement(errs, "@programId", "<ProgramInformation>");
+	
 	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage);
 
 	// <ProgramInformation><BasicDescription>
@@ -1271,10 +1452,11 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
  * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
+ * @param {array}  programCRIDs        array to record CRIDs for later use 
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
+function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs,requestType, errs) { 
 	var pi=0, ProgramInformation;
 	var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":ProgramInformationTable", CG_SCHEMA);
 	
@@ -1294,7 +1476,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 */
 	while (ProgramInformation=ProgramInformationTable.child(pi++)) 
 		if (ProgramInformation.name()=="ProgramInformation") 
-			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, pitLang);
+			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, requestType, errs);
 }
 
 
@@ -1560,16 +1742,227 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 
 
 /**
+ * validate an <OnDemandProgram> elements in the <ProgramLocationTable>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} OnDemandProgram     the node containing the <OnDemandProgram> being checked
+ * @param {string} progDescrLang       XML language of the parent element (expliclt or implicit from its parent(s))
+ * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs errors found in validaton
+ */
+function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, requestType, errs) {
+
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, ["Program","ProgramURL","InstanceDescription","PublishedDuration","StartOfAvailability","EndOfAvailability","DeliveryMode","Free"], ["AuxiliaryURL"], requestType, errs);
+	
+	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage);	
+	
+	var soa=OnDemandProgram.get(SCHEMA_PREFIX+":StartOfAvailability", CG_SCHEMA),
+	    eoa=OnDemandProgram.get(SCHEMA_PREFIX+":EndOfAvailability", CG_SCHEMA);
+	
+	if (soa) 
+		if (!isUTCDateTime(soa.text())) {
+			errs.push(soa.name()+" must be expressed in Zulu time");
+			soa=null;
+		}
+	if (eoa) 
+		if (!isUTCDateTime(eoa.text())) {
+			errs.push(eoa.name()+" must be expressed in Zulu time");
+			eoa=null;
+		}
+	if (soa && eoa) {
+		var fr=new Date(soa.text()), to=new Date(eoa.text());	
+		if (to.getTime() < fr.getTime()) 
+			errs.push(soa.name()+" must be earlier than "+eoa.name());
+	}
+	
+	var DeliveryMode=OnDemandProgram.get(SCHEMA_PREFIX+":DeliveryMode", CG_SCHEMA);
+	if (DeliveryMode) { // existance check and report done previously
+		if (DeliveryMode.text()!="streaming")
+			errs.push(OnDemandProgram.name()+"."+DeliveryMode.name()+" must be \"streaming\"");
+	}
+	
+	var Free=OnDemandProgram.get(SCHEMA_PREFIX+":Free", CG_SCHEMA);
+	if (Free) { // existance check and report done previously
+		if (Free.attr('value')) {
+			if (Free.attr('value').value()!="true")
+				errs.push(OnDemandProgram.name()+"."+Free.name()+"@value must be \"true\"");
+		}
+		else errs.push(OnDemandProgram.name()+"."+Free.name()+"@value is a required attribute");
+	}
+}	
+
+
+/**
+ * validate any <InstanceDescription> elements in the <ProgramLocationTable.Schedule.ScheduleEvent>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {string} VerifyType		   the type of verification to perform (OnDemandProgram | ScheduleEvent)
+ * @param {Object} InstanceDescription the <InstanceDescription> node to be checked
+ * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
+ * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ */
+function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, parentLanguage, programCRIDs, requestType, errs) {
+	
+	if (VerifyType=="OnDemandProgram") {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, ["Genre"], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier"], requestType, errs);
+	} else if (VerifyType=="ScheduleEvent") {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier", "Genre", "HowRelated"], requestType, errs);	
+	}
+	else
+		errs.push("--> ValidateInstanceDescription called with VerifyType="+VerifyType);
+	
+	// <Genre>
+	if (VerifyType=="OnDemandProgram") {
+		
+	} else if (VerifyType=="ScheduleEvent") {
+		
+	}
+	
+	// <CaptionLanguage>
+	
+	// <SignLanguage>
+	
+	// <AVAttributes>
+	
+	// <OtherIdentifier>
+	if (VerifyType=="OnDemandProgram") {
+		
+	} else if (VerifyType=="ScheduleEvent") {
+		
+	}
+	
+	// <HowRelated>
+	if (VerifyType=="ScheduleEvent") {
+		
+	}
+}
+
+/**
+ * validate any <ScheduleEvent> elements in the <ProgramLocationTable.Schedule>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} Schedule            the <Schedule> node containing the <ScheduleEvent> element to be checked
+ * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
+ * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {Date}   scheduleStart	   Date representation of Schedule@start
+ * @param {Date}   scheduleEnd  	   Date representation of Schedule@end
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ */
+function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, scheduleStart, scheduleEnd, requestType, errs) {
+
+	var se=0, ScheduleEvent;
+	while (ScheduleEvent=Schedule.child(se++)) 
+		if (ScheduleEvent.name()=="ScheduleEvent") {
+			var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage);
+			
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, ["Program", "PublishedStartTime", "PublishedDuration"], ["ProgramURL", "InstanceDescription", "ActualStartTime", "FirstShowing", "Free"], requestType, errs);
+			
+			// <Program>
+			var Program=ScheduleEvent.get(SCHEMA_PREFIX+":Program", CG_SCHEMA);
+			if (Program) {
+				var ProgramCRID=Program.attr('crid');
+				if (ProgramCRID) {
+					if (!isCRIDURI(ProgramCRID.value()))
+						errs.push(Program.name()+"@crid is not a valid CRID ("+ProgramCRID.value()+")");
+					if (!isIn(programCRIDs, ProgramCRID.value()))
+						errs.push(Program.name()+"@crid=\""+ProgramCRID.value()+"\" does not refer to a program in the <ProgramInformationTable>")
+				}
+			}
+			
+			// <ProgramURL>
+			var ProgramURL=ScheduleEvent.get(SCHEMA_PREFIX+":ProgramURL", CG_SCHEMA);
+			if (ProgramURL) 
+				if (!isDVBLocator(ProgramURL.text()))
+					errs.push("ScheduleEvent.ProgramURL ("+ProgramURL.text()+")is not a valid DVB locator");		
+			
+			// <InstanceDescription>
+			var InstanceDescription=ScheduleEvent.get(SCHEMA_PREFIX+":InstanceDescription", CG_SCHEMA);
+			if (InstanceDescription) 
+				ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent.name(), InstanceDescription, seLang, programCRIDs,requestType, errs);
+			
+			// <PublishedStartTime> and <PublishedDuration>
+			var psdElem=ScheduleEvent.get(SCHEMA_PREFIX+":PublishedStartTime", CG_SCHEMA);
+			var PublishedStartTime=new Date(psdElem?psdElem.text():0);
+
+			if (psdElem) {
+				if (PublishedStartTime < scheduleStart) 
+					errs.push("PublishedStartTime ("+PublishedStartTime+") is earlier than Schedule@start");
+				if (PublishedStartTime > scheduleEnd) 
+					errs.push("PublishedStartTime ("+PublishedStartTime+") is after Schedule@end");	
+
+				var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":PublishedDuration", CG_SCHEMA);
+				if (pdElem) {
+					var parsedPublishedDuration = parseISOduration(pdElem.text());
+					if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
+						errs.push("StartTime+Duration of event is after Schedule@end");
+				}
+			}
+		}
+}
+
+
+/**
+ * validate a <Schedule> elements in the <ProgramLocationTable>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} Schedule            the node containing the <Schedule> being checked
+ * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
+ * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ */
+function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, requestType, errs) {
+
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [], ["ScheduleEvent"], requestType, errs);
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Schedule, ["serviceIDRef", "start", "end"], [], requestType, errs);
+	
+	var scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage);	
+	
+	var startSchedule=Schedule.attr("start"), fr=null, endSchedule=Schedule.attr("end"), to=null;
+	if (startSchedule)
+		if (isUTCDateTime(startSchedule.value())) 
+			fr=new Date(startSchedule.value());
+		else {
+			errs.push(Schedule.name()+"@"+startSchedule.name()+" is not expressed in UTC format ("+startSchedule.value()+")");
+			startSchedule=null;
+		}
+
+	if (endSchedule)
+		if (isUTCDateTime(endSchedule.value())) 
+			to=new Date(endSchedule.value());
+		else {
+			errs.push(Schedule.name()+"@"+endSchedule.name()+" is not expressed in UTC format ("+endSchedule.value()+")");
+			endSchedule=null;
+		}
+	if (startSchedule && endSchedule) {
+		if (to.getTime() < fr.getTime()) 
+			errs.push(startSchedule.name()+" must be earlier than "+endSchedule.name());
+	}
+	
+	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, fr, to, requestType, errs);
+}
+
+
+/**
  * find and validate any <ProgramLocation> elements in the <ProgramLocationTable>
  *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
  * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
+ * @param {array}  programCRIDs        array to record CRIDs for later use  
  * @param {string} requestType         the type of content guide request being checked
- * @param {Class}  errs errors found in validaton
+ * @param {Class}  errs                errors found in validaton
  */
-function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) {
+function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs) {
 
 	var ProgramLocationTable=ProgramDescription.get(SCHEMA_PREFIX+":ProgramLocationTable", CG_SCHEMA);
 	if (!ProgramLocationTable) {
@@ -1579,13 +1972,13 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, progDescrLang);	
 	
 	var c=0, child;
-	while (child=ProgramLocationTable.child(c++)) {
+	while (child=ProgramLocationTable.child(c++)) {		
 		switch (child.name()) {
 			case "OnDemandProgram":
-				//TODO:
+				ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, requestType, errs);
 				break;
 			case "Schedule":
-				//TODO:
+				ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, requestType, errs);
 				break;
 		}
 		
@@ -1653,8 +2046,9 @@ function validateContentGuide(CGtext, requestType, errs) {
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, ["ProgramLocationTable","ProgramInformationTable"], requestType, errs);
 			
-			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs);
+			var programCRIDs=[];
+			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs,requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
@@ -1802,9 +2196,6 @@ function processFile(req,res) {
 }
 
 
-var knownCountries=new ISOcountries(false, true);
-var knownLanguanges=new IANAlanguages();
-
 function loadDataFiles(useURLs) {
 	console.log("loading classification schemes...");
     allowedGenres=[];
@@ -1816,7 +2207,8 @@ function loadDataFiles(useURLs) {
 	knownCountries.loadCountriesFromFile(ISO3166_Filename, true);
   
     console.log("loading languages...");
-	knownLanguanges.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
+	knownLanguages.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
+	//knownLanguages.loadLanguagesFromURL(IANA_Subtag_Registry_URL, true);
 	
 	console.log("loading CreditItem roles...");
 	allowedCreditItemRoles=[];
