@@ -148,7 +148,7 @@ function GetLanguage(validator, errs, node, parentLang, isRequired) {
 	if (!node) 
 		return parentLang;
 	if (!node.attr('lang') && isRequired) {
-		errs.push("@lang is required for \""+node.name()+"\""));
+		errs.push("@lang is required for \""+node.name()+"\"");
 		return parentLang;		
 	}
 
@@ -1364,7 +1364,6 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 	
 	if (!isCategoryGroup && (requestType!=CG_REQUEST_SCHEDULE_NOWNEXT && requestType!=CG_REQUEST_SCHEDULE_WINDOW)) {
 		elem=GroupInformation.get(SCHEMA_PREFIX+":MemberOf", CG_SCHEMA);
-		elem=GroupInformation.get(SCHEMA_PREFIX+":MemberOf", CG_SCHEMA);
 		if (elem) {
 			if (elem.attr("type")) {
 				if (elem.attr("type").value()!="MemberOfType")
@@ -1568,9 +1567,30 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
  * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
  * @param {string} progDescrLang       XML language of the ProgramDescription element (or its parent(s))
  * @param {string} requestType         the type of content guide request being checked
- * @param {Class} errs errors found in validaton
+ * @param {Class}  errs errors found in validaton
  */
-function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) { 
+function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, errs) {
+
+	var ProgramLocationTable=ProgramDescription.get(SCHEMA_PREFIX+":ProgramLocationTable", CG_SCHEMA);
+	if (!ProgramLocationTable) {
+		errs.push("<ProgramLocationTable> is not specified");
+		return;
+	}
+	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, progDescrLang);	
+	
+	var c=0, child;
+	while (child=ProgramLocationTable.child(c++)) {
+		switch (child.name()) {
+			case "OnDemandProgram":
+				//TODO:
+				break;
+			case "Schedule":
+				//TODO:
+				break;
+		}
+		
+		
+	}
 }
 
 
