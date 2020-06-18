@@ -140,6 +140,13 @@ function HTMLize(str) {
 }
 
 
+function CheckLanguage(validator, errs, lang, loc="" ) {
+	if (!validator)
+		errs.push("cannot validate language \""+lang+"\""+(loc!=""?" for \""+loc+"\"":""));
+	else if (!validator.isKnown(lang)) 
+		errs.push("language \""+lang+"\" specified"+(loc!=" for \""+loc+"\""? :"")+" is invalid");	
+}
+
 /**
  * validate the language specified record any errors
  *
@@ -161,10 +168,7 @@ function GetLanguage(validator, errs, node, parentLang, isRequired) {
 		return parentLang;
 	
 	var localLang=node.attr('lang').value();
-	if (!validator)
-		errs.push("cannot validate language \""+localLang+"\" for \""+node.name()+"\"");
-	else if (!validator.isKnown(localLang)) 
-		errs.push("language \""+localLang+"\" specified for \""+node.name()+"\" is invalid");
+	CheckLanguage(validator, errs, localLang, node.name());
 	return localLang;
 }
 
@@ -665,7 +669,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 					errs.push("@length=\""+synopsisLength+"\" is not permitted for this request type");
 			}
 			else 
-				errs.push("@length attribute is required for <Synopsis>"); //!!!!
+				errs.push("@length attribute is required for <Synopsis>");
 			
 			if (synopsisLang && synopsisLength) {
 				switch (synopsisLength) {
@@ -1741,6 +1745,12 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 }
 
 
+function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
+	var count=0, elem;
+	while (elem=node.get(SCHEMA_PREFIX+":"+elementName+"["+count+"]")) count++;
+	return count;
+}
+
 /**
  * validate any <InstanceDescription> elements in the <ProgramLocationTable.Schedule.ScheduleEvent>
  *
@@ -1814,10 +1824,20 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	}
 	
 	// <CaptionLanguage>
+	var captionCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, "CaptionLanguage");
+	if (captionCount > 1)
+		errs.push("only a single CaptionLanguage element is premitted in "+InstanceDesciption.name());
 	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":CaptionLanguage", CG_SCHEMA);
+	if (CaptionLanguage)
+		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name());
 	
 	// <SignLanguage>
+	var signCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, "SignLanguage");
+	if (signCount > 1)
+		errs.push("only a single SignLanguage element is premitted in "+InstanceDesciption.name());
 	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":SignLanguage", CG_SCHEMA);
+	if (SignLanguage)
+		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name());
 	
 	// <AVAttributes>
 	
