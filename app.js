@@ -1742,6 +1742,100 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 
 
 /**
+ * validate any <InstanceDescription> elements in the <ProgramLocationTable.Schedule.ScheduleEvent>
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {string} VerifyType		   the type of verification to perform (OnDemandProgram | ScheduleEvent)
+ * @param {Object} InstanceDescription the <InstanceDescription> node to be checked
+ * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
+ * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ */
+function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, parentLanguage, programCRIDs, requestType, errs) {
+
+	function isRestartIndicator(str) { return str==dvbi.RESTART_AVAILABLE || str==dvbi.RESTART_CHECK || str==dvbi.RESTART_PENDING; }
+	function isMediaAvailability(str) { return str==dvbi.MEDIA_AVAILABLE || str==dvbi.MEDIA_UNAVAILABLE; }
+	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
+	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
+	function checkGenre(node, parentNode, hrefAttribute) {
+		if (!node) return null;
+		var GenreType=(node.attr('type')?node.attr('type').value():"other");
+		if (GenreType!="other")
+			errs.push(parentNode.name()+"."+node.name()+"@value must contain \"other\"");
+		if (!node.attr('href'))
+			NoHrefAttribute(errs, node.name(), parentNode.name());
+		return (node.attr('href')?node.attr('href').value():null);
+	}
+
+	if (VerifyType=="OnDemandProgram") {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, ["Genre"], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier"], requestType, errs);
+	} else if (VerifyType=="ScheduleEvent") {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier", "Genre", "RelatedMaterial"], requestType, errs);	
+	}
+	else
+		errs.push("--> ValidateInstanceDescription called with VerifyType="+VerifyType);
+	
+	// <Genre>
+	if (VerifyType=="OnDemandProgram") {
+		// A177ve Table 54 - must be 2 elements
+		
+		var Genre1=InstanceDescription.get(SCHEMA_PREFIX+":Genre[1]", CG_SCHEMA);
+		var Genre2=InstanceDescription.get(SCHEMA_PREFIX+":Genre[2]", CG_SCHEMA);
+		var Genre3=InstanceDescription.get(SCHEMA_PREFIX+":Genre[3]", CG_SCHEMA);
+			
+		if (Genre3 || !Genre2 || !Genre1)
+			errs.push("exactly 2 <"+InstanceDescription.name()+".Genre> elements are required for "+VerifyType);
+
+		var g1href=checkGenre(Genre1, InstanceDescription);
+		if (Genre1 && !isAvailability(g1href))
+			errs.push(InstanceDescription.name()+"."+Genre1.name()+" 1 must contain a media or fepg availability indicator");
+
+		var g2href=checkGenre(Genre2, InstanceDescription);		
+		if (Genre2 && !isAvailability(g2href))
+			errs.push(InstanceDescription.name()+"."+Genre2.name()+" 2 must contain a media or fepg availability indicator");
+		
+		if (Genre1 && Genre2) {
+			if ((isMediaAvailability(g1href) && isMediaAvailability(g2href))
+			 || (isEPGAvailability(g1href) && isEPGAvailability(g2href)))
+				errs.push(InstanceDescripton.name()+"."+Genre1.name()+" elements must indicate different availabilities")
+		}
+		
+	} else if (VerifyType=="ScheduleEvent") {
+		var Genre=InstanceDescription.get(SCHEMA_PREFIX+":Genre", CG_SCHEMA);
+		if (Genre) {
+			if (!Genre.attr('href'))
+				NoHrefAttribute(errs, Genre.name(), InstanceDescription.name())
+			else 
+			if (!isRestartIndicator(Genre.attr('href').value()))
+				errs.push(InstanceDescription.name()+"."+Genre.name()+" must contain a restart indictor")
+		}		
+	}
+	
+	// <CaptionLanguage>
+	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":CaptionLanguage", CG_SCHEMA);
+	
+	// <SignLanguage>
+	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":SignLanguage", CG_SCHEMA);
+	
+	// <AVAttributes>
+	
+	// <OtherIdentifier>
+	if (VerifyType=="OnDemandProgram") {
+		
+	} else if (VerifyType=="ScheduleEvent") {
+		
+	}
+	
+	// <RelatedMaterial>
+	if (VerifyType=="ScheduleEvent") {
+		
+	}
+}
+
+
+/**
  * validate an <OnDemandProgram> elements in the <ProgramLocationTable>
  *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
@@ -1757,6 +1851,13 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, ["Program","ProgramURL","InstanceDescription","PublishedDuration","StartOfAvailability","EndOfAvailability","DeliveryMode","Free"], ["AuxiliaryURL"], requestType, errs);
 	
 	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage);	
+	
+	// <InstanceDescription>
+	var InstanceDescription=OnDemandProgram.get(SCHEMA_PREFIX+":InstanceDescription", CG_SCHEMA);
+	if (InstanceDescription) 
+		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, odpLang, programCRIDs,requestType, errs);
+	
+	
 	
 	var soa=OnDemandProgram.get(SCHEMA_PREFIX+":StartOfAvailability", CG_SCHEMA),
 	    eoa=OnDemandProgram.get(SCHEMA_PREFIX+":EndOfAvailability", CG_SCHEMA);
@@ -1793,85 +1894,6 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	}
 }	
 
-
-/**
- * validate any <InstanceDescription> elements in the <ProgramLocationTable.Schedule.ScheduleEvent>
- *
- * @param {string} CG_SCHEMA           Used when constructing Xpath queries
- * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
- * @param {string} VerifyType		   the type of verification to perform (OnDemandProgram | ScheduleEvent)
- * @param {Object} InstanceDescription the <InstanceDescription> node to be checked
- * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
- * @param {array}  programCRIDs        array to record CRIDs for later use 
- * @param {string} requestType         the type of content guide request being checked
- * @param {Class}  errs                errors found in validaton
- */
-function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, parentLanguage, programCRIDs, requestType, errs) {
-
-	function isRestartIndicator(str) {
-		return str==dvbi.RESTART_AVAILABLE
-		    || str==dvbi.RESTART_CHECK
-			|| str==dvbi.RESTART_PENDING;
-	}
-
-	function isMediaAvailability(str) { return str==dvbi.MEDIA_AVAILABLE || str==dvbi.MEDIA_AVAILABLE; }
-	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
-	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
-
-	if (VerifyType=="OnDemandProgram") {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, ["Genre"], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier"], requestType, errs);
-	} else if (VerifyType=="ScheduleEvent") {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier", "Genre", "RelatedMaterial"], requestType, errs);	
-	}
-	else
-		errs.push("--> ValidateInstanceDescription called with VerifyType="+VerifyType);
-	
-	// <Genre>
-	if (VerifyType=="OnDemandProgram") {
-		// A177ve Table 54 - must be 2 elements
-		var Genre1=InstanceDescription.get(SCHEMA_PREFIX+":Genre[0]", CG_SCHEMA);
-		var Genre2=InstanceDescription.get(SCHEMA_PREFIX+":Genre[1]", CG_SCHEMA);
-		var Genre3=InstanceDescription.get(SCHEMA_PREFIX+":Genre[2]", CG_SCHEMA);
-		
-		if (Genre3 || !Genre2 || !Genre1)
-			errs.push("exactly 2 <"+InstanceDescription.name()+".Genre> element are required for "+VerifyType);
-		
-		if (Genre1 && !isAvailability(Genre1.text()))
-			errs.push(InstanceDescription.name()+"."+Genre1.name()+"must contain an availability indicator");
-		if (Genre2 && !isAvailability(Genre2.text()))
-			errs.push(InstanceDescription.name()+"."+Genre2.name()+"must contain an availability indicator");
-		if (Genre1 && Genre2) {
-			if ((isMediaAvailability(Genre1.text()) && isMediaAvailability(Genre2.text()))
-			 || (isMEPGAvailability(Genre1.text()) && isEPGAvailability(Genre2.text())))
-				errs.push(InstanceDescripton.name()+"."+Genre1.name()+" elements must indicate different availabilities")
-		}
-		
-	} else if (VerifyType=="ScheduleEvent") {
-		var Genre=InstanceDescription.get(SCHEMA_PREFIX+":Genre", CG_SCHEMA);
-		if (Genre && !isRestartGenre(Genre.text()))
-			errs.push(InstanceDescription.name()+"."+Genre.name()+" must contain a restart indictor")
-	}
-	
-	// <CaptionLanguage>
-	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":CaptionLanguage", CG_SCHEMA);
-	
-	// <SignLanguage>
-	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":SignLanguage", CG_SCHEMA);
-	
-	// <AVAttributes>
-	
-	// <OtherIdentifier>
-	if (VerifyType=="OnDemandProgram") {
-		
-	} else if (VerifyType=="ScheduleEvent") {
-		
-	}
-	
-	// <RelatedMaterial>
-	if (VerifyType=="ScheduleEvent") {
-		
-	}
-}
 
 /**
  * validate any <ScheduleEvent> elements in the <ProgramLocationTable.Schedule>
