@@ -144,7 +144,7 @@ function CheckLanguage(validator, errs, lang, loc="" ) {
 	if (!validator)
 		errs.push("cannot validate language \""+lang+"\""+(loc!=""?" for \""+loc+"\"":""));
 	else if (!validator.isKnown(lang)) 
-		errs.push("language \""+lang+"\" specified"+(loc!=" for \""+loc+"\""? :"")+" is invalid");	
+		errs.push("language \""+lang+"\" specified"+(loc!=""?" for \""+loc+"\"":"")+" is invalid");	
 }
 
 /**
@@ -1747,7 +1747,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 
 function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
 	var count=0, elem;
-	while (elem=node.get(SCHEMA_PREFIX+":"+elementName+"["+count+"]")) count++;
+	while (elem=node.get(SCHEMA_PREFIX+":"+elementName+"["+count+"]", CG_SCHEMA)) count++;
 	return count;
 }
 
@@ -1829,7 +1829,9 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		errs.push("only a single CaptionLanguage element is premitted in "+InstanceDesciption.name());
 	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":CaptionLanguage", CG_SCHEMA);
 	if (CaptionLanguage)
-		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name());
+		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name()+"."+CaptionLanguage.name());
+	if (CaptionLanguage.attr('closed') && CaptionLanguage.attr('closed').value()!="true" && CaptionLanguage.attr('closed').value()!="false")
+		errs.push(InstanceDescription.name()+"."+CaptionLanguage.name()+"@closed must be \"true\" or \"false\"");
 	
 	// <SignLanguage>
 	var signCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, "SignLanguage");
@@ -1837,8 +1839,11 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		errs.push("only a single SignLanguage element is premitted in "+InstanceDesciption.name());
 	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":SignLanguage", CG_SCHEMA);
 	if (SignLanguage)
-		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name());
-	
+		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name()+"."+SignLanguage.name());
+	if (SignLanguage.attr('closed') && && SignLanguage.attr('closed').value()!="false")
+		errs.push(InstanceDescription.name()+"."+SignLanguage.name()+"@closed must be \"false\"");
+	//TODO: need to consider language validation against ISO 639-3 [18].
+
 	// <AVAttributes>
 	
 	// <OtherIdentifier>
