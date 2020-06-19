@@ -55,6 +55,8 @@ const CG_REQUEST_BS_CATEGORIES="bsCategories";
 const CG_REQUEST_BS_LISTS="bsLists";
 const CG_REQUEST_BS_CONTENTS="bsContents";
 
+const MAX_UNSIGNED_SHORT=65535;
+
 const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
       TVA_FormatCSFilename=path.join("dvb-common/tva","FormatCS.xml"),
       DVBI_ContentSubjectFilename=path.join("dvb-common/dvbi","DVBContentSubjectCS-2019.xml"),
@@ -141,10 +143,15 @@ function HTMLize(str) {
 
 
 function CheckLanguage(validator, errs, lang, loc="" ) {
-	if (!validator)
+	if (!validator) {
 		errs.push("cannot validate language \""+lang+"\""+(loc!=""?" for \""+loc+"\"":""));
-	else if (!validator.isKnown(lang)) 
+		return false;
+	}
+	if (!validator.isKnown(lang))  {
 		errs.push("language \""+lang+"\" specified"+(loc!=""?" for \""+loc+"\"":"")+" is invalid");	
+		return false;
+	}
+	return true;
 }
 
 /**
@@ -258,12 +265,25 @@ function isEmpty(obj) {
 }
 
 
+/**
+ * checks if the argument complies to the TV Anytime defintion of RatioType
+ *
+ * @param {string}     str string contining value to check
+ * @returns {boolean}  true if the argment is compliant to a tva:RatioType
+ */
+function isRatioType(str) {
+	// <pattern value="\d+:\d+"/>
+	const ratioRegex=/^\d+:\d+$/;
+	var s=str.match(ratioRegex);
+	return s?s[0]===str:false;
+}
+
 
 /**
  * converts a decimal representation of a string to a number
  *
- * @param {string} str        string contining the decimal value
- * @returns {integer}  the decimal representation of the string, or 0 is non-digits are included
+ * @param {string} str    string contining the decimal value
+ * @returns {integer}     the decimal representation of the string, or 0 is non-digits are included
  */
 function valUnsignedInt(str) {
 	var intRegex=/[\d]+/g;
@@ -275,7 +295,7 @@ function valUnsignedInt(str) {
  * checks if the argument complies to an XML representation of UTC time
  *
  * @param {string} str string contining the UTC time
- * @returns {boolean}  true is the argment is formatted according to UTC ("Zulu") time
+ * @returns {boolean}  true if the argment is formatted according to UTC ("Zulu") time
  */ /*
 function isUTCTime(str) {
 	//	<pattern value="(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z"/>
@@ -288,7 +308,7 @@ function isUTCTime(str) {
  * checks if the argument complies to an XML representation of UTC time
  *
  * @param {string} str string contining the UTC time
- * @returns {boolean}  true is the argment is formatted according to UTC ("Zulu") time
+ * @returns {boolean}  true if the argment is formatted according to UTC ("Zulu") time
  */
 function isUTCDateTime(str) {
 	const UTCregex=/^[\d]{4}-((0[1-9])|(1[0-2]))-((0[1-9])|1\d|2\d|(3[0-1]))T(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z$/;
@@ -300,7 +320,7 @@ function isUTCDateTime(str) {
  * checks if the argument complies to an XML representation of UTC time
  *
  * @param {string} duration string contining the UTC time
- * @returns {boolean}  true is the argment is formatted according to UTC ("Zulu") time
+ * @returns {boolean}  true if the argment is formatted according to UTC ("Zulu") time
  */
 function isISODuration(duration) {
 	const isoRegex = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
@@ -308,6 +328,8 @@ function isISODuration(duration) {
 	return s?s[0]===duration:false;
 }
  
+ 
+// credit to https://gist.github.com/adriengibrat/e0b6d16cdd8c584392d8#file-parseduration-es5-js
 function parseISOduration(duration) {
 	var durationRegex = /^(-)?P(?:(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?|(\d+)W)$/;
 	var parsed;
@@ -1214,7 +1236,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 			var titleStr=unEntity(Title.text());
 			
 			if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
-				errs.push("<Title> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
+				errs.push("<"+Title.name()+"> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 			if (titleType=="main") {
 				if (isIn(mainSet, titleLang))
 					errs.push("only a single language is permitted for @type=\"main\"")
@@ -1227,10 +1249,10 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 					else secondarySet.push(titleLang);
 				}
 				else 
-					errs.push("Title@type=\"secondary\" is not permitted for this <"+BasicDescription.name()+">");
+					errs.push(Title.name()+"@type=\"secondary\" is not permitted for this <"+BasicDescription.name()+">");
 			}
 			else
-				errs.push("type=\""+titleType+"\" is not permitted for <Title>");
+				errs.push("type=\""+titleType+"\" is not permitted for <"+Title.name()+">");
 			
 			secondarySet.forEach(lang => {
 				if (!isIn(mainSet, lang)) {
@@ -1296,7 +1318,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				break;
 			case CG_REQUEST_SCHEDULE_TIME:
 				// clause 6.10.5.2 -- 1..2 instances permitted - one each of @length="short"(90) and (required)"medium"(250)
-				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL],requestType, errs, bdLang);
+				ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL], requestType, errs, bdLang);
 				break;
 			case CG_REQUEST_PROGRAM:
 				// clause 6.10.5.3 -- 1..3 instances permitted - one each of @length="short"(90), (required)"medium"(250) and "long"(1200)
@@ -1751,8 +1773,127 @@ function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
 	return count;
 }
 
+
+
+
+
+
 /**
- * validate any <InstanceDescription> elements in the <ProgramLocationTable.Schedule.ScheduleEvent>
+ * validate any <AVAttributes> elements in <InstanceDescription> elements
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} AVAttributes        the <AVAttributes> node to be checked
+ * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
+ * @param {string} requestType         the type of content guide request being checked
+ * @param {Class}  errs                errors found in validaton
+ */
+function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs) {
+	
+	function isValidAudioMixType(mixType) {
+		return mixType==dvbi.AUDIO_MIX_MONO || mixType==dvbi.AUDIO_MIX_STEREO || mixType==dvbi.AUDIO_MIX_5_1;
+	}
+	function isValidAudioLanguagePurpose(purpose) {
+		return purpose==dvbi.AUDIO_PURPOSE_MAIN || purpose==dvbi.AUDIO_PURPOSE_DESCRIPTION;
+	}
+	
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, [], ["AudioAttributes", "VideoAttributes", "CaptioningAttributes"], requestType, errs);
+	
+	// <AudioAttributes>
+	var a=0, AudioAttributes, foundAttributes=[], audioCounts=[];
+	while (AudioAttributes=AVAttributes.child(a++))
+		if (AudioAttributes.name()=="AudioAttributes") {
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], ["MixType", "AudioLanguage"], requestType, errs);
+
+			var MixType=AudioAttributes.get(SCHEMA_PREFIX+":MixType", CG_SCHEMA);
+			if (MixType) {
+				if (MixType.attr('href')) {
+					if (!isValidAudioMixType(MixType.attr('href').value()))
+						errs.push(AudioAttributes.name()+"."+MixType.name()+" is not valid");
+				}
+				else
+					NoHrefAttribute(errs, MixType.name(), AudioAttributes.name());
+			}
+					
+			var AudioLanguage=AudioAttributes.get(SCHEMA_PREFIX+":AudioLanguage", CG_SCHEMA);
+			if (AudioLanguage) {
+				var validLanguage=false, validPurpose=false, audioLang=AudioLanguage.text();
+				if (AudioLanguage.attr('purpose')) {
+					if (!(validPurpose=isValidAudioLanguagePurpose(AudioLanguage.attr('purpose').value())))
+						errs.push(AudioLanguage.name()+"@purpose is not valid");
+				}
+				validLanguage=CheckLanguage(knownLanguages, errs, audioLang, AudioAttributes.name()+"."+AudioLanguage.name());
+				
+				// TODO: check that only two elements exist per language, one with each of the @purpose values
+				if (validLanguage && validPurpose) {	
+				
+					if (audioCounts[audioLang]===undefined)
+						audioCounts[audioLang]=1
+					else audioCounts[audioLang]++;
+
+					var combo=audioLang+"!--!"+AudioLanguage.attr('purpose').value();
+					if (isIn(foundAttributes, combo))
+						errs.push("audio @purpose \""+AudioLanguage.attr('purpose').value()+"\" already specified for language \""+audioLang+"\"");
+					else
+						foundAttributes.push(combo);
+				}
+			}
+		}
+	audioCounts.forEach(audioLang => {
+		if (audioCounts[audioLang]>2)
+			errs.push("more than 2 <AudioAttributes> for language \""+audioLang+"\"");
+	});
+	
+	// <VideoAttributes>
+	var v=0, VideoAttributes;
+	while (VideoAttributes=AVAttributes.child(v++))
+		if (VideoAttributes.name()=="VideoAttributes") {
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], ["HorizontalSize", "VerticalSize", "AspectRatio"], requestType, errs);
+			
+			var HorizontalSize=VideoAttributes.get(SCHEMA_PREFIX+":HorizontalSize", CG_SCHEMA);
+			if (HorizontalSize) 
+				if (valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
+					errs.push(HorizontalSize.name()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+			var VerticalSize=VideoAttributes.get(SCHEMA_PREFIX+":VerticalSize", CG_SCHEMA);
+			if (VerticalSize) 
+				if (valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
+					errs.push(HorizontalSize.name()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+			var AspectRatio=VideoAttributes.get(SCHEMA_PREFIX+":AspectRatio", CG_SCHEMA);
+			if (AspectRatio) 
+				if (!isRatioType(AspectRatio.text()))
+					errs.push(AspectRatio.name()+" is not a valid aspect ratio");
+		}
+
+	
+	// <CaptioningAttributes>
+	var c=0, CaptioningAttributes;
+	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":CaptioningAttributes", CG_SCHEMA);
+	if (CaptioningAttributes) {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], ["Coding", "BitRate"], requestType, errs);
+		
+		var Coding=CaptioningAttributes.get(SCHEMA_PREFIX+":Coding", CG_SCHEMA);
+		if (Coding) {
+			if (Coding.attr('href')) {
+				var codingHref=Coding.attr('href').value();
+				if (codingHref!=dvbi.DVB_BITMAP_SUBTITLES && codingHref!=DVB_CHARACTER_SUBTITLES 
+				  && codingHref!=dvbi.EBU_TT_D)
+					errs.push(CaptioningAttributes.name()+"."+Coding.name()+"@href is not valid - should be DVB (bitmap or character) or EBU TT-D")
+			}
+			else
+				NoHrefAttribute(errs, Coding.name(), AVAttributes.name()+"."+CaptioningAttributes.name());			
+		}
+		
+		var BitRate=CaptioningAttributes.get(SCHEMA_PREFIX+":BitRate", CG_SCHEMA);
+		if (BitRate) {
+			//TODO: unsure if this is needed in DVB-I profile, see bug 2813 - https://bugzilla.dvb.org/show_bug.cgi?id=2813
+		}
+		
+	}
+}
+
+
+/**
+ * validate any <InstanceDescription> elements in the <ScheduleEvent> and <OnDemandProgram> elements
  *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
@@ -1778,6 +1919,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 			NoHrefAttribute(errs, node.name(), parentNode.name());
 		return (node.attr('href')?node.attr('href').value():null);
 	}
+
 
 	if (VerifyType=="OnDemandProgram") {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, ["Genre"], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier"], requestType, errs);
@@ -1826,27 +1968,33 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	// <CaptionLanguage>
 	var captionCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, "CaptionLanguage");
 	if (captionCount > 1)
-		errs.push("only a single CaptionLanguage element is premitted in "+InstanceDesciption.name());
+		errs.push("only a single CaptionLanguage element is premitted in "+InstanceDescription.name());
 	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":CaptionLanguage", CG_SCHEMA);
-	if (CaptionLanguage)
+	if (CaptionLanguage) {
 		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name()+"."+CaptionLanguage.name());
-	if (CaptionLanguage.attr('closed') && CaptionLanguage.attr('closed').value()!="true" && CaptionLanguage.attr('closed').value()!="false")
-		errs.push(InstanceDescription.name()+"."+CaptionLanguage.name()+"@closed must be \"true\" or \"false\"");
+		if (CaptionLanguage.attr('closed') && CaptionLanguage.attr('closed').value()!="true" && CaptionLanguage.attr('closed').value()!="false")
+			errs.push(InstanceDescription.name()+"."+CaptionLanguage.name()+"@closed must be \"true\" or \"false\"");
+	}
 	
 	// <SignLanguage>
 	var signCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, "SignLanguage");
 	if (signCount > 1)
-		errs.push("only a single SignLanguage element is premitted in "+InstanceDesciption.name());
+		errs.push("only a single SignLanguage element is premitted in "+InstanceDescription.name());
 	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":SignLanguage", CG_SCHEMA);
-	if (SignLanguage)
+	if (SignLanguage) {
 		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name()+"."+SignLanguage.name());
-	if (SignLanguage.attr('closed') && && SignLanguage.attr('closed').value()!="false")
-		errs.push(InstanceDescription.name()+"."+SignLanguage.name()+"@closed must be \"false\"");
-	//TODO: need to consider language validation against ISO 639-3 [18].
-
+		if (SignLanguage.attr('closed') && SignLanguage.attr('closed').value()!="false")
+			errs.push(InstanceDescription.name()+"."+SignLanguage.name()+"@closed must be \"false\"");
+		//TODO: need to consider language validation against ISO 639-3 [18].
+	}
+	
 	// <AVAttributes>
+	var AVAttributes=InstanceDescription.get(SCHEMA_PREFIX+":AVAttributes", CG_SCHEMA);
+	if (AVAttributes)
+		ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs);
 	
 	// <OtherIdentifier>
+	// TODO:
 	if (VerifyType=="OnDemandProgram") {
 		
 	} else if (VerifyType=="ScheduleEvent") {
@@ -1854,8 +2002,9 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	}
 	
 	// <RelatedMaterial>
+	// TODO:
 	if (VerifyType=="ScheduleEvent") {
-		
+		// restart URL per 6.11.11
 	}
 }
 
@@ -1877,13 +2026,27 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	
 	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage);	
 	
+	// @serviceIDRef
+	// TODO:
+	
+	// <Program>
+	// TODO:
+	
+	// <ProgramURL>
+	// TODO:
+	
+	// <AuxiliaryURL>
+	// TODO:
+	
 	// <InstanceDescription>
 	var InstanceDescription=OnDemandProgram.get(SCHEMA_PREFIX+":InstanceDescription", CG_SCHEMA);
 	if (InstanceDescription) 
 		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, odpLang, programCRIDs,requestType, errs);
 	
+	// <PublishedDuration>
+	// TODO:
 	
-	
+	// <StartOfAvailability> and <EndOfAvailability>
 	var soa=OnDemandProgram.get(SCHEMA_PREFIX+":StartOfAvailability", CG_SCHEMA),
 	    eoa=OnDemandProgram.get(SCHEMA_PREFIX+":EndOfAvailability", CG_SCHEMA);
 	
@@ -1903,12 +2066,14 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 			errs.push(soa.name()+" must be earlier than "+eoa.name());
 	}
 	
+	// <DeliveryMode>
 	var DeliveryMode=OnDemandProgram.get(SCHEMA_PREFIX+":DeliveryMode", CG_SCHEMA);
 	if (DeliveryMode) { // existance check and report done previously
 		if (DeliveryMode.text()!="streaming")
 			errs.push(OnDemandProgram.name()+"."+DeliveryMode.name()+" must be \"streaming\"");
 	}
 	
+	// <Free>
 	var Free=OnDemandProgram.get(SCHEMA_PREFIX+":Free", CG_SCHEMA);
 	if (Free) { // existance check and report done previously
 		if (Free.attr('value')) {
