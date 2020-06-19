@@ -572,10 +572,9 @@ function checkRequiredTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, chil
  * @param {Object} parentElement          the element whose children should be checked
  * @param {Array}  mandatoryChildElements the names of elements that are required within the element
  * @param {Array}  optionalChildElements  the names of elements that are optional within the element
- * @param {string} requestType            the type of content guide request being checked
  * @param {Class}  errs                   errors found in validaton
  */
-function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChildElements, optionalChildElements, requestType, errs) {
+function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChildElements, optionalChildElements, errs) {
 	// check that each of the specifid childElements exists
 	mandatoryChildElements.forEach(elem => {
 		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
@@ -817,7 +816,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						
 						if (pgChild.name()=="ParentalRating") {
 							if (!pgChild.attr('href'))
-								NoHrefAttribute(errs, "<ParentalRating>", "<ParentalGuidance>")
+								NoHrefAttribute(errs, pgChild.name(), ParentalGuidance.name())
 						}
 					}
 					if (pgChild.name()=="ExplanatoryText") {
@@ -990,8 +989,8 @@ function NoChildElement(errs, missingElement, parentElement, schemaLocation=null
  * @param {String} src The element missing the @href
  * @param {String} loc The location of the element
  */
-function InvalidHrefValue(errs, value, src, loc) {
-	errs.push("invalid @href=\""+value+"\" specified for "+src+" in "+loc);
+function InvalidHrefValue(errs, value, src, loc=null) {
+	errs.push("invalid @href=\""+value+"\" specified for "+src+(loc)?" in "+loc:"");
 }
 
 /**
@@ -1001,8 +1000,8 @@ function InvalidHrefValue(errs, value, src, loc) {
  * @param {String} src The element missing the @href
  * @param {String} loc The location of the element
  */
-function NoHrefAttribute(errs, src, loc) {
-	errs.push("no @href specified for "+src+" in "+loc);
+function NoHrefAttribute(errs, src, loc=null) {
+	errs.push("no @href specified for "+src+(loc)?" in "+loc:"");
 }
 
 /**
@@ -1013,7 +1012,7 @@ function NoHrefAttribute(errs, src, loc) {
  * @param {String} loc The location of the element
  */
 function NoAuxiliaryURI(errs, src, loc) {
-	NoChilsElement(errs, "<AuxiliaryURI>", src+" <MediaLocator>", loc )
+	NoChildElement(errs, "<AuxiliaryURI>", src+" <MediaLocator>", loc )
 }
 
 
@@ -1022,9 +1021,8 @@ function NoAuxiliaryURI(errs, src, loc) {
  * @param {Object} RelatedMaterial   the <RelatedMaterial> element (a libxmls ojbect tree) to be checked
  * @param {Object} errs              The class where errors and warnings relating to the serivce list processing are stored 
  * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
- * @param {string} LocationType      The type of element containing the <RelatedMaterial> element. Different validation rules apply to different location types
   */
-function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
+function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location) {
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
@@ -1035,7 +1033,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
     }
 
     if (!HowRelated) {
-		NoChildElement(errs, "<HowRelated>", "<RelatedMaterial>", Location);
+		NoChildElement(errs, "<HowRelated>", RelatedMaterial.name(), Location);
 		return;
     }
 	var HRhref=HowRelated.attr("href");
@@ -1063,11 +1061,11 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 						NoAuxiliaryURI(errs, "template AIT", Location);
 				});
 			else 
-				NoChildElement(errs, "<MediaLocator>", "<RelatedMaterial>", Location);
+				NoChildElement(errs, "<MediaLocator>", RelatedMaterial.name(), Location);
 		}
 	}
 	else 
-		NoHrefAttribute(errs, "<RelatedMaterial><HowRelated>", Location);
+		NoHrefAttribute(errs, RelatedMaterial.name()+"."+HowRelated.name(), Location);
 }
 
 
@@ -1420,7 +1418,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 			case CG_REQUEST_BS_LISTS:			// clause 6.10.5.5 - three cases
 				if (!isParentGroup)
 					ValidateRelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
-				else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMterial"))
+				else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, "RelatedMaterial"))
 					errs.push("<RelatedMaterial> not permitted in \"category group\" for this request type");
 				break;
 			default:
@@ -1797,13 +1795,13 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 		return purpose==dvbi.AUDIO_PURPOSE_MAIN || purpose==dvbi.AUDIO_PURPOSE_DESCRIPTION;
 	}
 	
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, [], ["AudioAttributes", "VideoAttributes", "CaptioningAttributes"], requestType, errs);
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, [], ["AudioAttributes", "VideoAttributes", "CaptioningAttributes"], errs);
 	
 	// <AudioAttributes>
 	var a=0, AudioAttributes, foundAttributes=[], audioCounts=[];
 	while (AudioAttributes=AVAttributes.child(a++))
 		if (AudioAttributes.name()=="AudioAttributes") {
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], ["MixType", "AudioLanguage"], requestType, errs);
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], ["MixType", "AudioLanguage"], errs);
 
 			var MixType=AudioAttributes.get(SCHEMA_PREFIX+":MixType", CG_SCHEMA);
 			if (MixType) {
@@ -1848,7 +1846,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	var v=0, VideoAttributes;
 	while (VideoAttributes=AVAttributes.child(v++))
 		if (VideoAttributes.name()=="VideoAttributes") {
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], ["HorizontalSize", "VerticalSize", "AspectRatio"], requestType, errs);
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], ["HorizontalSize", "VerticalSize", "AspectRatio"], errs);
 			
 			var HorizontalSize=VideoAttributes.get(SCHEMA_PREFIX+":HorizontalSize", CG_SCHEMA);
 			if (HorizontalSize) 
@@ -1869,7 +1867,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	var c=0, CaptioningAttributes;
 	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":CaptioningAttributes", CG_SCHEMA);
 	if (CaptioningAttributes) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], ["Coding", "BitRate"], requestType, errs);
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], ["Coding", "BitRate"], errs);
 		
 		var Coding=CaptioningAttributes.get(SCHEMA_PREFIX+":Coding", CG_SCHEMA);
 		if (Coding) {
@@ -1892,6 +1890,39 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 }
 
 
+
+/**
+ * validate a <RelatedMaterial> element iconforms to the Restart Application Linking rules (A177v2 clause 6.5.5)
+ *
+ * @param {string} CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object} RelatedMaterial     the <RelatedMaterial> node to be checked
+ * @param {Class}  errs                errors found in validaton
+ */
+ function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs){
+	
+	function isRestartLink(str) { return str==dvbi.RESTART_LINK; }
+
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, ["HowRelated", "MediaLocator"], [], errs);
+	
+	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":HowRelated", CG_SCHEMA);
+	if (HowRelated) {
+		if (HowRelated.attr('href')) {
+			if (!isRestartLink(HowRelated.attr('href')))
+				errs.push("invalid "+HowRelated.name()+"@href for Restart Application Link");
+		}
+		else 
+			NoHrefAttribute(errs, RelatedMaterial.name(), RelatedMaterial.parent()?RelatedMaterial.parent().name():null);
+	}
+	
+	var MediaLocator=RelatedMaterial.get(SCHEMA_PREFIX+":MediaLocator", CG_SCHEMA);
+	if (MediaLocator) {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, MediaLocator, ["MediaUri", "AuxiliaryUri"], [], errs);
+	}
+}
+
+
+
 /**
  * validate any <InstanceDescription> elements in the <ScheduleEvent> and <OnDemandProgram> elements
  *
@@ -1906,7 +1937,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
  */
 function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, parentLanguage, programCRIDs, requestType, errs) {
 
-	function isRestartIndicator(str) { return str==dvbi.RESTART_AVAILABLE || str==dvbi.RESTART_CHECK || str==dvbi.RESTART_PENDING; }
+	function isRestartAvailability(str) { return str==dvbi.RESTART_AVAILABLE || str==dvbi.RESTART_CHECK || str==dvbi.RESTART_PENDING; }
 	function isMediaAvailability(str) { return str==dvbi.MEDIA_AVAILABLE || str==dvbi.MEDIA_UNAVAILABLE; }
 	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
 	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
@@ -1922,12 +1953,14 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 
 
 	if (VerifyType=="OnDemandProgram") {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, ["Genre"], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier"], requestType, errs);
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, ["Genre"], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier"], errs);
 	} else if (VerifyType=="ScheduleEvent") {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier", "Genre", "RelatedMaterial"], requestType, errs);	
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], ["CaptionLanguage", "SignLanguage", "AVAttributes", "OtherIdentifier", "Genre", "RelatedMaterial"], errs);	
 	}
 	else
 		errs.push("--> ValidateInstanceDescription called with VerifyType="+VerifyType);
+	
+	var restartGenre=null, restartRelatedMaterial=null;
 	
 	// <Genre>
 	if (VerifyType=="OnDemandProgram") {
@@ -1953,15 +1986,15 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 			 || (isEPGAvailability(g1href) && isEPGAvailability(g2href)))
 				errs.push(InstanceDescripton.name()+"."+Genre1.name()+" elements must indicate different availabilities")
 		}
-		
 	} else if (VerifyType=="ScheduleEvent") {
 		var Genre=InstanceDescription.get(SCHEMA_PREFIX+":Genre", CG_SCHEMA);
 		if (Genre) {
+			restartGenre=Genre;
 			if (!Genre.attr('href'))
 				NoHrefAttribute(errs, Genre.name(), InstanceDescription.name())
 			else 
-			if (!isRestartIndicator(Genre.attr('href').value()))
-				errs.push(InstanceDescription.name()+"."+Genre.name()+" must contain a restart indictor")
+			if (!isRestartAvailability(Genre.attr('href').value()))
+				errs.push(InstanceDescription.name()+"."+Genre.name()+" must contain a restart link indicator")
 		}		
 	}
 	
@@ -1994,17 +2027,40 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs);
 	
 	// <OtherIdentifier>
-	// TODO:
-	if (VerifyType=="OnDemandProgram") {
+	var oi=0, OtherIdentifier;
+	while (OtherIdentifier=InstanceDescription.child(oi++)){
+		if (OtherIdentifier.name()=="OtherIdentifier") {
+			if (OtherIdentifier.attr('type')) {			
+				var oiType=OtherIdentifier.attr('type').value();
 		
-	} else if (VerifyType=="ScheduleEvent") {
-		
+				if ((VerifyType=="ScheduleEvent" 
+							  && (oiType=="CPSIndex" || oiType==dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE))
+				  || (VerifyType=="OnDemandProgram" && oiType=="CPSIndex")) {
+						// all good
+					}
+					else 
+						errs.push(OtherIdentifier.name()+"@type=\""+oiType+"\" is not valid for "+VerifyType+"."+InstanceDescription.name());				
+					if (oiType=dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE)
+						if (!isCRIDURI(OtherIdentifier.text()))
+							errs.push(OtherIdentifier.name()+" must be a CRID for @type=\""+oiType+"\"");
+			}
+			else 
+				errs.push(OtherIdentifier.name()+"@type is required in "+VerifyType+"."+InstanceDescription.name())
+		}
 	}
 	
 	// <RelatedMaterial>
-	// TODO:
 	if (VerifyType=="ScheduleEvent") {
-		// restart URL per 6.11.11
+		var RelatedMaterial=InstanceDescription.get(SCHEMA_PREFIX+":RelatedMaterial", CG_SCHEMA);
+		if (RelatedMaterial) {
+			restartRelatedMaterial=RelatedMaterial;
+			ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs); 		
+		}
+	}
+	
+	if (VerifyType=="ScheduleEvent") {
+		if ((restartGenre && !restartRelatedMaterial) || (restartRelatedMaterial && !restartGenre))
+			errs.push("both <Genre> and <RelatedMaterial> are required together for "+VerifyType);	
 	}
 }
 
@@ -2042,7 +2098,7 @@ function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs) {
  */
 function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, requestType, errs) {
 
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, ["Program","ProgramURL","InstanceDescription","PublishedDuration","StartOfAvailability","EndOfAvailability","DeliveryMode","Free"], ["AuxiliaryURL"], requestType, errs);
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, ["Program","ProgramURL","InstanceDescription","PublishedDuration","StartOfAvailability","EndOfAvailability","DeliveryMode","Free"], ["AuxiliaryURL"], errs);
 	
 	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage);	
 	
@@ -2147,7 +2203,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		if (ScheduleEvent.name()=="ScheduleEvent") {
 			var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage);
 			
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, ["Program", "PublishedStartTime", "PublishedDuration"], ["ProgramURL", "InstanceDescription", "ActualStartTime", "FirstShowing", "Free"], requestType, errs);
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, ["Program", "PublishedStartTime", "PublishedDuration"], ["ProgramURL", "InstanceDescription", "ActualStartTime", "FirstShowing", "Free"], errs);
 			
 			// <Program>
 			var Program=ScheduleEvent.get(SCHEMA_PREFIX+":Program", CG_SCHEMA);
@@ -2206,7 +2262,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
  */
 function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, requestType, errs) {
 
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [], ["ScheduleEvent"], requestType, errs);
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [], ["ScheduleEvent"], errs);
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Schedule, ["serviceIDRef", "start", "end"], [], requestType, errs);
 	
 	var scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage);	
@@ -2254,7 +2310,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 		errs.push("<ProgramLocationTable> is not specified");
 		return;
 	}
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], ["Schedule", "OnDemandProgram"], requestType, errs);
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], ["Schedule", "OnDemandProgram"], errs);
 	
 	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, progDescrLang);	
 	
