@@ -9,7 +9,7 @@ const fs=require("fs"), path=require("path");
 const ErrorList=require("./dvb-common/ErrorList.js");
 const dvbi=require("./dvb-common/DVB-I_definitions.js");
 const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js");
-const {isCRIDURI}=require("./dvb-common/URI_checks.js");
+const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js");
 const {loadCS}=require("./dvb-common/CS_handler.js");
 
 const ISOcountries=require("./dvb-common/ISOcountries.js");
@@ -2012,13 +2012,33 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 /**
  * validate an <OnDemandProgram> elements in the <ProgramLocationTable>
  *
+ * @param {string} CG_SCHEMA         Used when constructing Xpath queries
+ * @param {string} SCHEMA_PREFIX     Used when constructing Xpath queries
+ * @param {Object} node              the element node containing the an XML AIT reference
+ * @param {Class}  errs              errors found in validaton
+ */
+function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs) {
+	if (!node) return;
+	
+	if (node.attr('contentType')) {
+		if (node.attr('contentType').value() != dvbi.XML_AIT_CONTENT_TYPE) 
+			errs.push(node.name()+"@contentType=\""+node.attr('contentType').value()+"\" is not valid for a template AIT")		
+	}
+	else
+		errs.push("@contentType attribute is required when signalling a template AIT in "+node.name());
+}
+
+
+/**
+ * validate an <OnDemandProgram> elements in the <ProgramLocationTable>
+ *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} OnDemandProgram     the node containing the <OnDemandProgram> being checked
  * @param {string} progDescrLang       XML language of the parent element (expliclt or implicit from its parent(s))
  * @param {array}  programCRIDs        array to record CRIDs for later use 
  * @param {string} requestType         the type of content guide request being checked
- * @param {Class}  errs errors found in validaton
+ * @param {Class}  errs                errors found in validaton
  */
 function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, requestType, errs) {
 
@@ -2027,16 +2047,35 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage);	
 	
 	// @serviceIDRef
-	// TODO:
+	if (OnDemandProgram.attr('serviceIDRef')) {
+		if (!isTAGURI(OnDemandProgram.attr('serviceIDRef').value()))
+			errs.push(OnDemandProgram.name()+"@serviceIDRef is not a TAG URI")
+	}
 	
 	// <Program>
-	// TODO:
+	var Program=OnDemandProgram.get(SCHEMA_PREFIX+":Program", CG_SCHEMA);
+	if (Program)
+		if (Program.attr('crid')) {
+			var programCRID=Program.attr('crid').value();
+			if (!isCRIDURI(programCRID))
+				errs.push(OnDemandProgram.name()+"."+Program.name()+"@crid is not a CRID URI");
+			else {
+				if (!isIn(programCRIDs, programCRID))
+					errs.push(OnDemandProgram.name()+"."+Program.name()+"@crid=\""+programCRID+"\" does not refer to a program in the <ProgramInformationTable>");
+			}
+		}
+		else
+			errs.push(OnDemandProgram.name()+"."+Program.name()+"@crid is a required attribute");
 	
 	// <ProgramURL>
-	// TODO:
-	
+	var ProgramURL=OnDemandProgram.get(SCHEMA_PREFIX+":ProgramURL", CG_SCHEMA);
+	if (ProgramURL)
+		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, ProgramURL, errs);
+
 	// <AuxiliaryURL>
-	// TODO:
+	var AuxiliaryURL=OnDemandProgram.get(SCHEMA_PREFIX+":AuxiliaryURL", CG_SCHEMA);
+	if (AuxiliaryURL)
+		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, AuxiliaryURL, errs);
 	
 	// <InstanceDescription>
 	var InstanceDescription=OnDemandProgram.get(SCHEMA_PREFIX+":InstanceDescription", CG_SCHEMA);
@@ -2044,7 +2083,10 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, odpLang, programCRIDs,requestType, errs);
 	
 	// <PublishedDuration>
-	// TODO:
+	var PublishedDuration=OnDemandProgram.get(SCHEMA_PREFIX+":PublishedDuration", CG_SCHEMA);
+	if (PublishedDuration)
+		if (!isISODuration(PublishedDuration.text()))
+			errs.push(OnDemandProgram.name()+"."+PublishedDuration.name()+" is not a valid ISO Duration (xs:duration)");
 	
 	// <StartOfAvailability> and <EndOfAvailability>
 	var soa=OnDemandProgram.get(SCHEMA_PREFIX+":StartOfAvailability", CG_SCHEMA),
@@ -2212,6 +2254,8 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 		errs.push("<ProgramLocationTable> is not specified");
 		return;
 	}
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], ["Schedule", "OnDemandProgram"], requestType, errs);
+	
 	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, progDescrLang);	
 	
 	var c=0, child;
