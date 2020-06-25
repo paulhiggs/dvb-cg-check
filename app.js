@@ -1532,7 +1532,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				if (child.attr(tva.a_index)) {
 					var index=valUnsignedInt(child.attr(tva.a_index).value());
 					if (isIn(indexes, index))
-						errs.puchCode("PI030", child.name()+"@"+child.attr(tva.a_index).name()+"="+index+" is in use by another "+ProgramInformation.name()+" element")
+						errs.pushCode("PI030", child.name()+"@"+child.attr(tva.a_index).name()+"="+index+" is in use by another "+ProgramInformation.name()+" element")
 					else 
 						indexes.push(index);
 				}
