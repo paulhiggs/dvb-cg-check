@@ -1505,7 +1505,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		}
 	if (o) {
 		if (o.childCount != cnt)
-			errs.pushCode("PL100", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+") does match the number of items ("+cnt+")");
+			errs.pushCode("PI100", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+") does match the number of items ("+cnt+")");
 	}
 }
 
