@@ -1482,9 +1482,10 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
  * @param {array}  programCRIDs        array to record CRIDs for later use 
  * @param {array}  groupCRIDs          array of CRIDs found in the GroupInformationTable (null if not used)
  * @param {string} requestType         the type of content guide request being checked
+ * @param {array}  indexes             array of @index values from other elements in the same table - for duplicate detection
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, errs) {
+function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
 	
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI001");
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [], errs, "PI002")
@@ -1527,6 +1528,14 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 						if (!isCRIDURI(oCRID))
 							errs.pushCode("PI021", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+oCRID+"\" is not a valid CRID")
 				}
+				
+				if (child.attr(tva.a_index)) {
+					var index=valUnsignedInt(child.attr(tva.a_index).value());
+					if (isIn(indexes, index))
+						errs.puchCode("PI030", child.name()+"@"+child.attr(tva.a_index).name()+"="+index+" is in use by another "+ProgramInformation.name()+" element")
+					else 
+						indexes.push(index);
+				}
 				break;			
 		}	
 	}
@@ -1559,10 +1568,10 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 	}
 	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, progDescrLang);
 
-	var pi=0, ProgramInformation, cnt=0;
+	var pi=0, ProgramInformation, cnt=0, indexes=[];
 	while (ProgramInformation=ProgramInformationTable.child(pi++)) 
 		if (ProgramInformation.name()==tva.e_ProgramInformation) {
-			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, errs);
+			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
 			cnt++;
 		}
 	if (o) {
