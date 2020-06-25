@@ -647,6 +647,23 @@ function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
 }
 
 /**
+ * check that the serviceIdRef attribute is a TAG URI and report warnings
+ * 
+ * @param {Object} elem       the node containing the element being checked
+ * @param {Class}  errs       errors found in validaton
+ * @param {string} errCode    error code prefix to be used in reports, if not present then use local codes
+ */
+function checkTAGUri(elem, errs, errCode=null) {
+	if (!elem) return;
+	if (elem.attr(tva.a_serviceIDRef)) {
+		if (!isTAGURI(elem.attr(tva.a_serviceIDRef).value()))
+			errs.pushCodeW(errCode?errCode:"UR001", elem.name()+"@"+elem.attr(tva.a_serviceIDRef).name()+" is not a TAG URI")
+	}
+}
+
+
+
+/**
  * validate the <Synopsis> elements 
  *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
@@ -866,7 +883,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
  */
 function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	
-	function checkNamePart(elem, parentElem, errs, errcode=null) {
+	function checkNamePart(elem, parentElem, errs, errCode=null) {
 		if (unEntity(elem.text()).length > dvbi.MAX_NAME_PART_LENGTH)	
 			errs.pushCode(errCode?errCode:"VN001", "<"+elem.name()+"> in <"+parentElem.name()+"> is longer than "+dvbi.MAX_NAME_PART_LENGTH+" characters");
 	}
@@ -959,6 +976,44 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 	}
 }
 
+
+/**
+ * validate a <RelatedMaterial> if it is signalled as an carrying an image
+ *
+ * @param {string}  CG_SCHEMA         Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX     Used when constructing Xpath queries
+ * @param {Object}  ReltedMaterial    the element whose children should be checked
+ * @param {Class}   errs              errors found in validaton
+ * @returns {boolean}  true if the RelatedMaterial element is evaluated here
+ */
+function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
+
+	if (!RelatedMaterial) return false;
+	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+	if (!HowRelated || !HowRelated.attr(tva.a_href)) return false;
+	var hrHref=HowRelated.attr(tva.a_href).value();
+
+	if (hrHref==tva.cs_PromotionalStillImage) {
+		// Promotional Still Image
+		
+		var errLocation="Promotional Still Image ("+HowRelated.name()+"@"+HowRelated.attr(tva.a_href).name()+"="+tva.cs_PromotionalStillImage+")"
+		var MediaUri=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator+"/"+SCHEMA_PREFIX+":"+tva.e_MediaUri, CG_SCHEMA);
+		if (!MediaUri) 
+			errs.pushCode("IRM001", tva.e_MediaUri+" not specified for "+errLocation);
+		if (MediaUri && !MediaUri.attr(tva.a_contentType))
+			errs.pushCode("IRM002", MediaUri.name()+"@"+tva.a_contentType+" not specified for "+errLocation );
+
+		if (MediaUri && MediaUri.attr(tva.a_contentType)) {
+			var contentType=MediaUri.attr(tva.a_contentType).value();
+			if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
+				errs.pushCode("IRM003", MediaUri.name()+"@"+MediaUri.attr(tva.a_contentType).name()+"=\""+contentType+"\" is not valid for a "+errLocation)
+		}		
+		return true;
+	}
+	return false;
+}
+
+
 /**
  * validate the <RelatedMaterial> elements specified
  *
@@ -975,7 +1030,8 @@ function Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
 			countRelatedMaterial++;
 			
-			// no additional checks are needed - DVB-I client should be robust to any siganlled RelatedMaterial
+			var evaluated=CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs);
+			
 		}
 	}
 	if (countRelatedMaterial > maxRMelements)
@@ -1271,33 +1327,32 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 			var titleStr=unEntity(Title.text());
 			
 			if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
-				errs.pushCode(errcode?errcode+"-1":"VT001", "<"+Title.name()+"> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
+				errs.pushCode(errCode?errCode+"-1":"VT001", "<"+Title.name()+"> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 			if (titleType==dvbi.TITLE_MAIN_TYPE) {
 				if (isIn(mainSet, titleLang))
-					errs.pushCode(errcode?errcode+"-2":"VT002", "only a single language is permitted for @"+tva.a_type+"=\""+TITLE_MAIN_TYPE+"\"")
+					errs.pushCode(errCode?errCode+"-2":"VT002", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\"")
 				else mainSet.push(titleLang);
 			}
 			else if (titleType=dvbi.TITLE_SECONDARY_TYPE) {
 				if (allowSecondary) {
 					if (isIn(secondarySet, titleLang))
-						errs.pushCode(errcode?errcode+"-3":"VT003", "only a single language is permitted for @"+tva.a_type+"=\""+TITLE_SECONDARY_TYPE+"\"")
+						errs.pushCode(errCode?errCode+"-3":"VT003", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\"")
 					else secondarySet.push(titleLang);
 				}
 				else 
-					errs.pushCode(errcode?errcode+"-4":"VT004", Title.name()+"@"+tva.a_type+"=\""+TITLE_SECONDARY_TYPE+"\" is not permitted for this <"+BasicDescription.name()+">");
+					errs.pushCode(errCode?errCode+"-4":"VT004", Title.name()+"@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" is not permitted for this <"+BasicDescription.name()+">");
 			}
 			else
-				errs.pushCode(errcode?errcode+"-5":"VT005", "@"+tva.a_type+"=\""+titleType+"\" is not permitted for <"+Title.name()+">");
+				errs.pushCode(errCode?errCode+"-5":"VT005", "@"+tva.a_type+"=\""+titleType+"\" is not permitted for <"+Title.name()+">");
 			
 			secondarySet.forEach(lang => {
 				if (!isIn(mainSet, lang)) {
 					var t=lang!=DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
-					errs.pushCode(errcode?errcode+"-6":"VT006", "@"+tva.a_type+"=\""+TITLE_SECONDARY_TYPE+"\" specified without @type=\""+TITLE_MAIN_TYPE+"\""+t);
+					errs.pushCode(errCode?errCode+"-6":"VT006", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @type=\""+dvbi.TITLE_MAIN_TYPE+"\""+t);
 				}
 			});
 		}
 	}	
-	
 }
 
 /**
@@ -1320,100 +1375,100 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	var isParentGroup=parentElement==categoryGroup;
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":"+tva.e_BasicDescription, CG_SCHEMA);
 
-	if (!BasicDescription) 
+	if (!BasicDescription) {
 		NoChildElement(errs, "<"+tva.e_BasicDescription+">", parentElement.name());
-	else {
-		var bdLang=GetLanguage(knownLanguages, errs, BasicDescription, parentLanguage);
+		return;
+	}
+	var bdLang=GetLanguage(knownLanguages, errs, BasicDescription, parentLanguage);
 
-		switch (parentElement.name()) {
-			case tva.e_ProgramInformation:
-				switch (requestType) {
-					case CG_REQUEST_SCHEDULE_NOWNEXT:  //6.10.5.2
-					case CG_REQUEST_SCHEDULE_WINDOW:
-					case CG_REQUEST_SCHEDULE_TIME:
-						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD010");	
-						ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
-						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL], requestType, errs, bdLang);
-						ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-						ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
-						Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
-						break;
-					case CG_REQUEST_PROGRAM:	// 6.10.5.3
-						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_Genre, tva.e_ParentalGuidance, tva.e_CreditsList, tva.e_RelatedMaterial], errs, "BD020");
-						ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
-						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL,dvbi.SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
+	switch (parentElement.name()) {
+		case tva.e_ProgramInformation:
+			switch (requestType) {
+				case CG_REQUEST_SCHEDULE_NOWNEXT:  //6.10.5.2
+				case CG_REQUEST_SCHEDULE_WINDOW:
+				case CG_REQUEST_SCHEDULE_TIME:
+					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD010");	
+					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
+					Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL], requestType, errs, bdLang);
+					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
+					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					break;
+				case CG_REQUEST_PROGRAM:	// 6.10.5.3
+					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_Genre, tva.e_ParentalGuidance, tva.e_CreditsList, tva.e_RelatedMaterial], errs, "BD020");
+					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
+					Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL,dvbi.SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
+					ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
+					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);	
+					ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);	
+					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);						
+					break;
+				case CG_REQUEST_BS_CONTENTS:  // 6.10.5.4					
+					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_Synopsis, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD030");
+					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
+					Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [dvbi.SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
+					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					break;
+				case CG_REQUEST_MORE_EPISODES:
+					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_RelatedMaterial], errs, "BD040");
+					Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+					break;
+			//	default:
+			//		errs.pushCode("BD050", "ValidateBasicDescription() called with invalid requestType/element ("+requestType+"/"+parentElement.name()+")");
+			}
+			break;
+
+		case tva.e_GroupInformation:
+			switch (requestType) {
+				case CG_REQUEST_SCHEDULE_NOWNEXT:  //6.10.17.3 - BasicDescription for NowNext should be empty
+				case CG_REQUEST_SCHEDULE_WINDOW:
+					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [], errs, "BD060");
+					break;
+				case CG_REQUEST_BS_LISTS:	// 6.10.5.5
+					if (isParentGroup) 
+						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [], errs, "BD061");
+					else
+					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_RelatedMaterial], errs, "BD062");
+					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);						
+					if (!isParentGroup)
+						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
+					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Synopsis))
+						errs.pushCode("BD063", "<"+tva.e_Synopsis+"> not permitted in \"category group\" for this request type");
+					if (!isParentGroup)
 						ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
-						ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-						ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);	
-						ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);	
-						Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);						
-						break;
-					case CG_REQUEST_BS_CONTENTS:  // 6.10.5.4					
-						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_Synopsis, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD030");
-						ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
-						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [dvbi.SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
-						ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
-						Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
-						break;
-					case CG_REQUEST_MORE_EPISODES:
-						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_RelatedMaterial], errs, "BD040");
-						Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
-						break;
-				//	default:
-				//		errs.pushCode("BD050", "ValidateBasicDescription() called with invalid requestType/element ("+requestType+"/"+parentElement.name()+")");
+					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Keyword))
+						errs.pushCode("BD064", "<"+tva.e_Keyword+"> not permitted in \"category group\" for this request type");
+					if (!isParentGroup)
+						Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_RelatedMaterial))
+						errs.pushCode("BD1065", "<"+tva.e_RelatedMaterial+"> not permitted in \"category group\" for this request type");
+			break;
+				case CG_REQUEST_MORE_EPISODES:   // TODO:: not defined in spec
+					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.e_RelatedMaterial], errs, "BD070");	
+					Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+					break;
+				case CG_REQUEST_BS_CATEGORIES:
+					if (isParentGroup) 
+						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [], errs, "BD080");	
+					else 
+						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_RelatedMaterial], errs, "BD081");
+					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);
+					if (!isParentGroup)
+						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_SHORT_LABEL], [], requestType, errs, bdLang);
+					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Synopsis))
+						errs.pushCode("BD082", "<"+tva.e_Synopsis+"> not permitted in \"category group\" for this request type");
+					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					break;
+				// default:
+				//	errs.pushCode("BD100", "ValidateBasicDescription() called with invalid requestType/element ("+requestType+"/"+parentElement.name()+")");
 				}
-				break;
-
-			case tva.e_GroupInformation:
-				switch (requestType) {
-					case CG_REQUEST_SCHEDULE_NOWNEXT:  //6.10.17.3 - BasicDescription for NowNext should be empty
-					case CG_REQUEST_SCHEDULE_WINDOW:
-						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [], errs, "BD060");
-						break;
-					case CG_REQUEST_BS_LISTS:	// 6.10.5.5
-						if (isParentGroup) 
-							checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [], errs, "BD061");
-						else
-						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_RelatedMaterial], errs, "BD062");
-						ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);						
-						if (!isParentGroup)
-							Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
-						else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Synopsis))
-							errs.pushCode("BD063", "<"+tva.e_Synopsis+"> not permitted in \"category group\" for this request type");
-						if (!isParentGroup)
-							ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
-						else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Keyword))
-							errs.pushCode("BD064", "<"+tva.e_Keyword+"> not permitted in \"category group\" for this request type");
-						if (!isParentGroup)
-							Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
-						else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_RelatedMaterial))
-							errs.pushCode("BD1065", "<"+tva.e_RelatedMaterial+"> not permitted in \"category group\" for this request type");
-				break;
-					case CG_REQUEST_MORE_EPISODES:   // TODO:: not defined in spec
-						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.e_RelatedMaterial], errs, "BD070");	
-						Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
-						break;
-					case CG_REQUEST_BS_CATEGORIES:
-						if (isParentGroup) 
-							checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [], errs, "BD080");	
-						else 
-							checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_RelatedMaterial], errs, "BD081");
-						ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);
-						if (!isParentGroup)
-							Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_SHORT_LABEL], [], requestType, errs, bdLang);
-						else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Synopsis))
-							errs.pushCode("BD082", "<"+tva.e_Synopsis+"> not permitted in \"category group\" for this request type");
-						ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-						Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
-						break;
-					// default:
-					//	errs.pushCode("BD100", "ValidateBasicDescription() called with invalid requestType/element ("+requestType+"/"+parentElement.name()+")");
-					}
-				break;
-			default:
-				errs.pushCode("BD003", "ValidateBasicDescription() called with invalid element ("+parentElement.name()+")");		
-		}
-	}	
+			break;
+		default:
+			errs.pushCode("BD003", "ValidateBasicDescription() called with invalid element ("+parentElement.name()+")");		
+	}
 }
 
 
@@ -1453,17 +1508,25 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		switch (child.name()) {
 			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
 				break;
-			case tva.e_MemberOf:				// <ProgramInformation><MemberOf>
 			case tva.e_EpisodeOf:				// <ProgramInformation><EpisodeOf>
+				// TODO: Table 41 in clause 6.10.4
+				break;
+			case tva.e_MemberOf:				// <ProgramInformation><MemberOf>
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI013");
+			
+				if (child.attr(tva.a_type)) {
+					if (child.attr(tva.a_type).value()!="MemberOfType")
+						errs.pushCode("PI014", "@xsi:"+child.attr(tva.a_type).name()+" must be \"MemberOfType\" for "+ProgramInformation.name()+"."+child.name());
+				}
+			
 				if (child.attr(tva.a_crid)) {
 					var oCRID=child.attr(tva.a_crid).value();
 					if (groupCRIDs && !isIn(groupCRIDs, oCRID)) 
-						errs.pushCode("PI014", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+oCRID+"\" is not a defined Group CRID for <"+child.name()+">")
+						errs.pushCode("PI020", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+oCRID+"\" is not a defined Group CRID for <"+child.name()+">")
 					else
 						if (!isCRIDURI(oCRID))
-							errs.pushCode("PI015", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+oCRID+"\" is not a valid CRID")
+							errs.pushCode("PI021", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+oCRID+"\" is not a valid CRID")
 				}
-				else errs.pushCode("PI013", ProgramInformation.name()+"."+child.name()+"@"+tva.a_crid+" is required for this request type")
 				break;			
 		}	
 	}
@@ -1504,7 +1567,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		}
 	if (o) {
 		if (o.childCount != cnt)
-			errs.pushCode("PI100", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+") does match the number of items ("+cnt+")");
+			errs.pushCode("PI100", "number of items ("+cnt+") in the "+ProgramInformationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+")");
 	}
 }
 
@@ -1524,6 +1587,13 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  */
 function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 	
+	// @serviceIDRef is required for Box Set Lists and Box Set Contents
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, 
+		(requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CONTENTS)
+			?[tva.a_groupId, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef] 
+			:[tva.a_groupId, tva.a_ordered, tva.a_numOfItems], 
+		[], errs, "GIB001")
+
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
 		if (isCRIDURI(groupId)) {
@@ -1533,35 +1603,31 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 		else
 			errs.pushCode("GIB002", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_groupId).name()+" value \""+groupId+"\" is not a CRID")
 	}
-	else errs.pushCode("GIB003", GroupInformation.name()+"@"+tva.a_groupId+" attribute is mandatory");	
 	
 	var isCategoryGroup=GroupInformation==categoryGroup;
 	var categoryCRID=(categoryGroup && categoryGroup.attr(tva.a_groupId)) ? categoryGroup.attr(tva.a_groupId).value() : "";
 
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES) {
 		if (!isCategoryGroup && GroupInformation.attr(tva.a_ordered)) 
-			errs.pushCode("GI004", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" is only permitted in the \"category group\"");
+			errs.pushCode("GIB004", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" is only permitted in the \"category group\"");
 		if (isCategoryGroup && !GroupInformation.attr(tva.a_ordered)) 
-			errs.pushCode("GI005", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" is required for this request type")
+			errs.pushCode("GIB005", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" is required for this request type")
 		if (!isCategoryGroup && GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GI006", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is only permitted in the \"category group\"");
+			errs.pushCode("GIB006", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is only permitted in the \"category group\"");
 		if (isCategoryGroup && !GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GI007", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is required for this request type")
+			errs.pushCode("GIB007", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is required for this request type")
 	}
 
-	// @serviceIDRef is required for Box Set Lists and Box Set Contents
-	if (GroupInformation.attr(tva.a_serviceIDRef) && requestType!=CG_REQUEST_BS_LISTS && requestType!=CG_REQUEST_BS_CONTENTS) 
-		errs.pushCode("GI011", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_serviceIDRef).name()+" is not permitted for this request type")
 
 	if (!isCategoryGroup) {
 		elem=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_MemberOf, CG_SCHEMA);
 		if (elem) {
 			if (elem.attr(tva.a_type)) {
 				if (elem.attr(tva.a_type).value()!=tva.t_MemberOfType)
-					errs.pushCode("GI020", GroupInformation.name()+"."+MemberOf.name()+"@xsi:"+tva.a_type+" is invalid (\""+elem.attr("type").value()+"\")");
+					errs.pushCode("GIB020", GroupInformation.name()+"."+MemberOf.name()+"@xsi:"+tva.a_type+" is invalid (\""+elem.attr("type").value()+"\")");
 			}
 			else
-				errs.pushCode("GI021", GroupInformation.name()+"."+MemberOf.name()+" requires @xsi:"+tva.a_type+"=\""+tva.t_MemberOfType+"\" attribute");
+				errs.pushCode("GIB021", GroupInformation.name()+"."+MemberOf.name()+" requires @xsi:"+tva.a_type+"=\""+tva.t_MemberOfType+"\" attribute");
 			
 			if (elem.attr(tva.a_index)) {
 				var index=valUnsignedInt(elem.attr(tva.a_index).value());
@@ -1573,21 +1639,23 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 					}
 				}
 				else 
-					errs.pushCode("GI023", GroupInformation.name()+"."+MemberOf.name()+"@"+elem.attr("index").name()+" must be an integer >= 1 (parsed "+index+")")
+					errs.pushCode("GIB023", GroupInformation.name()+"."+MemberOf.name()+"@"+elem.attr("index").name()+" must be an integer >= 1 (parsed "+index+")")
 			}
 			else
-				errs.pushCode("GI024", GroupInformation.name()+"."+MemberOf.name()+" requires @"+tva.a_index+" attribute");
+				errs.pushCode("GIB024", GroupInformation.name()+"."+MemberOf.name()+" requires @"+tva.a_index+" attribute");
 			
 			if (elem.attr(tva.a_crid)) {
 				if (elem.attr(tva.a_crid).value()!=categoryCRID)
-					errs.pushCode("GI025", GroupInformation.name()+"."+MemberOf.name()+"@"+elem.attr(tva.a_crid).name()+" ("+elem.attr(tva.a_crid).value()+") does not match the \"category group\" crid ("+categoryCRID+")");
+					errs.pushCode("GIB025", GroupInformation.name()+"."+MemberOf.name()+"@"+elem.attr(tva.a_crid).name()+" ("+elem.attr(tva.a_crid).value()+") does not match the \"category group\" crid ("+categoryCRID+")");
 			}
 			else
-				errs.pushCode("GI026", GroupInformation.name()+"."+MemberOf.name()+" requires @"+tva.a_crid+" attribute");
+				errs.pushCode("GIB026", GroupInformation.name()+"."+MemberOf.name()+" requires @"+tva.a_crid+" attribute");
 		}
 		else
-			errs.pushCode("GI027", GroupInformation.name()+" requires a <"+tva.e_MemberOf+"> element referring to the \"category group\" ("+categoryCRID+")");
+			errs.pushCode("GIB027", GroupInformation.name()+" requires a <"+tva.e_MemberOf+"> element referring to the \"category group\" ("+categoryCRID+")");
 	}
+	
+	checkTAGUri(GroupInformation, errs, "GIB030");	
 	
 	// <GroupInformation><BasicDescription>
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
@@ -1608,6 +1676,8 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
  */
 function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 	
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIS000")
+
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
 		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
@@ -1647,7 +1717,9 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 	
 	if (categoryGroup) 
-		errs.push("GIM001", "\"category group\" should not be specified for this request type")
+		errs.push("GIM000", "\"category group\" should not be specified for this request type")
+	
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIM001")
 	
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
@@ -1657,18 +1729,12 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 		else 
 			groupsFound.push(groupId);
 	}
-	else errs.pushCode("GIM003", GroupInformation.name()+"@"+tva.a_groupId+" attribute is mandatory");	
 
 	if (GroupInformation.attr(tva.a_ordered)) {
 		if (GroupInformation.attr(tva.a_ordered).value()!="true")
 			errs.pushCode("GIM004", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" must be \"true\" for this request type");
 	}
-	else 
-		errs.pushCode("GIM005", GroupInformation.name()+"@"+tva.a_ordered+" is required for this response type");
 	
-	if (!GroupInformation.attr(tva.a_numOfItems)) 
-		errs.pushCode("GI010", GroupInformation.name()+"@"+tva.a_numOfItems+" is required for this request type")
-
 	var elem=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_GroupType, CG_SCHEMA);
 	if (elem) {
 		if (!(elem.attr(tva.a_type) && elem.attr(tva.a_type).value()==tva.t_ProgramGroupTypeType)) 
@@ -2235,11 +2301,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 
 	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage);	
 	
-	// @serviceIDRef
-	if (OnDemandProgram.attr(tva.a_serviceIDRef)) {
-		if (!isTAGURI(OnDemandProgram.attr(tva.a_serviceIDRef).value()))
-			errs.pushCodeW("OD003", OnDemandProgram.name()+"@"+OnDemandProgram.attr(tva.a_serviceIDRef).name()+" is not a TAG URI")
-	}
+	checkTAGUri(OnDemandProgram, errs, "OD003");	
 	
 	// <Program>
 	var Program=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
@@ -2400,11 +2462,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	
 	var scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage);	
 	
-		// @serviceIDRef
-	if (Schedule.attr(tva.a_serviceIDRef)) {
-		if (!isTAGURI(Schedule.attr(tva.a_serviceIDRef).value()))
-			errs.pushCodeW("VS002", Schedule.name()+"@"+Schedule.attr(tva.a_serviceIDRef).name()+" is not a TAG URI")
-	}
+	checkTAGUri(Schedule, errs, "VS003");
 	
 	var startSchedule=Schedule.attr(tva.a_start), fr=null, endSchedule=Schedule.attr(tva.a_end), to=null;
 	if (startSchedule)
@@ -2469,8 +2527,8 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 		}
 	}
 	if (o) {
-		if (o.childCount != cnt++)
-			errs.pushCode("PL100", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+") does match the number of items ("+cnt+")");
+		if (o.childCount != cnt)
+			errs.pushCode("PI100", "number of items ("+cnt+") in the "+ProgramLocationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+")");
 	}
 }
 
