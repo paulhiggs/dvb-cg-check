@@ -1055,11 +1055,8 @@ function Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 	
 			// TODO:
 			
-			// no additional checks are needed - DVB-I client should be robust to any siganlled RelatedMaterial
 		}
 	}
-//	if (countRelatedMaterial > maxRMelements)
-//		errs.pushCode("RE001", "a maximum of "+maxRMelements+" <RelatedMaterial> element"+(maxRMelements>1?"s":"")+" are permitted")
 }
 
 
@@ -2015,9 +2012,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 				}
 				validLanguage=CheckLanguage(knownLanguages, errs, audioLang, AudioAttributes.name()+"."+AudioLanguage.name(), "AV102");
 				
-				// TODO: check that only two elements exist per language, one with each of the @purpose values
 				if (validLanguage && validPurpose) {	
-				
 					if (audioCounts[audioLang]===undefined)
 						audioCounts[audioLang]=1
 					else audioCounts[audioLang]++;
