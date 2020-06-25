@@ -3,12 +3,11 @@
 const express=require("express");
 var app=express();
 
-
 const fs=require("fs"), path=require("path");
 
 const ErrorList=require("./dvb-common/ErrorList.js");
 const dvbi=require("./dvb-common/DVB-I_definitions.js");
-const tva=require("../dvb-common/TVA_definitions.js");
+const tva=require("./dvb-common/TVA_definitions.js");
 
 const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js");
 const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js");
