@@ -1330,7 +1330,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 					errs.pushCode(errCode?errCode+"-2":"VT002", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\"")
 				else mainSet.push(titleLang);
 			}
-			else if (titleType=dvbi.TITLE_SECONDARY_TYPE) {
+			else if (titleType==dvbi.TITLE_SECONDARY_TYPE) {
 				if (allowSecondary) {
 					if (isIn(secondarySet, titleLang))
 						errs.pushCode(errCode?errCode+"-3":"VT003", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\"")
