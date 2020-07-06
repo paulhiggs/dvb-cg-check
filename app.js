@@ -4,6 +4,7 @@ const express=require("express");
 var app=express();
 
 const fs=require("fs"), path=require("path");
+const {parse}=require("querystring");
 
 const ErrorList=require("./dvb-common/ErrorList.js");
 const dvbi=require("./dvb-common/DVB-I_definitions.js");
@@ -25,20 +26,20 @@ const libxml=require("libxmljs");
 // morgan - https://github.com/expressjs/morgan
 const morgan=require("morgan")
 
-
 // sync-request - https://github.com/ForbesLindesay/sync-request
 const syncRequest=require("sync-request");
 
-const https=require("https");
-const HTTP_SERVICE_PORT=3020;
-const HTTPS_SERVICE_PORT=HTTP_SERVICE_PORT+1;
-const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt");
-
-const { parse }=require("querystring");
+// express-fileupload - https://github.com/richardgirges/express-fileupload#readme
+const fileUpload=require('express-fileupload');
 
 // https://github.com/alexei/sprintf.js
 var sprintf=require("sprintf-js").sprintf,
     vsprintf=require("sprintf-js").vsprintf
+	
+const https=require("https");
+const HTTP_SERVICE_PORT=3020;
+const HTTPS_SERVICE_PORT=HTTP_SERVICE_PORT+1;
+const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt");
 
 
 // convenience/readability values
@@ -60,7 +61,11 @@ const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
       DVBI_ContentSubjectFilename=path.join("dvb-common/dvbi","DVBContentSubjectCS-2019.xml"),
 	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
 	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt");
-
+/*
+const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
+	  MPEG7schemaFileName=path.join("schema","tva_mpeg7.xsd"),
+	  XMLschemaFileName=path.join("schema","xml.xsd");
+*/
 const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
       COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
       TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
@@ -80,6 +85,7 @@ const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-re
 var allowedGenres=[], allowedCreditItemRoles=[];
 var knownCountries=new ISOcountries(false, true);
 var knownLanguages=new IANAlanguages();
+var TVAschema, MPEG7schema, XMLschema;
 
 morgan.token("protocol", function getProtocol(req) {
     return req.protocol;
@@ -151,6 +157,7 @@ function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
 	}
 	return true;
 }
+
 
 /**
  * validate the language specified record any errors
@@ -243,7 +250,6 @@ function loadRolesFromURL(values, rolesURL) {
  * @param {boolean} useURL      if true use the URL loading method else use the local file
  * @param {String} roleFilename the filename of the classification scheme
  * @param {String} roleURL      URL to the classification scheme
- * 
  */ 
 function loadRoles(values, useURL, roleFilename, roleURL) {
 	if (useURL)
@@ -251,6 +257,34 @@ function loadRoles(values, useURL, roleFilename, roleURL) {
 	else loadRolesFromFile(values, roleFilename);	
 } 
 //----------------------------------------------------------
+
+function readmyfile(filename) {
+    try {
+        var stats=fs.statSync(filename);
+        if (stats.isFile()) return fs.readFileSync(filename); 
+    }
+    catch (err) {console.log(err.code,err.path);}
+    return null;
+}
+	  
+/**
+ * loads an XML schema from either a local file or an URL based location
+ *
+ * @param {boolean} useURL        if true use the URL loading method else use the local file
+ * @param {String} schemaFilename the filename of the schema
+ * @param {String} schemaURL      URL to the schema
+ * @returns {string} the string contents of the XML schema
+ */ /*
+function loadSchema(useURL, schemaFilename, schemaURL=null) {
+	console.log("loading schema", schemaFilename)
+
+	if (useURL) {
+		// TODO::
+	}
+	else {
+		return readmyfile(schemaFilename).toString() // .replace(/(\r\n|\n|\r|\t)/gm,"")
+	}
+} */
 
 
 
@@ -2537,8 +2571,8 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 }
 
 
-
-
+// https://www.npmjs.com/package/xmllint
+const xmllint=require('xmllint');
 
 /**
  * validate the content guide and record any errors
@@ -2551,24 +2585,22 @@ function validateContentGuide(CGtext, requestType, errs) {
 	if (CGtext) try {
 		CG=libxml.parseXmlString(CGtext);
 	} catch (err) {
-		errs.pushCode("CG001", "XML parsing failed: "+err.message);
+		errs.pushCode("CG000", "XML parsing failed: "+err.message);
 	}
 	if (!CG) return;
 
 	// check the retrieved service list against the schema
 	// https://syssgx.github.io/xml.js/
+	// https://github.com/kripken/xml.js
 
 //TODO: look into why both of these validation approaches are failing
 /*
-	console.log(xmllint.validateXML({
-		xml: SL.toString(),
-		schema: [SLschema.toString(), 
-				 TVAschema.toString(), 
-				 MPEG7schema.toString(),
-				 XMLschema.toString()]
-	}));
-*/
-/*
+
+	if (xmllint.validateXML({xml: CGtext,schema: [TVAschema, MPEG7schema, XMLschema]}).errors) {
+		// lint errors - xmllint "kills" node.js if there is an error
+		errs.pushCode("CG001", "xmllint error");
+	}
+
 	if (!SL.validate(SLschema)){
 		SL.validationErrors.forEach(err => console.log("validation error:", err));
 	};
@@ -2696,12 +2728,11 @@ function processQuery(req, res) {
 }
 
 
-const fileUpload=require('express-fileupload');
+
 //middleware
 app.use(express.static(__dirname));
 app.set('view engine', 'ejs');
 app.use(fileUpload());
-
 
 function checkFile(req) {
     if (req.files) {
@@ -2764,6 +2795,12 @@ function loadDataFiles(useURLs) {
 	allowedCreditItemRoles=[];
 	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
 	loadRoles(allowedCreditItemRoles, useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
+/*	
+	console.log("loading Schemas...");
+	TVAschema=loadSchema(false, TVAschemaFileName);
+	MPEG7schema=loadSchema(false, MPEG7schemaFileName);
+	XMLschema=loadSchema(false, XMLschemaFileName);
+*/
 }
 
 
@@ -2809,15 +2846,6 @@ var http_server=app.listen(HTTP_SERVICE_PORT, function() {
 
 // start the HTTPS server
 // sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ./selfsigned.key -out selfsigned.crt
-
-function readmyfile(filename) {
-    try {
-        var stats=fs.statSync(filename);
-        if (stats.isFile()) return fs.readFileSync(filename); 
-    }
-    catch (err) {console.log(err.code,err.path);}
-    return null;
-}
 
 var https_options={
     key:readmyfile(keyFilename),
