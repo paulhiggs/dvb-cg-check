@@ -779,9 +779,9 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 				counts[keywordLang]=1
 			else counts[keywordLang]++;
 			if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
-				errs.pushCode(errCode?errCode+"-1":"KW001","@"+tva.a_type+"=\""+keywordType+"\" not permitted for <"+tva.e_Keyword+">");
+				errs.pushCode(errCode?errCode+"-1":"KW001","@"+tva.a_type+"=\""+keywordType+"\" not permitted for <"+Keyword.name()+">");
 			if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
-				errs.pushCode(errCode?errCode+"-2":"KW002","<"+tva.e_Keyword+"> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
+				errs.pushCode(errCode?errCode+"-2":"KW002","<"+Keyword.name()+"> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
 		}
 	}
 	for (var i in counts) {
@@ -808,11 +808,11 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 			count++;
 			var genreType=Genre.attr(tva.a_type) ? Genre.attr(tva.a_type).value() : dvbi.DEFAULT_GENRE_TYPE;
 			if (genreType!=dvbi.GENRE_TYPE_MAIN)
-				errs.pushCode(errCode?errCode+"-1":"GE001","@"+tva.a_type+"=\""+genreType+"\" not permitted for <"+tva.e_Genre+">");
+				errs.pushCode(errCode?errCode+"-1":"GE001","@"+tva.a_type+"=\""+genreType+"\" not permitted for <"+Genre.name()+">");
 			
 			var genreValue=Genre.attr(tva.a_href) ? Genre.attr(tva.a_href).value() : "";
 			if (!isIn(allowedGenres, genreValue))
-				errs.pushCode(errCode?errCode+"-2":"GE002","invalid @"+tva.a_href+" value \""+genreValue+"\" for <"+tva.e_Genre+">");
+				errs.pushCode(errCode?errCode+"-2":"GE002","invalid @"+tva.a_href+" value \""+genreValue+"\" for <"+Genre.name()+">");
 		}
 	}
 	if (count>maxGenres)
@@ -845,10 +845,10 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 					
 					if (pgChild.name()==tva.e_MinimumAge || pgChild.name()==tva.e_ParentalRating) {
 						if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-							errs.pushCode(errCode?errCode+"-1":"PG001", "first <"+tva.e_ParentalGuidance+"> element must contain <mpeg7:"+tva.e_MinimumAge+">");
+							errs.pushCode(errCode?errCode+"-1":"PG001", "first <"+ParentalGuidance.name()+"> element must contain <mpeg7:"+tva.e_MinimumAge+">");
 						
-						if (pgChild.name()=="MinimumAge" && countParentalGuidance!=1)
-							errs.pushCode(errCode?errCode+"-2":"PG002", "<"+tva.e_MinimumAge+"> must be in the first <"+tva.e_ParentalGuidance+"> element");
+						if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
+							errs.pushCode(errCode?errCode+"-2":"PG002", "<"+tva.e_MinimumAge+"> must be in the first <"+ParentalGuidance.name()+"> element");
 						
 						if (pgChild.name()==tva.e_ParentalRating) {
 							if (!pgChild.attr(tva.a_href))
@@ -1002,7 +1002,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 	if (hrHref==tva.cs_PromotionalStillImage) {
 		// Promotional Still Image
 		
-		var errLocation="Promotional Still Image ("+HowRelated.name()+"@"+HowRelated.attr(tva.a_href).name()+"="+tva.cs_PromotionalStillImage+")"
+		var errLocation="Promotional Still Image ("+HowRelated.name()+"@"+HowRelated.attr(tva.a_href).name()+"="+tva.cs_PromotionalStillImage+")";
 		var MediaUri=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator+"/"+SCHEMA_PREFIX+":"+tva.e_MediaUri, CG_SCHEMA);
 		if (!MediaUri) 
 			errs.pushCode("IRM001", tva.e_MediaUri+" not specified for "+errLocation);
@@ -1079,6 +1079,7 @@ function NoChildElement(errs, missingElement, parentElement, schemaLocation=null
 	errs.pushCode(errno?errno:"NC001", missingElement+" element not specified for "+parentElement+ (schemaLocation)?" in "+schemaLocation:"");
 }
 
+
 /**
  * Add an error message when the @href contains an invalid value
  *
@@ -1091,6 +1092,7 @@ function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
 	errs.pushCode(errno?errno:"HV001", "invalid @"+tva.a_href+"=\""+value+"\" specified for "+src+(loc)?" in "+loc:"");
 }
 
+
 /**
  * Add an error message when the @href is not specified for an element
  *
@@ -1101,6 +1103,7 @@ function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
 function NoHrefAttribute(errs, src, loc=null, errno=null) {
 	errs.pushCode(errno?errno:"HA001","no @"+tva.a_href+" specified for "+src+((loc)?" in "+loc:""));
 }
+
 
 /**
  * Add an error message when the MediaLocator does not contain a MediaUri sub-element
@@ -1114,12 +1117,12 @@ function NoAuxiliaryURI(errs, src, loc, errno=null) {
 }
 
 
-/**TemplateAITPromotional Still Image
+/** TemplateAITPromotional Still Image
  *
  * @param {Object} RelatedMaterial   the <RelatedMaterial> element (a libxmls ojbect tree) to be checked
  * @param {Object} errs              The class where errors and warnings relating to the serivce list processing are stored 
  * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
-  */
+ */
 function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location) {
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
@@ -1245,6 +1248,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 		NoHrefAttribute(errs, RelatedMaterial.name()+"."+tva.e_HowRelated, Location);
 }
 
+
 /**
  * validate the <RelatedMaterial> elements specified in a Box Set List
  *
@@ -1357,6 +1361,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 		}
 	}	
 }
+
 
 /**
  * validate the <BasicDescription> element against the profile for the given request/response type
@@ -1543,6 +1548,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		}	
 	}
 }
+
 
 /**
  * find and validate any <ProgramInformation> elements in the <ProgramInformationTable>
@@ -2091,7 +2097,6 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 }
 
 
-
 /**
  * validate a <RelatedMaterial> element iconforms to the Restart Application Linking rules (A177v2 clause 6.5.5)
  *
@@ -2120,7 +2125,6 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	if (MediaLocator) 
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, MediaLocator, [tva.e_MediaUri, tva.e_AuxiliaryUri], [], errs, "ML000");
 }
-
 
 
 /**
