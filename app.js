@@ -44,6 +44,8 @@ const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","s
 
 // convenience/readability values
 const DEFAULT_LANGUAGE="***";
+const CATEGORY_GROUP_NAME="\"category group\"";
+const PARENT_GROUP_NAME="\"parent group\"";
 
 const CG_REQUEST_SCHEDULE_TIME="Time";
 const CG_REQUEST_SCHEDULE_NOWNEXT="NowNext";
@@ -186,15 +188,15 @@ function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
 function GetLanguage(validator, errs, node, parentLang, isRequired, errno=null) {
 	if (!node) 
 		return parentLang;
-	if (!node.attr('lang') && isRequired) {
-		errs.pushCode(errno?errno:"AC001", "@lang is required for \""+node.name()+"\"");
+	if (!node.attr(tva.a_lang) && isRequired) {
+		errs.pushCode(errno?errno:"AC001", "@"+tva.a_lang+" is required for \""+node.name()+"\"");
 		return parentLang;		
 	}
 
-	if (!node.attr('lang'))
+	if (!node.attr(tva.a_lang))
 		return parentLang;
 	
-	var localLang=node.attr('lang').value();
+	var localLang=node.attr(tva.a_lang).value();
 	CheckLanguage(validator, errs, localLang, node.name(), errno);
 	return localLang;
 }
@@ -285,9 +287,9 @@ function readmyfile(filename) {
 /**
  * loads an XML schema from either a local file or an URL based location
  *
- * @param {boolean} useURL        if true use the URL loading method else use the local file
- * @param {String} schemaFilename the filename of the schema
- * @param {String} schemaURL      URL to the schema
+ * @param {boolean} useURL         if true use the URL loading method else use the local file
+ * @param {String}  schemaFilename the filename of the schema
+ * @param {String}  schemaURL      URL to the schema
  * @returns {string} the string contents of the XML schema
  */ /*
 function loadSchema(useURL, schemaFilename, schemaURL=null) {
@@ -315,7 +317,7 @@ function isEmpty(obj) {
  * checks if the argument complies to the TV Anytime defintion of RatioType
  *
  * @param {string}     str string contining value to check
- * @returns {boolean}  true if the argment is compliant to a tva:RatioType
+ * @returns {boolean} true if the argment is compliant to a tva:RatioType
  */
 function isRatioType(str) {
 	const ratioRegex=/^\d+:\d+$/;
@@ -328,7 +330,7 @@ function isRatioType(str) {
  * converts a decimal representation of a string to a number
  *
  * @param {string} str    string contining the decimal value
- * @returns {integer}     the decimal representation of the string, or 0 is non-digits are included
+ * @returns {integer}  the decimal representation of the string, or 0 is non-digits are included
  */
 function valUnsignedInt(str) {
 	var intRegex=/[\d]+/g;
@@ -1430,21 +1432,14 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				case CG_REQUEST_BS_LISTS:	// 6.10.5.5
 					if (isParentGroup) 
 						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [], errs, "BD061");
-					else
-					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_RelatedMaterial], errs, "BD062");
+					else checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_RelatedMaterial], errs, "BD062");
+					
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);						
-					if (!isParentGroup)
-						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, bdLang);
-					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Synopsis))
-						errs.pushCode("BD063", "<"+tva.e_Synopsis+"> not permitted in \"category group\" for this request type");
-					if (!isParentGroup)
+					if (!isParentGroup) {
+						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs,bdLang);
 						ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
-					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Keyword))
-						errs.pushCode("BD064", "<"+tva.e_Keyword+"> not permitted in \"category group\" for this request type");
-					if (!isParentGroup)
 						Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
-					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_RelatedMaterial))
-						errs.pushCode("BD1065", "<"+tva.e_RelatedMaterial+"> not permitted in \"category group\" for this request type");
+					}
 			break;
 				case CG_REQUEST_MORE_EPISODES:   // TODO:: not defined in spec
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.e_RelatedMaterial], errs, "BD070");	
@@ -1458,8 +1453,6 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);
 					if (!isParentGroup)
 						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_SHORT_LABEL], [], requestType, errs, bdLang);
-					else if (ElementFound(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, tva.e_Synopsis))
-						errs.pushCode("BD082", "<"+tva.e_Synopsis+"> not permitted in \"category group\" for this request type");
 					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
@@ -1586,7 +1579,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		}
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PI100", "number of items ("+cnt+") in the "+ProgramInformationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+")");
+			errs.pushCode("PI100", "number of items ("+cnt+") in the "+ProgramInformationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
 }
 
@@ -1638,11 +1631,11 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES) {
 		if (!isCategoryGroup && GroupInformation.attr(tva.a_ordered)) 
-			errs.pushCode("GIB004", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" is only permitted in the \"category group\"");
+			errs.pushCode("GIB004", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" is only permitted in the "+CATEGORY_GROUP_NAME);
 		if (isCategoryGroup && !GroupInformation.attr(tva.a_ordered)) 
 			errs.pushCode("GIB005", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_ordered).name()+" is required for this request type")
 		if (!isCategoryGroup && GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GIB006", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is only permitted in the \"category group\"");
+			errs.pushCode("GIB006", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is only permitted in the "+CATEGORY_GROUP_NAME);
 		if (isCategoryGroup && !GroupInformation.attr(tva.a_numOfItems)) 
 			errs.pushCode("GIB007", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is required for this request type")
 	}
@@ -1674,13 +1667,13 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 			
 			if (elem.attr(tva.a_crid)) {
 				if (elem.attr(tva.a_crid).value()!=categoryCRID)
-					errs.pushCode("GIB025", GroupInformation.name()+"."+MemberOf.name()+"@"+elem.attr(tva.a_crid).name()+" ("+elem.attr(tva.a_crid).value()+") does not match the \"category group\" crid ("+categoryCRID+")");
+					errs.pushCode("GIB025", GroupInformation.name()+"."+MemberOf.name()+"@"+elem.attr(tva.a_crid).name()+" ("+elem.attr(tva.a_crid).value()+") does not match the "+CATEGORY_GROUP_NAME+" crid ("+categoryCRID+")");
 			}
 			else
 				errs.pushCode("GIB026", GroupInformation.name()+"."+MemberOf.name()+" requires @"+tva.a_crid+" attribute");
 		}
 		else
-			errs.pushCode("GIB027", GroupInformation.name()+" requires a <"+tva.e_MemberOf+"> element referring to the \"category group\" ("+categoryCRID+")");
+			errs.pushCode("GIB027", GroupInformation.name()+" requires a <"+tva.e_MemberOf+"> element referring to the "+CATEGORY_GROUP_NAME+" ("+categoryCRID+")");
 	}
 	
 	checkTAGUri(GroupInformation, errs, "GIB030");	
@@ -1688,6 +1681,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	// <GroupInformation><BasicDescription>
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
 }
+
 
 /**
  * validate the <GroupInformation> element for Schedules related requests
@@ -1729,6 +1723,7 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);	
 }
 
+
 /**
  * validate the <GroupInformation> element for More Episodes requests
  *
@@ -1745,7 +1740,7 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 	
 	if (categoryGroup) 
-		errs.push("GIM000", "\"category group\" should not be specified for this request type")
+		errs.push("GIM000", CATEGORY_GROUP_NAME+" should not be specified for this request type")
 	
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIM001")
 	
@@ -1826,6 +1821,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 		errs.pushCode("GI014", "<"+tva.e_GroupType+"> is required in <"+GroupInformation.name()+">"); // this should be checked in valdidation against the schema
 }
 
+
 /**
  * find and validate any <GroupInformation> elements in the <GroupInformationTable>
  *
@@ -1862,12 +1858,12 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 			if (countMemberOf==0) {
 				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
 				if (categoryGroup)
-					errs.pushCode("GI101", "only a single \"category group\" can be present in <"+GroupInformationTable.name()+">")
+					errs.pushCode("GI101", "only a single "+CATEGORY_GROUP_NAME+" can be present in <"+GroupInformationTable.name()+">")
 				else categoryGroup=GroupInformation;
 			}
 		}
 		if (!categoryGroup)
-			errs.pushCode("GI102", "a \"category group\" must be specified in <"+GroupInformationTable.name()+"> for this request type")
+			errs.pushCode("GI102", "a "+CATEGORY_GROUP_NAME+" must be specified in <"+GroupInformationTable.name()+"> for this request type")
 	}
 	
 	var indexes=[], giCount=0;
@@ -1882,7 +1878,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 	if (categoryGroup) {
 		var numOfItems=(categoryGroup.attr(tva.a_numOfItems) ? valUnsignedInt(categoryGroup.attr(tva.a_numOfItems).value()) : 0);
 		if (requestType!=CG_REQUEST_BS_CONTENTS && numOfItems!=giCount)
-			errs.pushCode("GI103", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+numOfItems+") does match the number of items ("+giCount+")");
+			errs.pushCode("GI103", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+numOfItems+") does match the number of items ("+giCount+")");
 
 		if (o) 
 			o.childCount=numOfItems;
@@ -1944,6 +1940,7 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	}
 }
 
+
 /**
  * find and validate any <GroupInformation> elements used for now/next in the <GroupInformationTable>
  *
@@ -1981,12 +1978,6 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 	}
 }
 
-
-function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
-	var count=0, elem;
-	while (elem=node.get(SCHEMA_PREFIX+":"+elementName+"["+count+"]", CG_SCHEMA)) count++;
-	return count;
-}
 
 /**
  * validate any <AVAttributes> elements in <InstanceDescription> elements
@@ -2146,23 +2137,30 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
  */
 function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, parentLanguage, programCRIDs, requestType, errs) {
 
+	function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
+		var count=1, elem;
+		while (elem=node.get(SCHEMA_PREFIX+":"+elementName+"["+count+"]", CG_SCHEMA)) count++;
+		return count-1;
+	}
+
 	function isRestartAvailability(str) { return str==dvbi.RESTART_AVAILABLE || str==dvbi.RESTART_CHECK || str==dvbi.RESTART_PENDING; }
 	function isMediaAvailability(str) { return str==dvbi.MEDIA_AVAILABLE || str==dvbi.MEDIA_UNAVAILABLE; }
 	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
 	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
+	
 	function checkGenre(node, parentNode, hrefAttribute) {
 		if (!node) return null;
 		var GenreType=(node.attr(tva.a_type)?node.attr(tva.a_type).value():"other");
 		if (GenreType!="other")
 			errs.pushCode("ID001", parentNode.name()+"."+node.name()+"@"+tva.a_type+" must contain \"other\"");
-		if (!node.attr('href'))
+		if (!node.attr(tva.a_href))
 			NoHrefAttribute(errs, node.name(), parentNode.name());
 		return (node.attr(tva.a_href)?node.attr(tva.a_href).value():null);
 	}
 
-	if (VerifyType=="OnDemandProgram") {
+	if (VerifyType==tva.e_OnDemandProgram) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [tva.e_Genre], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier], errs, "IDO000");
-	} else if (VerifyType=="ScheduleEvent") {
+	} else if (VerifyType==tva.e_ScheduleEvent) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier, tva.e_Genre, tva.e_RelatedMaterial], errs, "IDS000");	
 	}
 	else
@@ -2268,7 +2266,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	
 	if (VerifyType==tva.e_ScheduleEvent) {
 		if ((restartGenre && !restartRelatedMaterial) || (restartRelatedMaterial && !restartGenre))
-			errs.pushCode("ID060", "both <Genre> and <RelatedMaterial> are required together for "+VerifyType);	
+			errs.pushCode("ID060", "both <"+tva.e_Genre+"> and <"+tva.e_RelatedMaterial+"> are required together for "+VerifyType);	
 	}
 }
 
@@ -2554,7 +2552,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 	}
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PL100", "number of items ("+cnt+") in the "+ProgramLocationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+")");
+			errs.pushCode("PL100", "number of items ("+cnt+") in the "+ProgramLocationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
 }
 
@@ -2606,7 +2604,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 		
 		var ProgramDescription=CG.get(SCHEMA_PREFIX+":"+tva.e_ProgramDescription, CG_SCHEMA);
 		if (!ProgramDescription) {
-			errs.pushCode("CG003", "No <ProgramDescription> element specified.");
+			errs.pushCode("CG003", "No <"+tva.e_ProgramDescription+"> element specified.");
 			return;
 		}
 		var progDescrLang=GetLanguage(knownLanguages, errs, ProgramDescription, tvaMainLang);
