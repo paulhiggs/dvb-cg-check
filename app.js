@@ -20,8 +20,8 @@ const IANAlanguages=require("./dvb-common/IANAlanguages.js");
 // libxmljs - https://github.com/libxmljs/libxmljs
 const libxml=require("libxmljs");
 
-//TODO: validation against schema
-//const xmllint=require("xmllint");
+//LINT: validation against schema
+const xmllint=require("xmllint");
 
 // morgan - https://github.com/expressjs/morgan
 const morgan=require("morgan")
@@ -61,11 +61,12 @@ const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
       DVBI_ContentSubjectFilename=path.join("dvb-common/dvbi","DVBContentSubjectCS-2019.xml"),
 	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
 	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt");
-/*
+
+// LINT:
 const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
 	  MPEG7schemaFileName=path.join("schema","tva_mpeg7.xsd"),
 	  XMLschemaFileName=path.join("schema","xml.xsd");
-*/
+
 const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
       COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
       TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
@@ -85,8 +86,9 @@ const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-re
 var allowedGenres=[], allowedCreditItemRoles=[];
 var knownCountries=new ISOcountries(false, true);
 var knownLanguages=new IANAlanguages();
+/* // LINT
 var TVAschema, MPEG7schema, XMLschema;
-
+*/
 morgan.token("protocol", function getProtocol(req) {
     return req.protocol;
 });
@@ -103,8 +105,8 @@ morgan.token("cgLoc",function getCheckedLocation(req) {
 	return "[*]";
 });
 
-
 app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length] - :response-time ms :agent :parseErr :cgLoc"));
+
 
 /**
  * determines if a value is in a set of values - simular to 
@@ -125,6 +127,7 @@ function isIn(values, value){
     return false;
 }
 
+
 /*
  * replace ENTITY strings with a generic characterSet
  *
@@ -134,6 +137,7 @@ function isIn(values, value){
 function unEntity(str) {
 	return str.replace(/(&.+;)/ig,"*");
 }
+
 
 /* 
  * convert characters in the string to HTML entities
@@ -146,6 +150,15 @@ function HTMLize(str) {
 }
 
 
+/* 
+ * verify the language using a validation class
+ *
+ * @param {object} validator  the validation class to use
+ * @param {Class}  errs       errors found in validaton
+ * @param {string} lang 	  that should be displayed in HTML
+ * @param {string} loc        (optional) "location" of the language being checked
+ * @param {string} errno      (optional) error number to use instead of local values
+ */
 function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
 	if (!validator) {
 		errs.pushCode(errno?errno+"-1":"LA001", "cannot validate language \""+lang+"\""+(loc?" for \""+loc+"\"":""));
@@ -166,6 +179,8 @@ function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
  * @param {Class}  errs       errors found in validaton
  * @param {Object} node       the XML node whose @lang attribute should be checked
  * @param {string} parentLang the language of the XML element which is the parent of node
+ * @param {boolean} isRequired report an error if @lang is not explicitly stated
+ * @param {string} errno      (optional) error number to use instead of local values
  * @returns {string} the @lang attribute of the node element of the parentLang if it does not exist of is not specified
  */
 function GetLanguage(validator, errs, node, parentLang, isRequired, errno=null) {
@@ -224,7 +239,7 @@ function loadRolesFromFile(values, rolesFilename) {
 }
 
 /**
- * read the list of valid roles from a network location referenced by a REL  
+ * read the list of valid roles from a network location referenced by a URL  
  *
  * @param {Array} values 	The linear list of values
  * @param {String} rolesURL URL to the load
@@ -284,8 +299,7 @@ function loadSchema(useURL, schemaFilename, schemaURL=null) {
 	else {
 		return readmyfile(schemaFilename).toString() // .replace(/(\r\n|\n|\r|\t)/gm,"")
 	}
-} */
-
+}  */
 
 
 function isEmpty(obj) {
@@ -304,7 +318,6 @@ function isEmpty(obj) {
  * @returns {boolean}  true if the argment is compliant to a tva:RatioType
  */
 function isRatioType(str) {
-	// <pattern value="\d+:\d+"/>
 	const ratioRegex=/^\d+:\d+$/;
 	var s=str.match(ratioRegex);
 	return s?s[0]===str:false;
@@ -323,6 +336,7 @@ function valUnsignedInt(str) {
 	return s[0]===str?parseInt(str, 10):0;
 }
 
+
 /**
  * checks if the argument complies to an XML representation of UTC time
  *
@@ -336,6 +350,7 @@ function isUTCTime(str) {
 	return s?s[0]===str:false;
 } */
 
+
 /**
  * checks if the argument complies to an XML representation of UTC time
  *
@@ -347,6 +362,7 @@ function isUTCDateTime(str) {
 	var s=str.match(UTCregex);
 	return s?s[0]===str:false;
 }
+
 
 /**
  * checks if the argument complies to an XML representation of UTC time
@@ -536,6 +552,7 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
     }
 }
 
+
 /**
  * check if the node provided contains an RelatedMaterial element for a signalled application
  *
@@ -552,52 +569,6 @@ function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
 			return true;			
     }
     return false;
-}
-
-/**
- * check that only the specified child elements are in the parent element, no others
- *
- * @param {string} CG_SCHEMA     Used when constructing Xpath queries
- * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
- * @param {Object} parentElement the element whose children should be checked
- * @param {Array}  childElements the element names permitted within the parent
- * @param {string} requestType   the type of content guide request being checked
- * @param {Class}  errs          errors found in validaton
- */
-function checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, childElements, requestType, errs) {
-	// check that each of the specifid childElements exists
-	childElements.forEach(elem => {
-		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
-			errs.pushCode("TE001", "Element "+elem+" not specified in "+parentElement.name());
-	});
-	
-	// check that no additional child elements existance
-	var c=0, child;
-	while (child=parentElement.child(c++)) {
-		if (!isIn(childElements, child.name())) {
-			if (child.name()!='text')
-				errs.pushCode("TE002", "Element "+child.name()+" not permitted");
-		}
-	}
-}
-
-
-/**
- * check that the specified child elements are in the parent element
- *
- * @param {string} CG_SCHEMA     Used when constructing Xpath queries
- * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
- * @param {Object} parentElement the element whose children should be checked
- * @param {Array}  childElements the element names permitted within the parent
- * @param {string} requestType   the type of content guide request being checked
- * @param {Class}  errs          errors found in validaton
- */
-function checkRequiredTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, childElements, requestType, errs) {
-	// check that each of the specifid childElements exists
-	childElements.forEach(elem => {
-		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
-			errs.pushCode("TE001", "Element <"+elem+"> not specified in <"+parentElement.name()+">");
-	});
 }
 
 
@@ -634,7 +605,6 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 		}
 	}
 }
-
 
 
 /**
@@ -680,6 +650,7 @@ function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
 	return false;
 }
 
+
 /**
  * check that the serviceIdRef attribute is a TAG URI and report warnings
  * 
@@ -694,7 +665,6 @@ function checkTAGUri(elem, errs, errCode=null) {
 			errs.pushCodeW(errCode?errCode:"UR001", elem.name()+"@"+elem.attr(tva.a_serviceIDRef).name()+" is not a TAG URI")
 	}
 }
-
 
 
 /**
@@ -1544,28 +1514,37 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				// TODO: Table 41 in clause 6.10.4
 				break;
 			case tva.e_MemberOf:				// <ProgramInformation><MemberOf>
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI013");
-			
+				switch (requestType) {
+					case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
+					case CG_REQUEST_SCHEDULE_WINDOW:
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI013a");
+						break;
+					default:
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI013z");
+				}
+						
 				if (child.attr(tva.a_type)) {
 					if (child.attr(tva.a_type).value()!="MemberOfType")
 						errs.pushCode("PI014", "@xsi:"+child.attr(tva.a_type).name()+" must be \"MemberOfType\" for "+ProgramInformation.name()+"."+child.name());
 				}
 			
+				var foundCRID=null;
 				if (child.attr(tva.a_crid)) {
-					var oCRID=child.attr(tva.a_crid).value();
-					if (groupCRIDs && !isIn(groupCRIDs, oCRID)) 
-						errs.pushCode("PI020", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+oCRID+"\" is not a defined Group CRID for <"+child.name()+">")
+					foundCRID=child.attr(tva.a_crid).value();
+					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
+						errs.pushCode("PI020", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+foundCRID+"\" is not a defined Group CRID for <"+child.name()+">")
 					else
-						if (!isCRIDURI(oCRID))
-							errs.pushCode("PI021", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+oCRID+"\" is not a valid CRID")
+						if (!isCRIDURI(foundCRID))
+							errs.pushCode("PI021", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+foundCRID+"\" is not a valid CRID")
 				}
 				
 				if (child.attr(tva.a_index)) {
 					var index=valUnsignedInt(child.attr(tva.a_index).value());
-					if (isIn(indexes, index))
+					var indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")";
+					if (isIn(indexes, indexInCRID))
 						errs.pushCode("PI030", child.name()+"@"+child.attr(tva.a_index).name()+"="+index+" is in use by another "+ProgramInformation.name()+" element")
 					else 
-						indexes.push(index);
+						indexes.push(indexInCRID);
 				}
 				break;			
 		}	
@@ -1605,8 +1584,8 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
 			cnt++;
 		}
-	if (o) {
-		if (o.childCount != cnt)
+	if (o && o.childCount!=0) {
+		if (o.childCount!=cnt)
 			errs.pushCode("PI100", "number of items ("+cnt+") in the "+ProgramInformationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+")");
 	}
 }
@@ -2564,15 +2543,12 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 				break;
 		}
 	}
-	if (o) {
-		if (o.childCount != cnt)
-			errs.pushCode("PI100", "number of items ("+cnt+") in the "+ProgramLocationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+")");
+	if (o && o.childCount!=0) {
+		if (o.childCount!=cnt)
+			errs.pushCode("PL100", "number of items ("+cnt+") in the "+ProgramLocationTable.name()+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in \"category group\" ("+o.childCount+")");
 	}
 }
 
-
-// https://www.npmjs.com/package/xmllint
-const xmllint=require('xmllint');
 
 /**
  * validate the content guide and record any errors
@@ -2592,26 +2568,29 @@ function validateContentGuide(CGtext, requestType, errs) {
 	// check the retrieved service list against the schema
 	// https://syssgx.github.io/xml.js/
 	// https://github.com/kripken/xml.js
-
-//TODO: look into why both of these validation approaches are failing
 /*
-
-	if (xmllint.validateXML({xml: CGtext,schema: [TVAschema, MPEG7schema, XMLschema]}).errors) {
+//TODO: look into why both of these validation approaches are failing
+// LINT
+	let lintErrs=null;
+	if (lintErrs=xmllint.validateXML({xml: CGtext,schema: [TVAschema, MPEG7schema, XMLschema]}).errors) {
 		// lint errors - xmllint "kills" node.js if there is an error
-		errs.pushCode("CG001", "xmllint error");
+		lintErrs.forEach(err => {
+			errs.pushCode("CG001", "xmllint: "+err);
+		})
 	}
-
+*/ /*
 	if (!SL.validate(SLschema)){
 		SL.validationErrors.forEach(err => console.log("validation error:", err));
 	};
 */
+
 	if (CG.root().name()!==tva.e_TVAMain) {
 		errs.pushCode("CG002", "Root element is not <"+tva.e_TVAMain+">");
 	}
 	else {
 		var CG_SCHEMA={}, 
-			SCHEMA_PREFIX=CG.root().namespace().prefix(), 
-			SCHEMA_NAMESPACE=CG.root().namespace().href();
+			SCHEMA_PREFIX=CG.root().namespace()?CG.root().namespace().prefix():"", 
+			SCHEMA_NAMESPACE=CG.root().namespace()?CG.root().namespace().href():"";
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
 		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true);
@@ -2627,35 +2606,36 @@ function validateContentGuide(CGtext, requestType, errs) {
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE_TIME:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], requestType, errs);
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG004"); 
 			
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, null, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], requestType, errs);
-			
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG005"); 
+		
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, groupIds, requestType, errs);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_WINDOW:
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], requestType, errs);
-			
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG006"); 
+
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, groupIds, requestType, errs);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
 			break;
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], requestType, errs);
 			
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG007"); 
+		
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, null, requestType, errs);
 			break;
 		case CG_REQUEST_MORE_EPISODES:
 			// more episodes response (6.7.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramInformationTable,tva.e_GroupInformationTable,tva.e_ProgramLocationTable], requestType, errs);
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG009"); 
 
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs, o);
@@ -2663,39 +2643,28 @@ function validateContentGuide(CGtext, requestType, errs) {
 			break;
 		case CG_REQUEST_BS_CATEGORIES:
 			// box set categories response (6.8.2.3) has <GroupInformationTable> element
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_GroupInformationTable], requestType, errs);
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG010"); 
 
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, null, errs, null);
 			break;
 		case CG_REQUEST_BS_LISTS:
 			// box set lists response (6.8.3.3) has <GroupInformationTable> element
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_GroupInformationTable], requestType, errs);
-
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG011"); 
+			
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, null, errs, null);
 			break;
 		case CG_REQUEST_BS_CONTENTS:
 			// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
-			checkAllowedTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramInformationTable,tva.e_GroupInformationTable,tva.e_ProgramLocationTable], requestType, errs);
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG012"); 
 			
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs, o);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs, o);
 			break;
 		}
-
-
 	}	
 }
 
-function checkQuery(req) {
-    if (req.query) {
-        if (req.query.CGurl)
-            return true;
-        
-        return false;
-    }
-    return true;
-}
 
 /**
  * Process the content guide specificed for errors and display them
@@ -2704,6 +2673,17 @@ function checkQuery(req) {
  * @param {Object} res The HTTP response to be sent to the client
  */ 
 function processQuery(req, res) {
+
+	function checkQuery(req) {
+		if (req.query) {
+			if (req.query.CGurl)
+				return true;
+			
+			return false;
+		}
+		return true;
+	}
+	
     if (isEmpty(req.query)) 
         drawForm(true, res);    
     else if (!checkQuery(req)) {
@@ -2728,21 +2708,12 @@ function processQuery(req, res) {
 }
 
 
-
 //middleware
 app.use(express.static(__dirname));
 app.set('view engine', 'ejs');
 app.use(fileUpload());
 
-function checkFile(req) {
-    if (req.files) {
-        if (req.files.CGfile)
-            return true;
-        
-        return false;
-    }
-    return true;
-}
+
 /**
  * Process the content guide specificed by a file name for errors and display them
  *
@@ -2750,6 +2721,17 @@ function checkFile(req) {
  * @param {Object} res The HTTP response to be sent to the client
  */ 
 function processFile(req,res) {
+	
+	function checkFile(req) {
+		if (req.files) {
+			if (req.files.CGfile)
+				return true;
+			
+			return false;
+		}
+		return true;
+	}
+	
     if (isEmpty(req.query)) {
         drawForm(false, res);    
     } else if (!checkFile(req)) {
@@ -2776,7 +2758,11 @@ function processFile(req,res) {
     res.end();
 }
 
-
+/**
+ * Load classification schemes and other configuration files
+ *
+ * @param {boolean} useURLs when true, load configuration files from network locations
+ */ 
 function loadDataFiles(useURLs) {
 	console.log("loading classification schemes...");
     allowedGenres=[];
@@ -2796,6 +2782,7 @@ function loadDataFiles(useURLs) {
 	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
 	loadRoles(allowedCreditItemRoles, useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
 /*	
+	// LINT
 	console.log("loading Schemas...");
 	TVAschema=loadSchema(false, TVAschemaFileName);
 	MPEG7schema=loadSchema(false, MPEG7schemaFileName);
