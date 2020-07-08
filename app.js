@@ -1605,13 +1605,24 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  * @param {string} groupsFound         groupId values found (null if not needed)
  */
 function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
+
+	var isCategoryGroup=GroupInformation==categoryGroup;
 	
-	// @serviceIDRef is required for Box Set Lists and Box Set Contents
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, 
-		(requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CONTENTS)
-			?[tva.a_groupId, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef] 
-			:[tva.a_groupId, tva.a_ordered, tva.a_numOfItems], 
-		[], errs, "GIB001")
+	switch (requestType) {
+		case CG_REQUEST_BS_CATEGORIES:
+			if (isCategoryGroup) 
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIB001a")
+			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [], errs, "GIB001b")
+			break;
+		case CG_REQUEST_BS_LISTS:
+			if (isCategoryGroup) 
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIB001c")
+			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_serviceIDRef], [], errs, "GIB001d")
+			break;
+		case CG_REQUEST_BS_CONTENTS:
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], [], errs, "GIB001e")
+			break;
+	}
 
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
@@ -1622,8 +1633,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 		else
 			errs.pushCode("GIB002", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_groupId).name()+" value \""+groupId+"\" is not a CRID")
 	}
-	
-	var isCategoryGroup=GroupInformation==categoryGroup;
+
 	var categoryCRID=(categoryGroup && categoryGroup.attr(tva.a_groupId)) ? categoryGroup.attr(tva.a_groupId).value() : "";
 
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES) {
@@ -1636,7 +1646,6 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 		if (isCategoryGroup && !GroupInformation.attr(tva.a_numOfItems)) 
 			errs.pushCode("GIB007", GroupInformation.name()+"@"+GroupInformation.attr(tva.a_numOfItems).name()+" is required for this request type")
 	}
-
 
 	if (!isCategoryGroup) {
 		elem=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_MemberOf, CG_SCHEMA);
