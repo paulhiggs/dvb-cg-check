@@ -1509,7 +1509,18 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
 				break;
 			case tva.e_EpisodeOf:				// <ProgramInformation><EpisodeOf>
-				// TODO: Table 41 in clause 6.10.4
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI015a");
+				
+				// <ProgramInformation><EpisodeOf>@crid
+				var foundCRID=null;
+				if (child.attr(tva.a_crid)) {
+					foundCRID=child.attr(tva.a_crid).value();
+					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
+						errs.pushCode("PI015b", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+foundCRID+"\" is not a defined Group CRID for <"+child.name()+">")
+					else
+						if (!isCRIDURI(foundCRID))
+							errs.pushCode("PI015c", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+foundCRID+"\" is not a valid CRID")
+				}
 				break;
 			case tva.e_MemberOf:				// <ProgramInformation><MemberOf>
 				switch (requestType) {
@@ -1521,11 +1532,13 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI013z");
 				}
 						
+				// <ProgramInformation><MemberOf>@xsi:type
 				if (child.attr(tva.a_type)) {
 					if (child.attr(tva.a_type).value()!="MemberOfType")
 						errs.pushCode("PI014", "@xsi:"+child.attr(tva.a_type).name()+" must be \"MemberOfType\" for "+ProgramInformation.name()+"."+child.name());
 				}
 			
+				// <ProgramInformation><MemberOf>@crid
 				var foundCRID=null;
 				if (child.attr(tva.a_crid)) {
 					foundCRID=child.attr(tva.a_crid).value();
@@ -1536,6 +1549,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 							errs.pushCode("PI021", ProgramInformation.name()+"."+child.name()+"@"+child.attr(tva.a_crid).name()+"=\""+foundCRID+"\" is not a valid CRID")
 				}
 				
+				// <ProgramInformation><MemberOf>@index
 				if (child.attr(tva.a_index)) {
 					var index=valUnsignedInt(child.attr(tva.a_index).value());
 					var indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")";
