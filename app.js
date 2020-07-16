@@ -2466,20 +2466,20 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 				ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent.name(), InstanceDescription, seLang, programCRIDs,requestType, errs);
 			
 			// <PublishedStartTime> and <PublishedDuration>
-			var psdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedStartTime, CG_SCHEMA);
-			var PublishedStartTime=new Date(psdElem?psdElem.text():0);
+			var pstElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedStartTime, CG_SCHEMA);
 
-			if (psdElem) {
+			if (pstElem) {
+				var PublishedStartTime=new Date(pstElem.text());
 				if (scheduleStart && PublishedStartTime < scheduleStart) 
-					errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than Schedule@start");
+					errs.pushCode("SE041", pstElem.name()+" ("+PublishedStartTime+") is earlier than Schedule@start");
 				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
-					errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after Schedule@end");	
+					errs.pushCode("SE042", pstElem.name()+" ("+PublishedStartTime+") is after Schedule@end");	
 
 				var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
 				if (pdElem && scheduleEnd) {
 					var parsedPublishedDuration = parseISOduration(pdElem.text());
 					if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
-						errs.pushCode("SE043", "StartTime+Duration of event is after Schedule@end");
+						errs.pushCode("SE043", pstElem.name()+"+"+pdElem.name()+" of event is after Schedule@end");
 				}
 			}
 		}
