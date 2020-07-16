@@ -2470,13 +2470,13 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 			var PublishedStartTime=new Date(psdElem?psdElem.text():0);
 
 			if (psdElem) {
-				if (PublishedStartTime < scheduleStart) 
+				if (scheduleStart && PublishedStartTime < scheduleStart) 
 					errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than Schedule@start");
-				if (PublishedStartTime > scheduleEnd) 
+				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
 					errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after Schedule@end");	
 
 				var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
-				if (pdElem) {
+				if (pdElem && scheduleEnd) {
 					var parsedPublishedDuration = parseISOduration(pdElem.text());
 					if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
 						errs.pushCode("SE043", "StartTime+Duration of event is after Schedule@end");
