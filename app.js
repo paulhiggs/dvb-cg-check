@@ -1046,6 +1046,76 @@ function Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 
 
 /**
+ * validate the <RelatedMaterial> elements containing pagination links 
+ *
+ * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
+ * @param {string}  SCHEMA_PREFIX       Used when constructing Xpath queries
+ * @param {Object}  BasicDescription    the element whose children should be checked
+ * @param {Class}   errs                errors found in validaton
+ * @param {string}  Location			The location of the Basic Description element
+ */
+function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
+	
+	function checkLinkCount(errs, count, label, errno) {
+		if (count>1) {
+			errs.pushCode(errno, "more than 1 \""+label+" pagination\" link is specified"); 
+			return true;
+		}
+		return false;
+	}
+	
+	var countPaginationFirst=0, countPaginationPrev=0, countPaginationNext=0, countPaginationLast=0;
+	var rm=0, RelatedMaterial;
+	while (RelatedMaterial=BasicDescription.child(rm++)) {
+		if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
+			var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+			if (!HowRelated) 
+				NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+RelatedMaterial.name()+">", "VP001")
+			else {				
+				if (!HowRelated.attr(tva.a_href)) 
+					NoHrefAttribute(errs, "<"+HowRelated.name+">", "<"+RelatedMaterial.name()+">", "VP002");
+				else {
+					switch (HowRelated.attr(tva.a_href).value()) {
+						case dvbi.PAGINATION_FIRST_URI:
+							countPaginationFirst++;
+							break;
+						case dvbi.PAGINATION_PREV_URI:
+							countPaginationPrev++;
+							break;
+						case dvbi.PAGINATION_NEXT_URI:
+							countPaginationNext++;
+							break;
+						case dvbi.PAGINATION_LAST_URI:
+							countPaginationLast++;
+							break;
+					}	
+				}
+			}
+		}
+	}
+
+	var linkCountErrs=false;
+	if (checkLinkCount(errs, countPaginationFirst, "first", "VP011")) linkCountErrs=true;
+	if (checkLinkCount(errs, countPaginationPrev, "previous", "VP012")) linkCountErrs=true;
+	if (checkLinkCount(errs, countPaginationNext, "next", "VP013")) linkCountErrs=true;
+	if (checkLinkCount(errs, countPaginationLast, "last", "VP014")) linkCountErrs=true;
+
+	if (!linkCountErrs) {
+		var numPaginations=countPaginationFirst+countPaginationPrev+countPaginationNext+countPaginationLast;
+		if (numPaginations!=0 && numPaginations!=2 && numPaginations!=4)
+			errs.pushCode("VP020", "only 0, 2 or 4 paginations links may be signalled in <"+tva.e_RelatedMaterial+"> elements for "+Location);
+		else if (numPaginations==2) {
+			if (countPaginationPrev==1 && countPaginationLast==1) 
+				errs.pushCode("VP021", "\"previous\" and \"last\" links cannot be specified alone");
+			if (countPaginationFirst==1 && countPaginationNext==1) 
+				errs.pushCode("VP022", "\"first\" and \"next\" links cannot be specified alone");
+
+		}
+	}
+}
+
+
+/**
  * validate the <RelatedMaterial> elements in  More Episodes response
  *
  * @param {string}  CG_SCHEMA           Used when constructing Xpath queries
@@ -1054,14 +1124,22 @@ function Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
  * @param {Class}   errs                errors found in validaton
  */
 function Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
-	var rm=0, RelatedMaterial, countRelatedMaterial=0;
-	while (RelatedMaterial=BasicDescription.child(rm++)) {
-		if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
-			countRelatedMaterial++;
 	
-			// TODO:
-			
-		}
+	switch (BasicDescription.parent().name()) {
+		case tva.e_ProgramInformation:
+			var rm=0, RelatedMaterial, countRelatedMaterial=0;
+			while (RelatedMaterial=BasicDescription.child(rm++)) 
+				if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
+					countRelatedMaterial++;
+					ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes")
+				}
+			if (countRelatedMaterial > 1)
+				errs.pushCode("RMME001", "a maximum of 1 "+tva.e_RelatedMaterial+" element is permitted in "+BasicDescription.name()+" for this request type");	
+			break;
+		case tva.e_GroupInformation:
+			// TODO: 
+			ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "More Episodes")
+			break;
 	}
 }
 
@@ -1070,10 +1148,11 @@ function Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 /**
  * Add an error message when the a required element is not present
  *
- * @param {Object} errs Errors buffer
- * @param {String} missingElement Name of the missing element
- * @param {string} parentElement Name of the element which should contain the missingElement
- * @param {String} schemaLoctation The location in the schema of the element
+ * @param {Object} errs            Errors buffer
+ * @param {string} missingElement  Name of the missing element
+ * @param {string} parentElement   Name of the element which should contain the missingElement
+ * @param {string} schemaLoctation The location in the schema of the element
+ * @param {string} errno           The error number to show in the log
  */
 function NoChildElement(errs, missingElement, parentElement, schemaLocation=null, errno=null) {
 	errs.pushCode(errno?errno:"NC001", missingElement+" element not specified for "+parentElement+ (schemaLocation)?" in "+schemaLocation:"");
@@ -1083,10 +1162,11 @@ function NoChildElement(errs, missingElement, parentElement, schemaLocation=null
 /**
  * Add an error message when the @href contains an invalid value
  *
- * @param {Object} errs Errors buffer
- * @param {String} value The invalid value for the href attribute
- * @param {String} src The element missing the @href
- * @param {String} loc The location of the element
+ * @param {Object} errs    Errors buffer
+ * @param {string} value   The invalid value for the href attribute
+ * @param {string} src     The element missing the @href
+ * @param {string} loc     The location of the element
+ * @param {string} errno   The error number to show in the log
  */
 function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
 	errs.pushCode(errno?errno:"HV001", "invalid @"+tva.a_href+"=\""+value+"\" specified for "+src+(loc)?" in "+loc:"");
@@ -1260,7 +1340,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
  * @param {Class}   errs                errors found in validaton
  */
 function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
-	var countImage=0, countTemplateAIT=0, countPaginationFirst=0, countPaginationPrev=0, countPaginationNext=0, countPaginationLast=0;
+	var countImage=0, countTemplateAIT=0, hasPagination=false;
 	var rm=0, RelatedMaterial;
 	while (RelatedMaterial=BasicDescription.child(rm++)) {
 		if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
@@ -1278,16 +1358,11 @@ function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 							ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">")
 							break;
 						case dvbi.PAGINATION_FIRST_URI:
-							countPaginationFirst++;
-							break;
 						case dvbi.PAGINATION_PREV_URI:
-							countPaginationPrev++;
-							break;
 						case dvbi.PAGINATION_NEXT_URI:
-							countPaginationNext++;
-							break;
 						case dvbi.PAGINATION_LAST_URI:
-							countPaginationLast++;
+							// pagination links are allowed, but checked in ValidatePagination()
+							hasPagination=true;
 							break;
 						case dvbi.PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
 							countImage++;
@@ -1301,14 +1376,14 @@ function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 		}
 	}
 	if (countTemplateAIT==0)
-		errs.pushCodeCode("MB001", "a <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT must be specified for a Box Set List");
+		errs.pushCode("MB001", "a <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT must be specified for a Box Set List");
 	if (countTemplateAIT>1)
-		errs.pushCodeCode("MB002", "only one <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT can be specified for a Box Set List");
+		errs.pushCode("MB002", "only one <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT can be specified for a Box Set List");
 	if (countImage>1)
-		errs.pushCodeCode("MB003", "only one <"+tva.e_RelatedMaterial+"> element signalling the promotional still image can be specified for a Box Set List");
-	var numPaginations=countPaginationFirst+countPaginationPrev+countPaginationNext+countPaginationLast;
-	if (numPaginations!=0 && numPaginations!=2 && numPaginations!=4)
-		errs.pushCodeCode("MB004", "only 0, 2 or 4 paginations links may be siganlled in <"+tva.e_RelatedMaterial+"> elements for a Box Ser List");
+		errs.pushCode("MB003", "only one <"+tva.e_RelatedMaterial+"> element signalling the promotional still image can be specified for a Box Set List");
+	
+	if (hasPagination)
+		ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "Box Set List");
 }
 
 
@@ -1446,7 +1521,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 						Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					}
 			break;
-				case CG_REQUEST_MORE_EPISODES:   // TODO:: not defined in spec
+				case CG_REQUEST_MORE_EPISODES: 
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.e_RelatedMaterial], errs, "BD070");	
 					Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					break;
