@@ -163,11 +163,11 @@ function HTMLize(str) {
  */
 function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
 	if (!validator) {
-		errs.pushCode(errno?errno+"-1":"LA001", "cannot validate language \""+lang+"\""+(loc?" for \""+loc+"\"":""));
+		errs.pushCode(errno?errno+"-1":"LA001", "cannot validate language \""+lang+"\""+(loc?" for <"+loc+">":""));
 		return false;
 	}
 	if (!validator.isKnown(lang))  {
-		errs.pushCode(errno?errno+"-2":"LA002", "language \""+lang+"\" specified"+(loc?" for \""+loc+"\"":"")+" is invalid");	
+		errs.pushCode(errno?errno+"-2":"LA002", "language \""+lang+"\" specified"+(loc?" for <"+loc+">":"")+" is invalid");	
 		return false;
 	}
 	return true;
@@ -185,7 +185,7 @@ function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
  * @param {string} errno      (optional) error number to use instead of local values
  * @returns {string} the @lang attribute of the node element of the parentLang if it does not exist of is not specified
  */
-function GetLanguage(validator, errs, node, parentLang, isRequired, errno=null) {
+function GetLanguage(validator, errs, node, parentLang, isRequired=false, errno=null) {
 	if (!node) 
 		return parentLang;
 	if (!node.attr(tva.a_lang) && isRequired) {
@@ -693,7 +693,7 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
 	var shortLangs=[], mediumLangs=[], longLangs=[];
 	while (Synopsis=BasicDescription.child(s++)) {
 		if (Synopsis.name()==tva.e_Synopsis) {
-			var synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage);
+			var synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage, false, "SY000");
 			var synopsisLength=Synopsis.attr(tva.a_length)?Synopsis.attr(tva.a_length).value():null;
 			
 			if (synopsisLength) {
@@ -771,7 +771,7 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 	while (Keyword=BasicDescription.child(k++)) {
 		if (Keyword.name()==tva.e_Keyword) {
 			var keywordType=Keyword.attr(tva.a_type) ? Keyword.attr(tva.a_type).value() : dvbi.DEFAULT_KEYWORD_TYPE;
-			var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage);
+			var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW000");
 
 			if (counts[keywordLang]===undefined)
 				counts[keywordLang]=1
@@ -1403,7 +1403,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 	while (Title=BasicDescription.child(t++)) {
 		if (Title.name()==tva.e_Title) {
 			var titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : dvbi.DEFAULT_TITLE_TYPE; // MPEG7 default type is "main"
-			var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage);
+			var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT000");
 
 			var titleStr=unEntity(Title.text());
 			
@@ -1461,7 +1461,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 		NoChildElement(errs, "<"+tva.e_BasicDescription+">", parentElement.name());
 		return;
 	}
-	var bdLang=GetLanguage(knownLanguages, errs, BasicDescription, parentLanguage);
+	var bdLang=GetLanguage(knownLanguages, errs, BasicDescription, parentLanguage, false, "BD001");
 
 	switch (parentElement.name()) {
 		case tva.e_ProgramInformation:
@@ -1560,8 +1560,15 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
  */
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
 	
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI001");
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [], errs, "PI002")
+	if (!ProgramInformation) {
+		errs.pushCode("PI001", "ValidateProgramInformation() claled with ProgramInfomration=null")
+		return;
+	}
+	
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI002");
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI003")
+
+	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
 		
 	if (ProgramInformation.attr(tva.a_programId)) {
 		var programCRID=ProgramInformation.attr(tva.a_programId).value();
@@ -1571,8 +1578,6 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 			errs.pushCode("PI012", ProgramInformation.name()+"@"+tva.a_programId+"=\""+programCRID+"\" is already used");
 		else programCRIDs.push(programCRID);
 	}
-	
-	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage);
 
 	// <ProgramInformation><BasicDescription>
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
@@ -1582,7 +1587,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		switch (child.name()) {
 			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
 				break;
-			case tva.e_EpisodeOf:				// <ProgramInformation><EpisodeOf>
+			case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
 				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI015a");
 				
 				// <ProgramInformation><EpisodeOf>@crid
@@ -1596,7 +1601,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 							errs.pushCode("PI015c", ProgramInformation.name()+"."+tva.e_EpisodeOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a valid CRID")
 				}
 				break;
-			case tva.e_MemberOf:				// <ProgramInformation><MemberOf>
+			case tva.e_MemberOf:			// <ProgramInformation><MemberOf>
 				switch (requestType) {
 					case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
 					case CG_REQUEST_SCHEDULE_WINDOW:
@@ -1652,28 +1657,34 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
  * @param {integer} o.childCount       the number of child elements to be present (to match GroupInformation@numOfItems)
  */
 function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupCRIDs, requestType, errs, o=null) { 
-	if(!ProgramDescription) {
-		errs.pushCode("PI000", "CheckProgramInformation() called with "+tva.e_ProgramDescription+"=null");
+	if (!ProgramDescription) {
+		errs.pushCode("PI100", "CheckProgramInformation() called with ProgramDescription=null");
 		return;
 	}
 		
 	var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformationTable, CG_SCHEMA);
-	
 	if (!ProgramInformationTable) {
-		errs.pushCode("PI001", "<"+tva.e_ProgramInformationTable+"> not specified in <"+ProgramDescription.name()+">");
+		errs.pushCode("PI101", "<"+tva.e_ProgramInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
-	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, progDescrLang);
-
+	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, progDescrLang, false, "PI102");
+/*
 	var pi=0, ProgramInformation, cnt=0, indexes=[];
 	while (ProgramInformation=ProgramInformationTable.child(pi++)) 
 		if (ProgramInformation.name()==tva.e_ProgramInformation) {
 			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
 			cnt++;
 		}
+*/
+	var pi=1, ProgramInformation, cnt=0, indexes=[];
+	while (ProgramInformation=ProgramInformationTable.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformation+"["+pi+"]", CG_SCHEMA)) {
+			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
+			cnt++; pi++;
+		}
+
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PI100", "number of items ("+cnt+") in the "+tva.e_ProgramInformationTable+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
+			errs.pushCode("PI102", "number of items ("+cnt+") in the "+tva.e_ProgramInformationTable+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
 }
 
@@ -1698,16 +1709,16 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	switch (requestType) {
 		case CG_REQUEST_BS_CATEGORIES:
 			if (isCategoryGroup) 
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIB001a")
-			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [], errs, "GIB001b")
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB001a")
+			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB001b")
 			break;
 		case CG_REQUEST_BS_LISTS:
 			if (isCategoryGroup) 
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIB001c")
-			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_serviceIDRef], [], errs, "GIB001d")
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB001c")
+			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_serviceIDRef], [tva.a_lang], errs, "GIB001d")
 			break;
 		case CG_REQUEST_BS_CONTENTS:
-			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], [], errs, "GIB001e")
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], [tva.a_lang], errs, "GIB001e")
 			break;
 	}
 
@@ -1792,7 +1803,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
  */
 function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 	
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIS000")
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIS000")
 
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
@@ -1836,7 +1847,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 	if (categoryGroup) 
 		errs.push("GIM000", CATEGORY_GROUP_NAME+" should not be specified for this request type")
 	
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [], errs, "GIM001")
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIM001")
 	
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
@@ -1887,7 +1898,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 		return;
 	}
 
-	var giLang=GetLanguage(knownLanguages, errs, GroupInformation, parentLanguage);
+	var giLang=GetLanguage(knownLanguages, errs, GroupInformation, parentLanguage, false, "GI001");
 	
 	switch (requestType) {
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
@@ -1936,7 +1947,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 		errs.pushCode("GI100", "<"+tva.e_GroupInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
-	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, progDescrLang);
+	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, progDescrLang, false, "GI101");
 
 	// find which GroupInformation element is the "category group"
 	var categoryGroup=null;
@@ -1953,12 +1964,12 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 				if (countMemberOf==0) {
 					// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
 					if (categoryGroup)
-						errs.pushCode("GI101", "only a single "+CATEGORY_GROUP_NAME+" can be present in <"+tva.e_GroupInformationTable+">")
+						errs.pushCode("GI111", "only a single "+CATEGORY_GROUP_NAME+" can be present in <"+tva.e_GroupInformationTable+">")
 					else categoryGroup=GroupInformation;
 				}
 			}
 		if (!categoryGroup)
-			errs.pushCode("GI102", "a "+CATEGORY_GROUP_NAME+" must be specified in <"+tva.e_GroupInformationTable+"> for this request type")
+			errs.pushCode("GI112", "a "+CATEGORY_GROUP_NAME+" must be specified in <"+tva.e_GroupInformationTable+"> for this request type")
 	}
 	
 	var indexes=[], giCount=0;
@@ -1973,7 +1984,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 	if (categoryGroup) {
 		var numOfItems=(categoryGroup.attr(tva.a_numOfItems) ? valUnsignedInt(categoryGroup.attr(tva.a_numOfItems).value()) : 0);
 		if (requestType!=CG_REQUEST_BS_CONTENTS && numOfItems!=giCount)
-			errs.pushCode("GI103", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+numOfItems+") does match the number of items ("+giCount+")");
+			errs.pushCode("GI113", tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+numOfItems+") does match the number of items ("+giCount+")");
 
 		if (o) 
 			o.childCount=numOfItems;
@@ -2050,12 +2061,11 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, groupIds, requestType, errs) { 
 	
 	var GroupInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_GroupInformationTable, CG_SCHEMA);
-	
 	if (!GroupInformationTable) {
 		errs.pushCode("NN201", "<"+tva.e_GroupInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
-	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, progDescrLang);
+	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, progDescrLang, false, "NN202");
 	
 	var gi=0, GroupInformation;
 	while (GroupInformation=GroupInformationTable.child(gi++)) {
@@ -2416,7 +2426,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 		
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [], [tva.a_serviceIDRef, tva.a_lang], errs, "OD002"); 
 
-	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage);	
+	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage, false, "OD003");	
 	
 	checkTAGUri(OnDemandProgram, errs, "OD003");	
 	
@@ -2513,7 +2523,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 	var se=0, ScheduleEvent;
 	while (ScheduleEvent=Schedule.child(se++)) 
 		if (ScheduleEvent.name()==tva.e_ScheduleEvent) {
-			var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage);
+			var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE000");
 			
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, [tva.e_Program, tva.e_PublishedStartTime, tva.e_PublishedDuration], [tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_ActualStartTime, tva.e_FirstShowing, tva.e_Free], errs, "SE001");
 			
@@ -2577,7 +2587,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [], [tva.e_ScheduleEvent], errs, "VS001");
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [tva.a_serviceIDRef, tva.a_start, tva.a_end], [], errs, "VS002");
 	
-	var scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage);	
+	var scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage, false, "VS003");	
 	
 	checkTAGUri(Schedule, errs, "VS003");
 	
@@ -2628,7 +2638,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, prog
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], [tva.e_Schedule, tva.e_OnDemandProgram], errs, "PL001");
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], [tva.a_lang], errs, "PL002");
 	
-	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, progDescrLang);	
+	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, progDescrLang, false, "PL003");	
 	
 	var c=0, child, cnt=0;
 	while (child=ProgramLocationTable.child(c++)) {		
@@ -2693,11 +2703,11 @@ function validateContentGuide(CGtext, requestType, errs) {
 			SCHEMA_NAMESPACE=CG.root().namespace()?CG.root().namespace().href():"";
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
-		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true);
+		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
 		
 		var ProgramDescription=CG.get(SCHEMA_PREFIX+":"+tva.e_ProgramDescription, CG_SCHEMA);
 		if (!ProgramDescription) {
-			errs.pushCode("CG003", "No <"+tva.e_ProgramDescription+"> element specified.");
+			errs.pushCode("CG004", "No <"+tva.e_ProgramDescription+"> element specified.");
 			return;
 		}
 		var progDescrLang=GetLanguage(knownLanguages, errs, ProgramDescription, tvaMainLang);
@@ -2706,21 +2716,21 @@ function validateContentGuide(CGtext, requestType, errs) {
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE_TIME:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG004"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG011"); 
 			
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, null, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG005"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG021"); 
 		
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, groupIds, requestType, errs);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_WINDOW:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG006"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG031"); 
 
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, groupIds, requestType, errs);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs);
@@ -2729,13 +2739,13 @@ function validateContentGuide(CGtext, requestType, errs) {
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
 			
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG007"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG041"); 
 		
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, null, requestType, errs);
 			break;
 		case CG_REQUEST_MORE_EPISODES:
 			// more episodes response (6.7.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG009"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG051"); 
 
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs, o);
@@ -2743,19 +2753,19 @@ function validateContentGuide(CGtext, requestType, errs) {
 			break;
 		case CG_REQUEST_BS_CATEGORIES:
 			// box set categories response (6.8.2.3) has <GroupInformationTable> element
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG010"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG061"); 
 
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, null, errs, null);
 			break;
 		case CG_REQUEST_BS_LISTS:
 			// box set lists response (6.8.3.3) has <GroupInformationTable> element
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG011"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG071"); 
 			
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, null, errs, null);
 			break;
 		case CG_REQUEST_BS_CONTENTS:
 			// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG012"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG081"); 
 			
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs, o);
