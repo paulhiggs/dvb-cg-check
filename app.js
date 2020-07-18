@@ -204,8 +204,7 @@ function GetLanguage(validator, errs, node, parentLang, isRequired, errno=null) 
  
 //---------------- CreditsItem@role LOADING ----------------
 
-if(typeof(String.prototype.trim)==="undefined")
-{
+if (typeof(String.prototype.trim)==="undefined") {
     String.prototype.trim=function() 
     {
         return String(this).replace(/^\s+|\s+$/g, '');
@@ -590,21 +589,20 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 		errs.pushCode(errCode?errCode+"-0":"TE000", "checkTopElements() called with a 'null' element to check");
 		return;
 	}
-	
+	var thisElem="<"+parentElement.parent().name()+"."+parentElement.name()+">";
 	// check that each of the specifid childElements exists
 	mandatoryChildElements.forEach(elem => {
 		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
-			errs.pushCode(errCode?errCode+"-1":"TE010", "Mandatory element <"+elem+"> not specified in <"+parentElement.parent().name()+"."+parentElement.name()+">");
+			errs.pushCode(errCode?errCode+"-1":"TE010", "Mandatory element <"+elem+"> not specified in "+thisElem);
 	});
 	
 	// check that no additional child elements existance
 	var c=0, child;
 	while (child=parentElement.child(c++)) {
 		var childName=child.name();
-		if (!isIn(mandatoryChildElements, childName) &&!isIn(optionalChildElements, childName)) {
-			if (childName!='text')
-				errs.pushCode(errCode?errCode+"-2":"TE011", "Element <"+childName+"> is not permitted in <"+parentElement.parent().name()+"."+parentElement.name()+">");
-		}
+		if (childName!='text')
+			if (!isIn(mandatoryChildElements, childName) &&!isIn(optionalChildElements, childName)) 		
+				errs.pushCode(errCode?errCode+"-2":"TE011", "Element <"+childName+"> is not permitted in "+thisElem);
 	}
 }
 
@@ -664,7 +662,7 @@ function checkTAGUri(elem, errs, errCode=null) {
 	if (!elem) return;
 	if (elem.attr(tva.a_serviceIDRef)) {
 		if (!isTAGURI(elem.attr(tva.a_serviceIDRef).value()))
-			errs.pushCodeW(errCode?errCode:"UR001", elem.name()+"@"+elem.attr(tva.a_serviceIDRef).name()+" is not a TAG URI")
+			errs.pushCodeW(errCode?errCode:"UR001", elem.name()+"@"+tva.a_serviceIDRef+" is not a TAG URI")
 	}
 }
 
@@ -852,7 +850,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						
 						if (pgChild.name()==tva.e_ParentalRating) {
 							if (!pgChild.attr(tva.a_href))
-								NoHrefAttribute(errs, pgChild.name(), tva.e_ParentalGuidance )
+								NoHrefAttribute(errs, tva.e_ParentalRating, tva.e_ParentalGuidance )
 						}
 					}
 					if (pgChild.name()==tva.e_ExplanatoryText) {
@@ -1208,9 +1206,9 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
-        if (elem.name()===tva.e_HowRelated)
+        if (elem.name()==tva.e_HowRelated)
             HowRelated=elem;
-        else if (elem.name()===tva.e_MediaLocator)
+        else if (elem.name()==tva.e_MediaLocator)
             MediaLocator.push(elem);
     }
 
@@ -1218,11 +1216,11 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 		NoChildElement(errs, "<"+tva.e_HowRelated+">", RelatedMaterial.name(), Location, "TA100");
 		return;
     }
-	var HRhref=HowRelated.attr(tva.a_href);
 	
+	var HRhref=HowRelated.attr(tva.a_href);
 	if (HRhref) {
 		if (HRhref.value()!=dvbi.TEMPLATE_AIT_URI) 
-			errs.pushCode("TA001", HowRelated.name()+"@"+Hrhref.name()+"=\""+HRhref.value()+"\" does not designate a Template AIT");
+			errs.pushCode("TA001", tva.e_HowRelated+"@"+tva.a_href+"=\""+HRhref.value()+"\" does not designate a Template AIT");
 		else {		
 			if (MediaLocator.length!=0) 
 				MediaLocator.forEach(ml => {
@@ -1247,7 +1245,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 		}
 	}
 	else 
-		NoHrefAttribute(errs, RelatedMaterial.name()+"."+HowRelated.name(), Location);
+		NoHrefAttribute(errs, RelatedMaterial.name()+"."+tva.e_HowRelated, Location);
 }
 
 
@@ -1278,7 +1276,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 	var HRhref=HowRelated.attr(tva.a_href);
 	if (HRhref) {
 		if (HRhref.value()!=dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
-			errs.pushCode("PS001", HowRelated.name()+"@"+HRhref.name()+"=\""+HRhref.value()+"\" does not designate a Promotional Still Image");
+			errs.pushCode("PS001", tva.e_HowRelated+"@"+tva.a_href+"=\""+HRhref.value()+"\" does not designate a Promotional Still Image");
 		else {
 			if (Format) {
 				var subElems=Format.childNodes(), hasStillPictureFormat=false;
@@ -1291,14 +1289,14 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						if (child.attr(tva.a_href)) {
 							var href=child.attr(tva.a_href).value();
 							if (href!=JPEG_IMAGE_CS_VALUE && href!=PNG_IMAGE_CS_VALUE) 
-								InvalidHrefValue(errs, href, RelatedMaterial.name()+"."+Format.name()+"."+tva.e_StillPictureFormat, Location)
+								InvalidHrefValue(errs, href, RelatedMaterial.name()+"."+tva.e_Format+"."+tva.e_StillPictureFormat, Location)
 							if (href==JPEG_IMAGE_CS_VALUE) isJPEG=true;
 							if (href==PNG_IMAGE_CS_VALUE) isPNG=true;
 						}
 					}
 				});
 				if (!hasStillPictureFormat) 
-					NoChildElement(errs, "<"+tva.e_StillPictureFormat+">", Format.name(), Location, "PS104");
+					NoChildElement(errs, "<"+tva.e_StillPictureFormat+">", tva.e_Format, Location, "PS104");
 			}
 
 			if (MediaLocator.length!=0) 
@@ -1314,7 +1312,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
 									errs.pushCode("PS002", "invalid @"+tva.a_contentType+"=\""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
 								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) 
-									errs.pushCode("PS003", "conflicting media types in <"+Format.name()+"> and <"+tva.e_MediaUri+"> for "+Location);
+									errs.pushCode("PS003", "conflicting media types in <"+tva.e_Format+"> and <"+tva.e_MediaUri+"> for "+Location);
 							}
 						}
 					});
@@ -1322,7 +1320,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						NoMediaLocator(errs, "logo", Location);
 				});
 			else 
-				NoChildElement(errs, MediaLocator.name(), "<"+RelatedMaterial.name()+">", Location, "PS106");
+				NoChildElement(errs, tva.e_MediaLocator, "<"+RelatedMaterial.name()+">", Location, "PS106");
 		}
 	}
 	else 
@@ -2120,7 +2118,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 					if (!(validPurpose=isValidAudioLanguagePurpose(AudioLanguage.attr(tva.a_purpose).value())))
 						errs.pushCode("AV002", tva.e_AudioLanguage+"@"+tva.a_purpose+" is not valid");
 				}
-				validLanguage=CheckLanguage(knownLanguages, errs, audioLang, AudioAttributes.name()+"."+tva.e_AudioLanguage, "AV102");
+				validLanguage=CheckLanguage(knownLanguages, errs, audioLang, tva.e_AudioAttributes+"."+tva.e_AudioLanguage, "AV102");
 				
 				if (validLanguage && validPurpose) {	
 					if (audioCounts[audioLang]===undefined)
@@ -2456,7 +2454,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	var PublishedDuration=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
 	if (PublishedDuration)
 		if (!isISODuration(PublishedDuration.text()))
-			errs.pushCode("OD050", OnDemandProgram.name()+"."+PublishedDuration.name()+" is not a valid ISO Duration (xs:duration)");
+			errs.pushCode("OD050", OnDemandProgram.name()+"."+tva.e_PublishedDuration+" is not a valid ISO Duration (xs:duration)");
 	
 	// <StartOfAvailability> and <EndOfAvailability>
 	var soa=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_StartOfAvailability, CG_SCHEMA),
