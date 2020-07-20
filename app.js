@@ -620,6 +620,11 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
  */
 function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttributes, optionalAttributes, errs, errCode=null)
 {
+	if (!requiredAttributes || !parentElement) {
+		errs.pushCode("AT000", "checkAttributes() called with parentElement==null or requiredAttributes==null")
+		return;
+	}
+	
 	requiredAttributes.forEach(attributeName => {
 		if (!parentElement.attr(attributeName))
 			errs.pushCode(errCode?errCode+"-1":"AT001", parentElement.name()+"@"+attributeName+" is a required attribute");	
@@ -689,10 +694,14 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
 	function requiredSynopsisError(length) {
 		return "a "+tva.e_Synopsis+" with @length=\""+length+"\" is required"; }
 	
+	if (!BasicDescription) {
+		errs.pushCode("SY000", "Validate_Synopsis() called with BasicDescription=null")
+		return
+	}
 	var s=1, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
 	var shortLangs=[], mediumLangs=[], longLangs=[];
 	while (Synopsis=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Synopsis+"["+ s++ +"]", CG_SCHEMA)) {
-		var synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage, false, "SY000");
+		var synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage, false, "SY001");
 		var synopsisLength=Synopsis.attr(tva.a_length)?Synopsis.attr(tva.a_length).value():null;
 		
 		if (synopsisLength) {
@@ -700,43 +709,43 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
 				switch (synopsisLength) {
 				case dvbi.SYNOPSIS_SHORT_LABEL:
 					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
-						errs.pushCode(errCode?errCode+"-1":"SY001", synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
+						errs.pushCode(errCode?errCode+"-1":"SY011", synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
 					hasShort=true;
 					break;
 				case dvbi.SYNOPSIS_MEDIUM_LABEL:
 					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
-						errs.pushCode(errCode?errCode+"-2":"SY002", synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
+						errs.pushCode(errCode?errCode+"-2":"SY012", synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
 					hasMedium=true;
 					break;
 				case dvbi.SYNOPSIS_LONG_LABEL:
 					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
-						errs.pushCode(errCode?errCode+"-3":"SY003", synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
+						errs.pushCode(errCode?errCode+"-3":"SY013", synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
 					hasLong=true;
 					hasLong=true;
 					break;						
 				}
 			}
 			else
-				errs.pushCode(errCode?errCode+"-4":"SY004", "@"+tva.a_length+"=\""+synopsisLength+"\" is not permitted for this request type");
+				errs.pushCode(errCode?errCode+"-4":"SY014", "@"+tva.a_length+"=\""+synopsisLength+"\" is not permitted for this request type");
 		}
 		else 
-			errs.pushCode(errCode?errCode+"-5":"SY005","@"+tva.a_length+" attribute is required for <"+tva.e_Synopsis+">");
+			errs.pushCode(errCode?errCode+"-5":"SY015","@"+tva.a_length+" attribute is required for <"+tva.e_Synopsis+">");
 	
 		if (synopsisLang && synopsisLength) {
 			switch (synopsisLength) {
 				case dvbi.SYNOPSIS_SHORT_LABEL:
 					if (isIn(shortLangs, synopsisLang)) 
-						errs.pushCode(errCode?errCode+"-6":"SY006",singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCode(errCode?errCode+"-6":"SY016",singleLengthLangError(synopsisLength, synopsisLang));
 					else shortLangs.push(synopsisLang);
 					break;
 				case dvbi.SYNOPSIS_MEDIUM_LABEL:
 					if (isIn(mediumLangs, synopsisLang)) 
-						errs.pushCode(errCode?errCode+"-7":"SY007",singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCode(errCode?errCode+"-7":"SY017",singleLengthLangError(synopsisLength, synopsisLang));
 					else mediumLangs.push(synopsisLang);
 					break;
 				case dvbi.SYNOPSIS_LONG_LABEL:
 					if (isIn(longLangs, synopsisLang)) 
-						errs.pushCode(errCode?errCode+"-8":"SY008",singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCode(errCode?errCode+"-8":"SY018",singleLengthLangError(synopsisLength, synopsisLang));
 					else longLangs.push(synopsisLang);
 					break;
 			}
@@ -745,11 +754,11 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
 	
 	// note that current DVB-I specifiction only mandates "medium" length, but all three are checked here
 	if (isIn(requiredLengths, dvbi.SYNOPSIS_SHORT_LABEL) && !hasShort)
-		errs.pushCode(errCode?errCode+"-9":"SY009",requiredSynopsisError(dvbi.SYNOPSIS_SHORT_LABEL));	
+		errs.pushCode(errCode?errCode+"-9":"SY019",requiredSynopsisError(dvbi.SYNOPSIS_SHORT_LABEL));	
 	if (isIn(requiredLengths, dvbi.SYNOPSIS_MEDIUM_LABEL) && !hasMedium)
-		errs.pushCode(errCode?errCode+"-10":"SY010",requiredSynopsisError(dvbi.SYNOPSIS_MEDIUM_LABEL));	
+		errs.pushCode(errCode?errCode+"-10":"SY020",requiredSynopsisError(dvbi.SYNOPSIS_MEDIUM_LABEL));	
 	if (isIn(requiredLengths, dvbi.SYNOPSIS_LONG_LABEL) && !hasLong)
-		errs.pushCode(errCode?errCode+"-11":"SY011",requiredSynopsisError(dvbi.SYNOPSIS_LONG_LABEL));	
+		errs.pushCode(errCode?errCode+"-11":"SY021",requiredSynopsisError(dvbi.SYNOPSIS_LONG_LABEL));	
 }
 
 
@@ -766,23 +775,28 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
 function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs, parentLanguage, errCode=null) {
+
+	if (!BasicDescription) {
+		errs.pushCode("KW000", "ValidateKeyword() called with BasicDescription=null")
+		return
+	}
 	var k=1, Keyword, counts=[];
 	while (Keyword=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Keyword+"["+ k++ +"]", CG_SCHEMA)) {
 		var keywordType=Keyword.attr(tva.a_type) ? Keyword.attr(tva.a_type).value() : dvbi.DEFAULT_KEYWORD_TYPE;
-		var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW000");
+		var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW001");
 
 		if (counts[keywordLang]===undefined)
 			counts[keywordLang]=1
 		else counts[keywordLang]++;
 		if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
-			errs.pushCode(errCode?errCode+"-1":"KW001","@"+tva.a_type+"=\""+keywordType+"\" not permitted for <"+tva.e_Keyword+">");
+			errs.pushCode(errCode?errCode+"-1":"KW011","@"+tva.a_type+"=\""+keywordType+"\" not permitted for <"+tva.e_Keyword+">");
 		if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
-			errs.pushCode(errCode?errCode+"-2":"KW002","<"+tva.e_Keyword+"> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
+			errs.pushCode(errCode?errCode+"-2":"KW012","<"+tva.e_Keyword+"> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
 	}
 	
 	for (var i in counts) {
         if (counts[i]!=0 && counts[i]>maxKeywords) 
-            errs.pushCode(errCode?errCode+"-3":"KW003","More than "+maxKeywords+" <"+tva.e_Keyword+"> element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language \""+i+"\""));
+            errs.pushCode(errCode?errCode+"-3":"KW013","More than "+maxKeywords+" <"+tva.e_Keyword+"> element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language \""+i+"\""));
 	}
 }
 
@@ -798,6 +812,11 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
 function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, maxGenres, errs, errCode=null) {
+
+	if (!BasicDescription) {
+		errs.pushCode("GE000", "ValidateGenre() called with BasicDescription=null")
+		return
+	}
 	var g=1, Genre, count=0;
 	while (Genre=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"["+ g++ +"]",CG_SCHEMA)) {
 		count++;
@@ -826,6 +845,11 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
  */
 function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minPGelements, maxPGelements, errs, errCode=null) {
 	// first <ParentalGuidance> element must contain an <mpeg7:MinimumAge> element
+
+	if (!BasicDescription) {
+		errs.pushCode("PG000", "ValidateParentalGuidance() called with BasicDescription=null")
+		return
+	}
 	var pg=1, ParentalGuidance, countParentalGuidance=0;
 	
 	while (ParentalGuidance=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_ParentalGuidance+"["+ pg++ +"]", CS_SCHEMA)) {
@@ -833,10 +857,9 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		
 		var pgc=0, pgChild, countExplanatoryText=0;
 		while (pgChild=ParentalGuidance.child(pgc++)) {
-			
-			if (pgChild.name()!="text") {
-				
-				if (pgChild.name()==tva.e_MinimumAge || pgChild.name()==tva.e_ParentalRating) {
+			switch (pgChile.name()) {
+				case tva.e_MinimumAge:
+				case tva.e_ParentalRating:
 					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
 						errs.pushCode(errCode?errCode+"-1":"PG001", "first <"+tva.e_ParentalGuidance+"> element must contain <mpeg7:"+tva.e_MinimumAge+">");
 					
@@ -847,8 +870,8 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						if (!pgChild.attr(tva.a_href))
 							NoHrefAttribute(errs, tva.e_ParentalRating, tva.e_ParentalGuidance )
 					}
-				}
-				if (pgChild.name()==tva.e_ExplanatoryText) {
+					break;
+				case tva.e_ExplanatoryText:
 					countExplanatoryText++;
 					if (pgChild.attr(tva.a_length)) {
 						if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
@@ -859,7 +882,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 					
 					if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
 						errs.pushCode(errCode?errCode+"-5":"PG005", "length of <"+tva.e_ExplanatoryText+"> cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+"");
-				}
+					break;
 			}
 		}
 		if (countExplanatoryText > 1)
@@ -884,6 +907,11 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	function checkNamePart(elem, parentElem, errs, errCode=null) {
 		if (unEntity(elem.text()).length > dvbi.MAX_NAME_PART_LENGTH)	
 			errs.pushCode(errCode?errCode:"VN001", "<"+elem.name()+"> in <"+parentElem.name()+"> is longer than "+dvbi.MAX_NAME_PART_LENGTH+" characters");
+	}
+	
+	if (!elem) {
+		errs.pushCode("VN000", "ValidateName() called with elem=null")
+		return
 	}
 	var se=0, subElem;
 	var familyNameCount=0, givenNameCount=0, otherElemCount=0;
@@ -918,6 +946,11 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
 function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, errCode=null) {
+	
+	if (!BasicDescription) {
+		errs.pushCode("CL000", "ValidateCreditsList() called with BasicDescription=null")
+		return
+	}
 	var CreditsList=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_CreditsList, CG_SCHEMA);
 	if (CreditsList) {
 		var ci=1, CreditsItem;		
@@ -985,7 +1018,10 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
  */
 function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
 
-	if (!RelatedMaterial) return false;
+	if (!RelatedMaterial) {
+		errs.pushCode("IRM000", "CheckImageRelatedMaterial() called with RelatedMaterial=null")
+		return
+	}
 	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
 	if (!HowRelated || !HowRelated.attr(tva.a_href)) return false;
 	var hrHref=HowRelated.attr(tva.a_href).value();
@@ -1022,6 +1058,11 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
  * @param {Class}   errs                errors found in validaton
  */
 function Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
+	
+	if (!BasicDescription) {
+		errs.pushCode("RM000", "Validate_RelatedMaterial() called with BasicDescription=null")
+		return
+	}	
 	var rm=1, RelatedMaterial, countRelatedMaterial=0;
 	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
 		countRelatedMaterial++;
@@ -1052,6 +1093,10 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 		return false;
 	}
 	
+	if (!BasicDescription) {
+		errs.pushCode("VP000", "ValidatePagination() called with BasicDescription=null")
+		return
+	}
 	var countPaginationFirst=0, countPaginationPrev=0, countPaginationNext=0, countPaginationLast=0;
 	var rm=1, RelatedMaterial;
 	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
@@ -1111,6 +1156,10 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
  */
 function Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 	
+	if (!BasicDescription) {
+		errs.pushCode("RMME000", "Validate_RelatedMaterialMoreEpisodes() called with BasicDescription=null")
+		return
+	}
 	switch (BasicDescription.parent().name()) {
 		case tva.e_ProgramInformation:
 			var rm=1, RelatedMaterial, countRelatedMaterial=0;
@@ -1189,6 +1238,11 @@ function NoAuxiliaryURI(errs, src, loc, errno=null) {
  * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
  */
 function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location) {
+	
+	if (!RelatedMaterial) {
+		errs.pushCode("TA000", "ValidateTemplateAIT() called with RelatedMaterial=null")
+		return
+	}
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
@@ -1244,6 +1298,11 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
  * @param {string} LocationType      The type of element containing the <RelatedMaterial> element. Different validation rules apply to different location types
  */
 function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
+	
+	if (!RelatedMaterial) {
+		errs.pushCode("PS000", "ValidatePromotionalStillImage() called with RelatedMaterial=null")
+		return
+	}
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
@@ -1325,6 +1384,11 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
  * @param {Class}   errs                errors found in validaton
  */
 function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
+	
+	if (!BasicDescription) {
+		errs.pushCode("MB000", "Validate_RelatedMaterialBoxSetList() called with BasicDescription=null")
+		return
+	}
 	var countImage=0, countTemplateAIT=0, hasPagination=false;
 	var rm=1, RelatedMaterial;
 	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm+++ "]", CG_SCHEMA)) {
@@ -1382,37 +1446,43 @@ function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
 function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondary, errs, parentLanguage, errCode=null) {
+	
+	if (!BasicDescription) {
+		errs.pushCode("VT000", "ValidateTitle() called with BasicDescription=null")
+		return
+	}
+	
 	var mainSet=[], secondarySet=[];
 	var t=0, Title;
 	while (Title=BasicDescription.child(SCHEMA_PREFIX+":"+tva.e_Title+"["+ t++ +"]", CG_SCHEMA)) {
 		var titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : dvbi.DEFAULT_TITLE_TYPE; // MPEG7 default type is "main"
-		var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT000");
+		var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT001");
 
 		var titleStr=unEntity(Title.text());
 		
 		if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
-			errs.pushCode(errCode?errCode+"-1":"VT001", "<"+tva.e_Title+"> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
+			errs.pushCode(errCode?errCode+"-1":"VT011", "<"+tva.e_Title+"> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 		if (titleType==dvbi.TITLE_MAIN_TYPE) {
 			if (isIn(mainSet, titleLang))
-				errs.pushCode(errCode?errCode+"-2":"VT002", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\"")
+				errs.pushCode(errCode?errCode+"-2":"VT012", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\"")
 			else mainSet.push(titleLang);
 		}
 		else if (titleType==dvbi.TITLE_SECONDARY_TYPE) {
 			if (allowSecondary) {
 				if (isIn(secondarySet, titleLang))
-					errs.pushCode(errCode?errCode+"-3":"VT003", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\"")
+					errs.pushCode(errCode?errCode+"-3":"VT013", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\"")
 				else secondarySet.push(titleLang);
 			}
 			else 
-				errs.pushCode(errCode?errCode+"-4":"VT004", tva.e_Title+"@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" is not permitted for this <"+BasicDescription.name()+">");
+				errs.pushCode(errCode?errCode+"-4":"VT014", tva.e_Title+"@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" is not permitted for this <"+BasicDescription.name()+">");
 		}
 		else
-			errs.pushCode(errCode?errCode+"-5":"VT005", "@"+tva.a_type+"=\""+titleType+"\" is not permitted for <"+tva.e_Title+">");
+			errs.pushCode(errCode?errCode+"-5":"VT015", "@"+tva.a_type+"=\""+titleType+"\" is not permitted for <"+tva.e_Title+">");
 		
 		secondarySet.forEach(lang => {
 			if (!isIn(mainSet, lang)) {
 				var t=lang!=DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
-				errs.pushCode(errCode?errCode+"-6":"VT006", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @type=\""+dvbi.TITLE_MAIN_TYPE+"\""+t);
+				errs.pushCode(errCode?errCode+"-6":"VT016", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @type=\""+dvbi.TITLE_MAIN_TYPE+"\""+t);
 			}
 		});
 	}
@@ -1432,6 +1502,10 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
  */
 function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage, categoryGroup) {
 
+	if (!parentElement) {
+		errs.pushCode("BD000", "ValidateBasicDescription() called with parentElement==null")
+		return;
+	}
 	// TODO: need to determine if Now/Next and Prev/Now/Next (windowed) is needed for these request types (see A177v2 6.10.16.2)
 	// if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW)
 	//	return;
@@ -1543,12 +1617,12 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
 	
 	if (!ProgramInformation) {
-		errs.pushCode("PI001", "ValidateProgramInformation() claled with ProgramInfomration=null")
+		errs.pushCode("PI000", "ValidateProgramInformation() claled with ProgramInformation=null")
 		return;
 	}
 	
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI002");
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI003")
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI001");
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI002")
 
 	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
 		
@@ -1640,13 +1714,13 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
  */
 function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupCRIDs, requestType, errs, o=null) { 
 	if (!ProgramDescription) {
-		errs.pushCode("PI100", "CheckProgramInformation() called with ProgramDescription=null");
+		errs.pushCode("PI000", "CheckProgramInformation() called with ProgramDescription=null");
 		return;
 	}
 		
 	var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformationTable, CG_SCHEMA);
 	if (!ProgramInformationTable) {
-		errs.pushCode("PI101", "<"+tva.e_ProgramInformationTable+"> not specified in <"+ProgramDescription.name()+">");
+		errs.pushCode("PI001", "<"+tva.e_ProgramInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
 	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, progDescrLang, false, "PI102");
@@ -1659,7 +1733,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PI102", "number of items ("+cnt+") in the "+tva.e_ProgramInformationTable+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
+			errs.pushCode("PI002", "number of items ("+cnt+") in the "+tva.e_ProgramInformationTable+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
 }
 
@@ -1679,6 +1753,10 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  */
 function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 
+	if (!GroupInformation) {
+		errs.pushCode("GIB000", "ValidateGroupInformationBoxSets() called with GroupInformation==null")
+		return;
+	}
 	var isCategoryGroup=GroupInformation==categoryGroup;
 	
 	switch (requestType) {
@@ -1777,26 +1855,30 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
  * @param {string} groupsFound         groupId values found (null if not needed)
  */
 function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
-	
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIS000")
+
+	if (!GroupInformation) {
+		errs.pushCode("GIS000", "ValidateGroupInformationSchedules() called with GroupInformation==null")
+		return;
+	}
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIS001")
 
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
 		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
 			if (groupId!=dvbi.CRID_NOW && groupId!=dvbi.CRID_LATER && groupId!=dvbi.CRID_EARLIER )
-				errs.pushCode("GIS001", GroupInformation.name()+"@"+tva.a_groupId+" value \""+groupId+"\" is valid for this request type")
+				errs.pushCode("GIS011", GroupInformation.name()+"@"+tva.a_groupId+" value \""+groupId+"\" is valid for this request type")
 		}
 	}
-	else errs.pushCode("GIS003", GroupInformation.name()+"@"+tva.a_groupId+" attribute is mandatory");
+	else errs.pushCode("GIS012", GroupInformation.name()+"@"+tva.a_groupId+" attribute is mandatory");
 
 	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
 		if (GroupInformation.attr(tva.a_ordered)) {
 			if (GroupInformation.attr(tva.a_ordered).value()!="true")
-				errs.pushCode("GI008", GroupInformation.name()+"@"+tva.a_ordered+" must be \"true\" for this response type");
+				errs.pushCode("GIS013", GroupInformation.name()+"@"+tva.a_ordered+" must be \"true\" for this response type");
 		}
-		else errs.pushCode("GI009", GroupInformation.name()+"@"+tva.a_ordered+" is required for this response type");
+		else errs.pushCode("GIS014", GroupInformation.name()+"@"+tva.a_ordered+" is required for this response type");
 		if (!GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GI010", GroupInformation.name()+"@"+tva.a_numOfItems+" is required for this request type")
+			errs.pushCode("GIS015", GroupInformation.name()+"@"+tva.a_numOfItems+" is required for this request type")
 	}
 
 	// <GroupInformation><BasicDescription>
@@ -1819,15 +1901,19 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
  */
 function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 	
+	if (!GroupInformation) {
+		errs.pushCode("GIM000", "ValidateGroupInformationMoreEpisodes() called with GroupInformation==null")
+		return;
+	}
 	if (categoryGroup) 
-		errs.push("GIM000", CATEGORY_GROUP_NAME+" should not be specified for this request type")
+		errs.push("GIM001", CATEGORY_GROUP_NAME+" should not be specified for this request type")
 	
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIM001")
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIM002")
 	
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
 		if (!isCRIDURI(groupId)) {
-			errs.pushCode("GIM002", GroupInformation.name()+"@"+tva.a_groupId+" value \""+groupId+"\" is not a valid CRID")
+			errs.pushCode("GIM003", GroupInformation.name()+"@"+tva.a_groupId+" value \""+groupId+"\" is not a valid CRID")
 		}
 		else 
 			groupsFound.push(groupId);
