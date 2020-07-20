@@ -689,61 +689,60 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
 	function requiredSynopsisError(length) {
 		return "a "+tva.e_Synopsis+" with @length=\""+length+"\" is required"; }
 	
-	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
+	var s=1, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
 	var shortLangs=[], mediumLangs=[], longLangs=[];
-	while (Synopsis=BasicDescription.child(s++)) {
-		if (Synopsis.name()==tva.e_Synopsis) {
-			var synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage, false, "SY000");
-			var synopsisLength=Synopsis.attr(tva.a_length)?Synopsis.attr(tva.a_length).value():null;
-			
-			if (synopsisLength) {
-				if (isIn(requiredLengths, synopsisLength) || isIn(optionalLengths, synopsisLength)) {
-					switch (synopsisLength) {
-					case dvbi.SYNOPSIS_SHORT_LABEL:
-						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
-							errs.pushCode(errCode?errCode+"-1":"SY001", synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
-						hasShort=true;
-						break;
-					case dvbi.SYNOPSIS_MEDIUM_LABEL:
-						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
-							errs.pushCode(errCode?errCode+"-2":"SY002", synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
-						hasMedium=true;
-						break;
-					case dvbi.SYNOPSIS_LONG_LABEL:
-						if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
-							errs.pushCode(errCode?errCode+"-3":"SY003", synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
-						hasLong=true;
-						hasLong=true;
-						break;						
-					}
-				}
-				else
-					errs.pushCode(errCode?errCode+"-4":"SY004", "@"+tva.a_length+"=\""+synopsisLength+"\" is not permitted for this request type");
-			}
-			else 
-				errs.pushCode(errCode?errCode+"-5":"SY005","@"+tva.a_length+" attribute is required for <"+tva.e_Synopsis+">");
+	while (Synopsis=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Synopsis+"["+ s++ +"]", CG_SCHEMA)) {
+		var synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage, false, "SY000");
+		var synopsisLength=Synopsis.attr(tva.a_length)?Synopsis.attr(tva.a_length).value():null;
 		
-			if (synopsisLang && synopsisLength) {
+		if (synopsisLength) {
+			if (isIn(requiredLengths, synopsisLength) || isIn(optionalLengths, synopsisLength)) {
 				switch (synopsisLength) {
-					case dvbi.SYNOPSIS_SHORT_LABEL:
-						if (isIn(shortLangs, synopsisLang)) 
-							errs.pushCode(errCode?errCode+"-6":"SY006",singleLengthLangError(synopsisLength, synopsisLang));
-						else shortLangs.push(synopsisLang);
-						break;
-					case dvbi.SYNOPSIS_MEDIUM_LABEL:
-						if (isIn(mediumLangs, synopsisLang)) 
-							errs.pushCode(errCode?errCode+"-7":"SY007",singleLengthLangError(synopsisLength, synopsisLang));
-						else mediumLangs.push(synopsisLang);
-						break;
-					case dvbi.SYNOPSIS_LONG_LABEL:
-						if (isIn(longLangs, synopsisLang)) 
-							errs.pushCode(errCode?errCode+"-8":"SY008",singleLengthLangError(synopsisLength, synopsisLang));
-						else longLangs.push(synopsisLang);
-						break;
+				case dvbi.SYNOPSIS_SHORT_LABEL:
+					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
+						errs.pushCode(errCode?errCode+"-1":"SY001", synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
+					hasShort=true;
+					break;
+				case dvbi.SYNOPSIS_MEDIUM_LABEL:
+					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
+						errs.pushCode(errCode?errCode+"-2":"SY002", synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
+					hasMedium=true;
+					break;
+				case dvbi.SYNOPSIS_LONG_LABEL:
+					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
+						errs.pushCode(errCode?errCode+"-3":"SY003", synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
+					hasLong=true;
+					hasLong=true;
+					break;						
 				}
+			}
+			else
+				errs.pushCode(errCode?errCode+"-4":"SY004", "@"+tva.a_length+"=\""+synopsisLength+"\" is not permitted for this request type");
+		}
+		else 
+			errs.pushCode(errCode?errCode+"-5":"SY005","@"+tva.a_length+" attribute is required for <"+tva.e_Synopsis+">");
+	
+		if (synopsisLang && synopsisLength) {
+			switch (synopsisLength) {
+				case dvbi.SYNOPSIS_SHORT_LABEL:
+					if (isIn(shortLangs, synopsisLang)) 
+						errs.pushCode(errCode?errCode+"-6":"SY006",singleLengthLangError(synopsisLength, synopsisLang));
+					else shortLangs.push(synopsisLang);
+					break;
+				case dvbi.SYNOPSIS_MEDIUM_LABEL:
+					if (isIn(mediumLangs, synopsisLang)) 
+						errs.pushCode(errCode?errCode+"-7":"SY007",singleLengthLangError(synopsisLength, synopsisLang));
+					else mediumLangs.push(synopsisLang);
+					break;
+				case dvbi.SYNOPSIS_LONG_LABEL:
+					if (isIn(longLangs, synopsisLang)) 
+						errs.pushCode(errCode?errCode+"-8":"SY008",singleLengthLangError(synopsisLength, synopsisLang));
+					else longLangs.push(synopsisLang);
+					break;
 			}
 		}
 	}
+	
 	// note that current DVB-I specifiction only mandates "medium" length, but all three are checked here
 	if (isIn(requiredLengths, dvbi.SYNOPSIS_SHORT_LABEL) && !hasShort)
 		errs.pushCode(errCode?errCode+"-9":"SY009",requiredSynopsisError(dvbi.SYNOPSIS_SHORT_LABEL));	
@@ -767,21 +766,20 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
 function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs, parentLanguage, errCode=null) {
-	var k=0, Keyword, counts=[];
-	while (Keyword=BasicDescription.child(k++)) {
-		if (Keyword.name()==tva.e_Keyword) {
-			var keywordType=Keyword.attr(tva.a_type) ? Keyword.attr(tva.a_type).value() : dvbi.DEFAULT_KEYWORD_TYPE;
-			var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW000");
+	var k=1, Keyword, counts=[];
+	while (Keyword=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Keyword+"["+ k++ +"]", CG_SCHEMA)) {
+		var keywordType=Keyword.attr(tva.a_type) ? Keyword.attr(tva.a_type).value() : dvbi.DEFAULT_KEYWORD_TYPE;
+		var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW000");
 
-			if (counts[keywordLang]===undefined)
-				counts[keywordLang]=1
-			else counts[keywordLang]++;
-			if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
-				errs.pushCode(errCode?errCode+"-1":"KW001","@"+tva.a_type+"=\""+keywordType+"\" not permitted for <"+tva.e_Keyword+">");
-			if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
-				errs.pushCode(errCode?errCode+"-2":"KW002","<"+tva.e_Keyword+"> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
-		}
+		if (counts[keywordLang]===undefined)
+			counts[keywordLang]=1
+		else counts[keywordLang]++;
+		if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
+			errs.pushCode(errCode?errCode+"-1":"KW001","@"+tva.a_type+"=\""+keywordType+"\" not permitted for <"+tva.e_Keyword+">");
+		if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
+			errs.pushCode(errCode?errCode+"-2":"KW002","<"+tva.e_Keyword+"> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
 	}
+	
 	for (var i in counts) {
         if (counts[i]!=0 && counts[i]>maxKeywords) 
             errs.pushCode(errCode?errCode+"-3":"KW003","More than "+maxKeywords+" <"+tva.e_Keyword+"> element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language \""+i+"\""));
@@ -800,18 +798,16 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
 function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, maxGenres, errs, errCode=null) {
-	var g=0, Genre, count=0;
-	while (Genre=BasicDescription.child(g++)) {
-		if (Genre.name()==tva.e_Genre) {
-			count++;
-			var genreType=Genre.attr(tva.a_type) ? Genre.attr(tva.a_type).value() : dvbi.DEFAULT_GENRE_TYPE;
-			if (genreType!=dvbi.GENRE_TYPE_MAIN)
-				errs.pushCode(errCode?errCode+"-1":"GE001","@"+tva.a_type+"=\""+genreType+"\" not permitted for <"+tva.e_Genre+">");
-			
-			var genreValue=Genre.attr(tva.a_href) ? Genre.attr(tva.a_href).value() : "";
-			if (!isIn(allowedGenres, genreValue))
-				errs.pushCode(errCode?errCode+"-2":"GE002","invalid @"+tva.a_href+" value \""+genreValue+"\" for <"+tva.e_Genre+">");
-		}
+	var g=1, Genre, count=0;
+	while (Genre=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"["+ g++ +"]",CG_SCHEMA)) {
+		count++;
+		var genreType=Genre.attr(tva.a_type) ? Genre.attr(tva.a_type).value() : dvbi.DEFAULT_GENRE_TYPE;
+		if (genreType!=dvbi.GENRE_TYPE_MAIN)
+			errs.pushCode(errCode?errCode+"-1":"GE001","@"+tva.a_type+"=\""+genreType+"\" not permitted for <"+tva.e_Genre+">");
+		
+		var genreValue=Genre.attr(tva.a_href) ? Genre.attr(tva.a_href).value() : "";
+		if (!isIn(allowedGenres, genreValue))
+			errs.pushCode(errCode?errCode+"-2":"GE002","invalid @"+tva.a_href+" value \""+genreValue+"\" for <"+tva.e_Genre+">");
 	}
 	if (count>maxGenres)
 		errs.pushCode(errCode?errCode+"-3":"GE003","More than "+maxGenres+" <"+tva.e_Genre+"> element"+(maxGenres>1?"s":"")+" specified");
@@ -830,46 +826,44 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
  */
 function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minPGelements, maxPGelements, errs, errCode=null) {
 	// first <ParentalGuidance> element must contain an <mpeg7:MinimumAge> element
-	var pg=0, ParentalGuidance, countParentalGuidance=0;
+	var pg=1, ParentalGuidance, countParentalGuidance=0;
 	
-	while (ParentalGuidance=BasicDescription.child(pg++)) {
-		if (ParentalGuidance.name()==tva.e_ParentalGuidance) {
-			countParentalGuidance++;
+	while (ParentalGuidance=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_ParentalGuidance+"["+ pg++ +"]", CS_SCHEMA)) {
+		countParentalGuidance++;
+		
+		var pgc=0, pgChild, countExplanatoryText=0;
+		while (pgChild=ParentalGuidance.child(pgc++)) {
 			
-			var pgc=0, pgChild, countExplanatoryText=0;
-			while (pgChild=ParentalGuidance.child(pgc++)) {
+			if (pgChild.name()!="text") {
 				
-				if (pgChild.name()!="text") {
+				if (pgChild.name()==tva.e_MinimumAge || pgChild.name()==tva.e_ParentalRating) {
+					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
+						errs.pushCode(errCode?errCode+"-1":"PG001", "first <"+tva.e_ParentalGuidance+"> element must contain <mpeg7:"+tva.e_MinimumAge+">");
 					
-					if (pgChild.name()==tva.e_MinimumAge || pgChild.name()==tva.e_ParentalRating) {
-						if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-							errs.pushCode(errCode?errCode+"-1":"PG001", "first <"+tva.e_ParentalGuidance+"> element must contain <mpeg7:"+tva.e_MinimumAge+">");
-						
-						if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-							errs.pushCode(errCode?errCode+"-2":"PG002", "<"+tva.e_MinimumAge+"> must be in the first <"+tva.e_ParentalGuidance+"> element");
-						
-						if (pgChild.name()==tva.e_ParentalRating) {
-							if (!pgChild.attr(tva.a_href))
-								NoHrefAttribute(errs, tva.e_ParentalRating, tva.e_ParentalGuidance )
-						}
-					}
-					if (pgChild.name()==tva.e_ExplanatoryText) {
-						countExplanatoryText++;
-						if (pgChild.attr(tva.a_length)) {
-							if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
-								errs.pushCode(errCode?errCode+"-3":"PG003", "@"+tva.a_length+"=\""+pgChild.attr(tva.a_length).value()+"\" is not allowed for <"+tva.e_ExplanatoryText+">")
-						}
-						else 
-							errs.pushCode(errCode?errCode+"-4":"PG004", "@"+tva.a_length+"=\""+tva.v_lengthLong+"\" is required for <"+tva.e_ExplanatoryText+">");
-						
-						if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
-							errs.pushCode(errCode?errCode+"-5":"PG005", "length of <"+tva.e_ExplanatoryText+"> cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+"");
+					if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
+						errs.pushCode(errCode?errCode+"-2":"PG002", "<"+tva.e_MinimumAge+"> must be in the first <"+tva.e_ParentalGuidance+"> element");
+					
+					if (pgChild.name()==tva.e_ParentalRating) {
+						if (!pgChild.attr(tva.a_href))
+							NoHrefAttribute(errs, tva.e_ParentalRating, tva.e_ParentalGuidance )
 					}
 				}
+				if (pgChild.name()==tva.e_ExplanatoryText) {
+					countExplanatoryText++;
+					if (pgChild.attr(tva.a_length)) {
+						if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
+							errs.pushCode(errCode?errCode+"-3":"PG003", "@"+tva.a_length+"=\""+pgChild.attr(tva.a_length).value()+"\" is not allowed for <"+tva.e_ExplanatoryText+">")
+					}
+					else 
+						errs.pushCode(errCode?errCode+"-4":"PG004", "@"+tva.a_length+"=\""+tva.v_lengthLong+"\" is required for <"+tva.e_ExplanatoryText+">");
+					
+					if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
+						errs.pushCode(errCode?errCode+"-5":"PG005", "length of <"+tva.e_ExplanatoryText+"> cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+"");
+				}
 			}
-			if (countExplanatoryText > 1)
-				errs.pushCode(errCode?errCode+"-7":"PG006", "only a single <"+tva.e_ExplanatoryText+"> element is premitted in <"+tva.e_ParentalGuidance+">")
 		}
+		if (countExplanatoryText > 1)
+			errs.pushCode(errCode?errCode+"-7":"PG006", "only a single <"+tva.e_ExplanatoryText+"> element is premitted in <"+tva.e_ParentalGuidance+">")
 	}
 	if (countParentalGuidance>maxPGelements)
 		errs.pushCode(errCode?errCode+"-7":"PG007", "no more than "+maxPGelements+" <"+tva.e_ParentalGuidance+"> elements are premitted");
@@ -926,57 +920,55 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, errCode=null) {
 	var CreditsList=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_CreditsList, CG_SCHEMA);
 	if (CreditsList) {
-		var ci=0, CreditsItem;		
-		while (CreditsItem=CreditsList.child(ci++)) {
-			if (CreditsItem.name()==tva.e_CreditsItem) {
-				if (CreditsItem.attr(tva.a_role)) {
-					var CreditsItemRole=CreditsItem.attr(tva.a_role).value();
-					if (!isIn(allowedCreditItemRoles, CreditsItemRole))
-						errs.pushCode(errCode?errCode+"-1":"CL001", "\""+CreditsItemRole+"\" is not valid for "+tva.e_CreditsItem+"@"+tva.a_role);
-				}
-				else 
-					errs.pushCode(errCode?errCode+"-2":"CL002", tva.e_CreditsItem+"@"+tva.a_role+" not specified")
-				var foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
-				var s=0, elem;
-				while (elem=CreditsItem.child(s++)) {
-					switch (elem.name()) {
-						case tva.e_PersonName:
-							foundPersonName++;
-							// required to have a GivenName optionally have a FamilyName
-							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-							break;
-						case tva.e_Character:
-							foundCharacter++;
-							// required to have a GivenName optionally have a FamilyName
-							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-							break;
-						case tva.e_OrganizationName:
-							foundOrganizationName++;
-							if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
-								errs.pushCode(errCode?errCode+"-3":"CL003", "length of <"+tva.e_OrganizationName+"> in <"+tva.e_CreditsItem+"> exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
-							break;
-						default:
-							if (elem.name()!="text")
-								errs.pushCode(errCode?errCode+"-4":"CL004", "extra element <"+elem.name()+"> found in <"+tva.e_CreditsItem+">");
-					}
-					if (foundPersonName>1)
-						errs.pushCode(errCode?errCode+"-5":"CL005", "only a single <"+tva.e_PersonName+"> is permitted in <"+tva.e_CreditsItem+">");
-					if (foundCharacter>1)
-						errs.pushCode(errCode?errCode+"-6":"CL006", "only a single <"+tva.e_Character+"> is permitted in <"+tva.e_CreditsItem+">");
-					if (foundOrganizationName>1)
-						errs.pushCode(errCode?errCode+"-7":"CL007", "only a single <"+tva.e_OrganizationName+"> is permitted in <"+tva.e_CreditsItem+">");
-					if (foundCharacter>0 && foundPersonName==0)
-						errs.pushCode(errCode?errCode+"-8":"CL008", "<"+tva.e_Character+"> in <"+tva.e_CreditsItem+"> requires <"+tva.e_PersonName+">");
-					if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
-						errs.pushCode(errCode?errCode+"-9":"CL009", "<"+tva.e_OrganizationName+"> can only be present when <"+tva.e_PersonName+"> is absent in <"+tva.e_CreditsItem+">");
-				}			
-				if (foundPersonName>1)
-					errs.pushCode(errCode?errCode+"-10":"CL010", "only a single <"+tva.e_PersonName+"> is permitted in <"+tva.e_CreditsItem+">")
-				if (foundCharacter>1)
-					errs.pushCode(errCode?errCode+"-11":"CL011", "only a single <"+tva.e_Character+"> is permitted in <"+tva.e_CreditsItem+">")
-				if (foundOrganizationName>1)
-					errs.pushCode(errCode?errCode+"-12":"CL012", "only a single <"+tva.e_OrganizationName+"> is permitted in <"+tva.e_CreditsItem+">")
+		var ci=1, CreditsItem;		
+		while (CreditsItem=CreditsList.get(SCHEMA_PREFIX+":"+tva.e_CreditsItem+"["+ ci++ +"]", CG_SCHEMA)) {
+			if (CreditsItem.attr(tva.a_role)) {
+				var CreditsItemRole=CreditsItem.attr(tva.a_role).value();
+				if (!isIn(allowedCreditItemRoles, CreditsItemRole))
+					errs.pushCode(errCode?errCode+"-1":"CL001", "\""+CreditsItemRole+"\" is not valid for "+tva.e_CreditsItem+"@"+tva.a_role);
 			}
+			else 
+				errs.pushCode(errCode?errCode+"-2":"CL002", tva.e_CreditsItem+"@"+tva.a_role+" not specified")
+			var foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
+			var s=0, elem;
+			while (elem=CreditsItem.child(s++)) {
+				switch (elem.name()) {
+					case tva.e_PersonName:
+						foundPersonName++;
+						// required to have a GivenName optionally have a FamilyName
+						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+						break;
+					case tva.e_Character:
+						foundCharacter++;
+						// required to have a GivenName optionally have a FamilyName
+						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+						break;
+					case tva.e_OrganizationName:
+						foundOrganizationName++;
+						if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
+							errs.pushCode(errCode?errCode+"-3":"CL003", "length of <"+tva.e_OrganizationName+"> in <"+tva.e_CreditsItem+"> exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
+						break;
+					default:
+						if (elem.name()!="text")
+							errs.pushCode(errCode?errCode+"-4":"CL004", "extra element <"+elem.name()+"> found in <"+tva.e_CreditsItem+">");
+				}
+				if (foundPersonName>1)
+					errs.pushCode(errCode?errCode+"-5":"CL005", "only a single <"+tva.e_PersonName+"> is permitted in <"+tva.e_CreditsItem+">");
+				if (foundCharacter>1)
+					errs.pushCode(errCode?errCode+"-6":"CL006", "only a single <"+tva.e_Character+"> is permitted in <"+tva.e_CreditsItem+">");
+				if (foundOrganizationName>1)
+					errs.pushCode(errCode?errCode+"-7":"CL007", "only a single <"+tva.e_OrganizationName+"> is permitted in <"+tva.e_CreditsItem+">");
+				if (foundCharacter>0 && foundPersonName==0)
+					errs.pushCode(errCode?errCode+"-8":"CL008", "<"+tva.e_Character+"> in <"+tva.e_CreditsItem+"> requires <"+tva.e_PersonName+">");
+				if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
+					errs.pushCode(errCode?errCode+"-9":"CL009", "<"+tva.e_OrganizationName+"> can only be present when <"+tva.e_PersonName+"> is absent in <"+tva.e_CreditsItem+">");
+			}			
+			if (foundPersonName>1)
+				errs.pushCode(errCode?errCode+"-10":"CL010", "only a single <"+tva.e_PersonName+"> is permitted in <"+tva.e_CreditsItem+">")
+			if (foundCharacter>1)
+				errs.pushCode(errCode?errCode+"-11":"CL011", "only a single <"+tva.e_Character+"> is permitted in <"+tva.e_CreditsItem+">")
+			if (foundOrganizationName>1)
+				errs.pushCode(errCode?errCode+"-12":"CL012", "only a single <"+tva.e_OrganizationName+"> is permitted in <"+tva.e_CreditsItem+">")
 		}
 	}
 }
@@ -1030,14 +1022,11 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
  * @param {Class}   errs                errors found in validaton
  */
 function Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
-	var rm=0, RelatedMaterial, countRelatedMaterial=0;
-	while (RelatedMaterial=BasicDescription.child(rm++)) {
-		if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
-			countRelatedMaterial++;
-			
-			var evaluated=CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs);
-			
-		}
+	var rm=1, RelatedMaterial, countRelatedMaterial=0;
+	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
+		countRelatedMaterial++;
+		
+		var evaluated=CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs);
 	}
 	if (countRelatedMaterial > maxRMelements)
 		errs.pushCode("RM001", "a maximum of "+maxRMelements+" <"+tva.e_RelatedMaterial+"> element"+(maxRMelements>1?"s":"")+" are permitted")
@@ -1064,31 +1053,29 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 	}
 	
 	var countPaginationFirst=0, countPaginationPrev=0, countPaginationNext=0, countPaginationLast=0;
-	var rm=0, RelatedMaterial;
-	while (RelatedMaterial=BasicDescription.child(rm++)) {
-		if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
-			var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
-			if (!HowRelated) 
-				NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP001")
-			else {				
-				if (!HowRelated.attr(tva.a_href)) 
-					NoHrefAttribute(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP002");
-				else {
-					switch (HowRelated.attr(tva.a_href).value()) {
-						case dvbi.PAGINATION_FIRST_URI:
-							countPaginationFirst++;
-							break;
-						case dvbi.PAGINATION_PREV_URI:
-							countPaginationPrev++;
-							break;
-						case dvbi.PAGINATION_NEXT_URI:
-							countPaginationNext++;
-							break;
-						case dvbi.PAGINATION_LAST_URI:
-							countPaginationLast++;
-							break;
-					}	
-				}
+	var rm=1, RelatedMaterial;
+	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
+		var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+		if (!HowRelated) 
+			NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP001")
+		else {				
+			if (!HowRelated.attr(tva.a_href)) 
+				NoHrefAttribute(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP002");
+			else {
+				switch (HowRelated.attr(tva.a_href).value()) {
+					case dvbi.PAGINATION_FIRST_URI:
+						countPaginationFirst++;
+						break;
+					case dvbi.PAGINATION_PREV_URI:
+						countPaginationPrev++;
+						break;
+					case dvbi.PAGINATION_NEXT_URI:
+						countPaginationNext++;
+						break;
+					case dvbi.PAGINATION_LAST_URI:
+						countPaginationLast++;
+						break;
+				}	
 			}
 		}
 	}
@@ -1126,12 +1113,11 @@ function Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 	
 	switch (BasicDescription.parent().name()) {
 		case tva.e_ProgramInformation:
-			var rm=0, RelatedMaterial, countRelatedMaterial=0;
-			while (RelatedMaterial=BasicDescription.child(rm++)) 
-				if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
-					countRelatedMaterial++;
-					ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes")
-				}
+			var rm=1, RelatedMaterial, countRelatedMaterial=0;
+			while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
+				countRelatedMaterial++;
+				ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes")
+			}
 			if (countRelatedMaterial > 1)
 				errs.pushCode("RMME001", "a maximum of 1 "+tva.e_RelatedMaterial+" element is permitted in "+BasicDescription.name()+" for this request type");	
 			break;
@@ -1340,37 +1326,35 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
  */
 function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
 	var countImage=0, countTemplateAIT=0, hasPagination=false;
-	var rm=0, RelatedMaterial;
-	while (RelatedMaterial=BasicDescription.child(rm++)) {
-		if (RelatedMaterial.name()==tva.e_RelatedMaterial) {
-			var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
-			if (!HowRelated) 
-				NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">")
-			else {				
-				if (!HowRelated.attr(tva.a_href)) 
-					NoHrefAttribute(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">");
-				else {
-					var hrHref=HowRelated.attr(tva.a_href).value();
-					switch (hrHref) {
-						case dvbi.TEMPLATE_AIT_URI:
-							countTemplateAIT++;
-							ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">")
-							break;
-						case dvbi.PAGINATION_FIRST_URI:
-						case dvbi.PAGINATION_PREV_URI:
-						case dvbi.PAGINATION_NEXT_URI:
-						case dvbi.PAGINATION_LAST_URI:
-							// pagination links are allowed, but checked in ValidatePagination()
-							hasPagination=true;
-							break;
-						case dvbi.PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
-							countImage++;
-							ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">");
-							break;
-						default:
-							InvalidHrefValue(errs, +hrHref, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+"> in Box Set List");
-					}	
-				}
+	var rm=1, RelatedMaterial;
+	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm+++ "]", CG_SCHEMA)) {
+		var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+		if (!HowRelated) 
+			NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">")
+		else {				
+			if (!HowRelated.attr(tva.a_href)) 
+				NoHrefAttribute(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">");
+			else {
+				var hrHref=HowRelated.attr(tva.a_href).value();
+				switch (hrHref) {
+					case dvbi.TEMPLATE_AIT_URI:
+						countTemplateAIT++;
+						ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">")
+						break;
+					case dvbi.PAGINATION_FIRST_URI:
+					case dvbi.PAGINATION_PREV_URI:
+					case dvbi.PAGINATION_NEXT_URI:
+					case dvbi.PAGINATION_LAST_URI:
+						// pagination links are allowed, but checked in ValidatePagination()
+						hasPagination=true;
+						break;
+					case dvbi.PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
+						countImage++;
+						ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">");
+						break;
+					default:
+						InvalidHrefValue(errs, +hrHref, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+"> in Box Set List");
+				}	
 			}
 		}
 	}
@@ -1400,40 +1384,38 @@ function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondary, errs, parentLanguage, errCode=null) {
 	var mainSet=[], secondarySet=[];
 	var t=0, Title;
-	while (Title=BasicDescription.child(t++)) {
-		if (Title.name()==tva.e_Title) {
-			var titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : dvbi.DEFAULT_TITLE_TYPE; // MPEG7 default type is "main"
-			var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT000");
+	while (Title=BasicDescription.child(SCHEMA_PREFIX+":"+tva.e_Title+"["+ t++ +"]", CG_SCHEMA)) {
+		var titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : dvbi.DEFAULT_TITLE_TYPE; // MPEG7 default type is "main"
+		var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT000");
 
-			var titleStr=unEntity(Title.text());
-			
-			if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
-				errs.pushCode(errCode?errCode+"-1":"VT001", "<"+tva.e_Title+"> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
-			if (titleType==dvbi.TITLE_MAIN_TYPE) {
-				if (isIn(mainSet, titleLang))
-					errs.pushCode(errCode?errCode+"-2":"VT002", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\"")
-				else mainSet.push(titleLang);
-			}
-			else if (titleType==dvbi.TITLE_SECONDARY_TYPE) {
-				if (allowSecondary) {
-					if (isIn(secondarySet, titleLang))
-						errs.pushCode(errCode?errCode+"-3":"VT003", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\"")
-					else secondarySet.push(titleLang);
-				}
-				else 
-					errs.pushCode(errCode?errCode+"-4":"VT004", tva.e_Title+"@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" is not permitted for this <"+BasicDescription.name()+">");
-			}
-			else
-				errs.pushCode(errCode?errCode+"-5":"VT005", "@"+tva.a_type+"=\""+titleType+"\" is not permitted for <"+tva.e_Title+">");
-			
-			secondarySet.forEach(lang => {
-				if (!isIn(mainSet, lang)) {
-					var t=lang!=DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
-					errs.pushCode(errCode?errCode+"-6":"VT006", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @type=\""+dvbi.TITLE_MAIN_TYPE+"\""+t);
-				}
-			});
+		var titleStr=unEntity(Title.text());
+		
+		if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
+			errs.pushCode(errCode?errCode+"-1":"VT001", "<"+tva.e_Title+"> length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
+		if (titleType==dvbi.TITLE_MAIN_TYPE) {
+			if (isIn(mainSet, titleLang))
+				errs.pushCode(errCode?errCode+"-2":"VT002", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\"")
+			else mainSet.push(titleLang);
 		}
-	}	
+		else if (titleType==dvbi.TITLE_SECONDARY_TYPE) {
+			if (allowSecondary) {
+				if (isIn(secondarySet, titleLang))
+					errs.pushCode(errCode?errCode+"-3":"VT003", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\"")
+				else secondarySet.push(titleLang);
+			}
+			else 
+				errs.pushCode(errCode?errCode+"-4":"VT004", tva.e_Title+"@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" is not permitted for this <"+BasicDescription.name()+">");
+		}
+		else
+			errs.pushCode(errCode?errCode+"-5":"VT005", "@"+tva.a_type+"=\""+titleType+"\" is not permitted for <"+tva.e_Title+">");
+		
+		secondarySet.forEach(lang => {
+			if (!isIn(mainSet, lang)) {
+				var t=lang!=DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
+				errs.pushCode(errCode?errCode+"-6":"VT006", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @type=\""+dvbi.TITLE_MAIN_TYPE+"\""+t);
+			}
+		});
+	}
 }
 
 
@@ -1668,14 +1650,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		return;
 	}
 	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, progDescrLang, false, "PI102");
-/*
-	var pi=0, ProgramInformation, cnt=0, indexes=[];
-	while (ProgramInformation=ProgramInformationTable.child(pi++)) 
-		if (ProgramInformation.name()==tva.e_ProgramInformation) {
-			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
-			cnt++;
-		}
-*/
+
 	var pi=1, ProgramInformation, cnt=0, indexes=[];
 	while (ProgramInformation=ProgramInformationTable.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformation+"["+pi+"]", CG_SCHEMA)) {
 			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
@@ -1952,34 +1927,31 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pro
 	// find which GroupInformation element is the "category group"
 	var categoryGroup=null;
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES || requestType==CG_REQUEST_BS_CONTENTS) {
-		while (GroupInformation=GroupInformationTable.child(gi++)) 
-			if (GroupInformation.name()==tva.e_GroupInformation) {
-				var countMemberOf=0;
-				// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
-				var e=0, elem;
-				while (elem=GroupInformation.child(e++)) {
-					if (elem.name()==tva.e_MemberOf)
-						countMemberOf++
-				}
-				if (countMemberOf==0) {
-					// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
-					if (categoryGroup)
-						errs.pushCode("GI111", "only a single "+CATEGORY_GROUP_NAME+" can be present in <"+tva.e_GroupInformationTable+">")
-					else categoryGroup=GroupInformation;
-				}
+		gi=1;
+		while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) 
+			var countMemberOf=0;
+			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
+			var e=0, elem;
+			while (elem=GroupInformation.child(e++)) {
+				if (elem.name()==tva.e_MemberOf)
+					countMemberOf++
+			}
+			if (countMemberOf==0) {
+				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
+				if (categoryGroup)
+					errs.pushCode("GI111", "only a single "+CATEGORY_GROUP_NAME+" can be present in <"+tva.e_GroupInformationTable+">")
+				else categoryGroup=GroupInformation;
 			}
 		if (!categoryGroup)
 			errs.pushCode("GI112", "a "+CATEGORY_GROUP_NAME+" must be specified in <"+tva.e_GroupInformationTable+"> for this request type")
 	}
 	
 	var indexes=[], giCount=0;
-	gi=0;
-	while (GroupInformation=GroupInformationTable.child(gi++)) {
-		if (GroupInformation.name()==tva.e_GroupInformation) {
-			ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, categoryGroup, indexes, groupIds);
-			if (GroupInformation!=categoryGroup) 
-				giCount++;
-		}
+	gi=1;
+	while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) {
+		ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, categoryGroup, indexes, groupIds);
+		if (GroupInformation!=categoryGroup) 
+			giCount++;
 	}
 	if (categoryGroup) {
 		var numOfItems=(categoryGroup.attr(tva.a_numOfItems) ? valUnsignedInt(categoryGroup.attr(tva.a_numOfItems).value()) : 0);
@@ -2067,18 +2039,15 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 	}
 	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, progDescrLang, false, "NN202");
 	
-	var gi=0, GroupInformation;
-	while (GroupInformation=GroupInformationTable.child(gi++)) {
-		if (GroupInformation.name()==tva.e_GroupInformation) {
-			
-			switch (requestType) {
-				case CG_REQUEST_SCHEDULE_NOWNEXT:
-					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, null, 1, 1, groupIds);
-					break;
-				case CG_REQUEST_SCHEDULE_WINDOW:
-					ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
-					break;
-			}
+	var gi=1, GroupInformation;
+	while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) {	
+		switch (requestType) {
+			case CG_REQUEST_SCHEDULE_NOWNEXT:
+				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, null, 1, 1, groupIds);
+				break;
+			case CG_REQUEST_SCHEDULE_WINDOW:
+				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
+				break;
 		}
 	}
 }
@@ -2106,69 +2075,66 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, [], [tva.e_AudioAttributes, tva.e_VideoAttributes, tva.e_CaptioningAttributes], errs, "AV000");
 
 	// <AudioAttributes>
-	var a=0, AudioAttributes, foundAttributes=[], audioCounts=[];
-	while (AudioAttributes=AVAttributes.child(a++))
-		if (AudioAttributes.name()==tva.e_AudioAttributes) {
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], [tva.e_MixType, tva.e_AudioLanguage], errs, "AA000");
+	var a=1, AudioAttributes, foundAttributes=[], audioCounts=[];
+	while (AudioAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioAttributes+"["+ a++ +"]", CG_SCHEMA)) {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], [tva.e_MixType, tva.e_AudioLanguage], errs, "AA000");
 
-			var MixType=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_MixType, CG_SCHEMA);
-			if (MixType) {
-				if (MixType.attr(tva.a_href)) {
-					if (!isValidAudioMixType(MixType.attr(tva.a_href).value()))
-						errs.pushCode("AV001", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
-				}
-				else
-					NoHrefAttribute(errs, tva.e_MixType, tva.e_AudioAttributes);
+		var MixType=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_MixType, CG_SCHEMA);
+		if (MixType) {
+			if (MixType.attr(tva.a_href)) {
+				if (!isValidAudioMixType(MixType.attr(tva.a_href).value()))
+					errs.pushCode("AV001", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
 			}
-					
-			var AudioLanguage=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioLanguage, CG_SCHEMA);
-			if (AudioLanguage) {
-				var validLanguage=false, validPurpose=false, audioLang=AudioLanguage.text();
-				if (AudioLanguage.attr(tva.a_purpose)) {
-					if (!(validPurpose=isValidAudioLanguagePurpose(AudioLanguage.attr(tva.a_purpose).value())))
-						errs.pushCode("AV002", tva.e_AudioLanguage+"@"+tva.a_purpose+" is not valid");
-				}
-				validLanguage=CheckLanguage(knownLanguages, errs, audioLang, tva.e_AudioAttributes+"."+tva.e_AudioLanguage, "AV102");
+			else
+				NoHrefAttribute(errs, tva.e_MixType, tva.e_AudioAttributes);
+		}
 				
-				if (validLanguage && validPurpose) {	
-					if (audioCounts[audioLang]===undefined)
-						audioCounts[audioLang]=1
-					else audioCounts[audioLang]++;
+		var AudioLanguage=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioLanguage, CG_SCHEMA);
+		if (AudioLanguage) {
+			var validLanguage=false, validPurpose=false, audioLang=AudioLanguage.text();
+			if (AudioLanguage.attr(tva.a_purpose)) {
+				if (!(validPurpose=isValidAudioLanguagePurpose(AudioLanguage.attr(tva.a_purpose).value())))
+					errs.pushCode("AV002", tva.e_AudioLanguage+"@"+tva.a_purpose+" is not valid");
+			}
+			validLanguage=CheckLanguage(knownLanguages, errs, audioLang, tva.e_AudioAttributes+"."+tva.e_AudioLanguage, "AV102");
+			
+			if (validLanguage && validPurpose) {	
+				if (audioCounts[audioLang]===undefined)
+					audioCounts[audioLang]=1
+				else audioCounts[audioLang]++;
 
-					var combo=audioLang+"!--!"+AudioLanguage.attr(tva.a_purpose).value();
-					if (isIn(foundAttributes, combo))
-						errs.pushCode("AV003", "audio @"+tva.a_purpose+" \""+AudioLanguage.attr(tva.a_purpose).value()+"\" already specified for language \""+audioLang+"\"");
-					else
-						foundAttributes.push(combo);
-				}
+				var combo=audioLang+"!--!"+AudioLanguage.attr(tva.a_purpose).value();
+				if (isIn(foundAttributes, combo))
+					errs.pushCode("AV003", "audio @"+tva.a_purpose+" \""+AudioLanguage.attr(tva.a_purpose).value()+"\" already specified for language \""+audioLang+"\"");
+				else
+					foundAttributes.push(combo);
 			}
 		}
+	}
 	audioCounts.forEach(audioLang => {
 		if (audioCounts[audioLang]>2)
 			errs.pushCode("AV004", "more than 2 <"+tva.e_AudioAttributes+"> for language \""+audioLang+"\"");
 	});
 	
 	// <VideoAttributes>
-	var v=0, VideoAttributes;
-	while (VideoAttributes=AVAttributes.child(v++))
-		if (VideoAttributes.name()==tva.e_VideoAttributes) {
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "VA000");
-			
-			var HorizontalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_HorizontalSize, CG_SCHEMA);
-			if (HorizontalSize) 
-				if (valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
-					errs.pushCode("AV010", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
-			var VerticalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_VerticalSize, CG_SCHEMA);
-			if (VerticalSize) 
-				if (valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
-					errs.pushCode("AV011", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
-			var AspectRatio=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_AspectRatio, CG_SCHEMA);
-			if (AspectRatio) 
-				if (!isRatioType(AspectRatio.text()))
-					errs.pushCode("AV012", tva.e_AspectRatio+" is not a valid aspect ratio");
-		}
+	var v=1, VideoAttributes;
+	while (VideoAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_VideoAttributes+"["+ v++ +"]", CG_SCHEMA)) {
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "VA000");
+		
+		var HorizontalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_HorizontalSize, CG_SCHEMA);
+		if (HorizontalSize) 
+			if (valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
+				errs.pushCode("AV010", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+		var VerticalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_VerticalSize, CG_SCHEMA);
+		if (VerticalSize) 
+			if (valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
+				errs.pushCode("AV011", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+		var AspectRatio=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_AspectRatio, CG_SCHEMA);
+		if (AspectRatio) 
+			if (!isRatioType(AspectRatio.text()))
+				errs.pushCode("AV012", tva.e_AspectRatio+" is not a valid aspect ratio");
+	}
 
-	
 	// <CaptioningAttributes>
 	var c=0, CaptioningAttributes;
 	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_CaptioningAttributes, CG_SCHEMA);
@@ -2336,26 +2302,24 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs);
 	
 	// <OtherIdentifier>
-	var oi=0, OtherIdentifier;
-	while (OtherIdentifier=InstanceDescription.child(oi++)){
-		if (OtherIdentifier.name()==tva.e_OtherIdentifier) {
-			if (OtherIdentifier.attr(tva.a_type)) {			
-				var oiType=OtherIdentifier.attr(tva.a_type).value();
-		
-				if ((VerifyType==tva.e_ScheduleEvent
-							  && (oiType=="CPSIndex" || oiType==dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE))
-				  || (VerifyType=="OnDemandProgram" && oiType=="CPSIndex")) {
-						// all good
-					}
-					else 
-						errs.pushCode("ID050", tva.e_OtherIdentifier+"@"+tva.a_type+"=\""+oiType+"\" is not valid for "+VerifyType+"."+InstanceDescription.name());				
-					if (oiType=dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE)
-						if (!isCRIDURI(OtherIdentifier.text()))
-							errs.pushCode("ID051", tva.e_OtherIdentifier+" must be a CRID for @"+tva.a_type+"=\""+oiType+"\"");
-			}
-			else 
-				errs.pushCode("ID052", tva.e_OtherIdentifier+"@"+tva.a_type+" is required in "+VerifyType+"."+InstanceDescription.name())
+	var oi=1, OtherIdentifier;
+	while (OtherIdentifier=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_OtherIdentifier+"["+ oi++ +"]", CG_SCHEMA)) {
+		if (OtherIdentifier.attr(tva.a_type)) {			
+			var oiType=OtherIdentifier.attr(tva.a_type).value();
+	
+			if ((VerifyType==tva.e_ScheduleEvent
+						  && (oiType=="CPSIndex" || oiType==dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE))
+			  || (VerifyType=="OnDemandProgram" && oiType=="CPSIndex")) {
+					// all good
+				}
+				else 
+					errs.pushCode("ID050", tva.e_OtherIdentifier+"@"+tva.a_type+"=\""+oiType+"\" is not valid for "+VerifyType+"."+InstanceDescription.name());				
+				if (oiType=dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE)
+					if (!isCRIDURI(OtherIdentifier.text()))
+						errs.pushCode("ID051", tva.e_OtherIdentifier+" must be a CRID for @"+tva.a_type+"=\""+oiType+"\"");
 		}
+		else 
+			errs.pushCode("ID052", tva.e_OtherIdentifier+"@"+tva.a_type+" is required in "+VerifyType+"."+InstanceDescription.name())
 	}
 	
 	// <RelatedMaterial>
@@ -2521,53 +2485,52 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, scheduleStart, scheduleEnd, requestType, errs) {
 
 	var se=0, ScheduleEvent;
-	while (ScheduleEvent=Schedule.child(se++)) 
-		if (ScheduleEvent.name()==tva.e_ScheduleEvent) {
-			var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE000");
-			
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, [tva.e_Program, tva.e_PublishedStartTime, tva.e_PublishedDuration], [tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_ActualStartTime, tva.e_FirstShowing, tva.e_Free], errs, "SE001");
-			
-			// <Program>
-			var Program=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
-			if (Program) {
-				var ProgramCRID=Program.attr(tva.e_crid);
-				if (ProgramCRID) {
-					if (!isCRIDURI(ProgramCRID.value()))
-						errs.pushCode("SE011", tva.e_Program+"@"+tva.e_crid+" is not a valid CRID ("+ProgramCRID.value()+")");
-					if (!isIn(programCRIDs, ProgramCRID.value()))
-						errs.pushCode("SE012", tva.e_Program+"@"+tva.e_crid+"=\""+ProgramCRID.value()+"\" does not refer to a program in the <"+tva.e_ProgramInformationTable+">")
-				}
-			}
-			
-			// <ProgramURL>
-			var ProgramURL=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL, CG_SCHEMA);
-			if (ProgramURL) 
-				if (!isDVBLocator(ProgramURL.text()))
-					errs.pushCode("SE021", tva.e_ScheduleEvent+"."+tva.e_ProgramURL+" ("+ProgramURL.text()+")is not a valid DVB locator");		
-			
-			// <InstanceDescription>
-			var InstanceDescription=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription, CG_SCHEMA);
-			if (InstanceDescription) 
-				ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, seLang, programCRIDs,requestType, errs);
-			
-			// <PublishedStartTime> and <PublishedDuration>
-			var pstElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedStartTime, CG_SCHEMA);
-
-			if (pstElem) {
-				var PublishedStartTime=new Date(pstElem.text());
-				if (scheduleStart && PublishedStartTime < scheduleStart) 
-					errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than Schedule@start");
-				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
-					errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after Schedule@end");	
-
-				var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
-				if (pdElem && scheduleEnd) {
-					var parsedPublishedDuration = parseISOduration(pdElem.text());
-					if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
-						errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after Schedule@end");
-				}
+	while (ScheduleEvent=Schedule.get(SCHEMA_PREFIX+":"+tva.e_ScheduleEvent+"["+ se++ +"]", CG_SCHEMA)) {
+		var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE000");
+		
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, [tva.e_Program, tva.e_PublishedStartTime, tva.e_PublishedDuration], [tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_ActualStartTime, tva.e_FirstShowing, tva.e_Free], errs, "SE001");
+		
+		// <Program>
+		var Program=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
+		if (Program) {
+			var ProgramCRID=Program.attr(tva.e_crid);
+			if (ProgramCRID) {
+				if (!isCRIDURI(ProgramCRID.value()))
+					errs.pushCode("SE011", tva.e_Program+"@"+tva.e_crid+" is not a valid CRID ("+ProgramCRID.value()+")");
+				if (!isIn(programCRIDs, ProgramCRID.value()))
+					errs.pushCode("SE012", tva.e_Program+"@"+tva.e_crid+"=\""+ProgramCRID.value()+"\" does not refer to a program in the <"+tva.e_ProgramInformationTable+">")
 			}
 		}
+		
+		// <ProgramURL>
+		var ProgramURL=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL, CG_SCHEMA);
+		if (ProgramURL) 
+			if (!isDVBLocator(ProgramURL.text()))
+				errs.pushCode("SE021", tva.e_ScheduleEvent+"."+tva.e_ProgramURL+" ("+ProgramURL.text()+")is not a valid DVB locator");		
+		
+		// <InstanceDescription>
+		var InstanceDescription=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription, CG_SCHEMA);
+		if (InstanceDescription) 
+			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, seLang, programCRIDs,requestType, errs);
+		
+		// <PublishedStartTime> and <PublishedDuration>
+		var pstElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedStartTime, CG_SCHEMA);
+
+		if (pstElem) {
+			var PublishedStartTime=new Date(pstElem.text());
+			if (scheduleStart && PublishedStartTime < scheduleStart) 
+				errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than Schedule@start");
+			if (scheduleEnd && PublishedStartTime > scheduleEnd) 
+				errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after Schedule@end");	
+
+			var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
+			if (pdElem && scheduleEnd) {
+				var parsedPublishedDuration = parseISOduration(pdElem.text());
+				if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
+					errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after Schedule@end");
+			}
+		}
+	}
 }
 
 
