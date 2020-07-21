@@ -1872,11 +1872,8 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 	else errs.pushCode("GIS012", GroupInformation.name()+"@"+tva.a_groupId+" attribute is mandatory");
 
 	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
-		if (GroupInformation.attr(tva.a_ordered)) {
-			if (GroupInformation.attr(tva.a_ordered).value()!="true")
-				errs.pushCode("GIS013", GroupInformation.name()+"@"+tva.a_ordered+" must be \"true\" for this response type");
-		}
-		else errs.pushCode("GIS014", GroupInformation.name()+"@"+tva.a_ordered+" is required for this response type");
+		
+		TrueValue(GroupInformation, tva.a_ordered, "GIS013", errs)
 		if (!GroupInformation.attr(tva.a_numOfItems)) 
 			errs.pushCode("GIS015", GroupInformation.name()+"@"+tva.a_numOfItems+" is required for this request type")
 	}
@@ -1919,10 +1916,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 			groupsFound.push(groupId);
 	}
 
-	if (GroupInformation.attr(tva.a_ordered)) {
-		if (GroupInformation.attr(tva.a_ordered).value()!="true")
-			errs.pushCode("GIM004", GroupInformation.name()+"@"+tva.a_ordered+" must be \"true\" for this request type");
-	}
+	TrueValue(GroupInformation, tva.a_ordered, "GIM004", errs, false)
 	
 	var GroupType=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_GroupType, CG_SCHEMA);
 	if (GroupType) {
@@ -2365,8 +2359,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_CaptionLanguage, CG_SCHEMA);
 	if (CaptionLanguage) {
 		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name()+"."+tva.e_CaptionLanguage, "AV120");
-		if (CaptionLanguage.attr(tva.a_closed) && CaptionLanguage.attr(tva.a_closed).value()!="true" && CaptionLanguage.attr(tva.a_closed).value()!="false")
-			errs.pushCode("ID021", InstanceDescription.name()+"."+tva.e_CaptionLanguage+"@"+tva.a_closed+" must be \"true\" or \"false\"");
+		BooleanValue(CaptionLanguage, tva.a_closed, "ID021", errs)
 	}
 	
 	// <SignLanguage>
@@ -2544,15 +2537,65 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	
 	// <Free>
 	var Free=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Free, CG_SCHEMA);
-	if (Free) { // existance check and report done previously
-		if (Free.attr(tva.a_value)) {
-			if (Free.attr(tva.a_value).value()!="true")
-				errs.pushCode("OD080", OnDemandProgram.name()+"."+tva.e_Free+"@"+tva.a_value+" must be \"true\"");
-		}
-		else errs.pushCode("OD081", OnDemandProgram.name()+"."+tva.e_Free+"@"+tva.a_value+" is a required attribute");
-	}
+	if (Free)  // existance check and report done previously
+		TrueValue(Free, tva.a_value, "OD080", errs)
 }	
 
+
+/** 
+ * checks is the specified element (elem) has an attribute named attrName and that its value is on the given list)
+ *
+ * @param {Node}    elem       the XML element to be checked
+ * @param {string}  attrName   the name of the attribute carrying the boolean value
+ * @param {string}  errno      the error number used as a prefix for reporting errors
+ * @param {Class}   errs       errors found in validaton
+ * @param {array}   allowed    the set or permitted values
+ * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
+ */
+function AllowedValue(elem, attrName, errno, errs, allowed, isRequired=true) {
+	if (elem) {
+		if (elem.attr(attrName)) {
+			if (!isIn(allowed, flag=elem.attr(attrName).value())) {
+				var str="";
+				allowed.forEach(value => {str=str+((str.length!=0)?" or ":"")+value});
+				errs.pushCode(errno+"-1", elem.parent().name+"."+elem.name()+"@"+attrName+" must be "+str);
+			}
+		}
+		else 
+			if (isRequired) errs.pushCode(errno+"-2", "@"+attrName+" must be specified for "+elem.parent().name+"."+elem.name());
+	}
+	else
+		errs.pushCode(errno+"-0", "BooleanValue() called with elem==null")
+}
+
+
+/** 
+ * checks is the specified element (elem) has an attribute named attrName and that its value is "true" or "false"
+ *
+ * @param {Node}    elem       the XML element to be checked
+ * @param {string}  attrName   the name of the attribute carrying the boolean value
+ * @param {string}  errno      the error number used as a prefix for reporting errors
+ * @param {Class}   errs       errors found in validaton
+ * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
+ */
+function BooleanValue(elem, attrName, errno, errs, isRequired=true) {
+	AllowedValue(elem, attrName, errno, errs, ["true", "false"], isRequired);
+}
+
+
+/** 
+ * checks is the specified element (elem) has an attribute named attrName and that its value is "true"
+ *
+ * @param {Node}    elem       the XML element to be checked
+ * @param {string}  attrName   the name of the attribute carrying the boolean value
+ * @param {string}  errno      the error number used as a prefix for reporting errors
+ * @param {Class}   errs       errors found in validaton
+ * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
+ */
+function TrueValue(elem, attrName, errno, errs, isRequired=true) {
+	AllowedValue(elem, attrName, errno, errs, ["true"], isRequired);
+}
+	
 
 /**
  * validate any <ScheduleEvent> elements in the <ProgramLocationTable.Schedule>
@@ -2568,7 +2611,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
  * @param {Class}  errs                errors found in validaton
  */
 function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, scheduleStart, scheduleEnd, requestType, errs) {
-
+	
 	var se=1, ScheduleEvent;
 	while (ScheduleEvent=Schedule.get(SCHEMA_PREFIX+":"+tva.e_ScheduleEvent+"["+ se++ +"]", CG_SCHEMA)) {
 		var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE000");
@@ -2600,22 +2643,39 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		
 		// <PublishedStartTime> and <PublishedDuration>
 		var pstElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedStartTime, CG_SCHEMA);
-
 		if (pstElem) {
-			var PublishedStartTime=new Date(pstElem.text());
-			
-			if (scheduleStart && PublishedStartTime < scheduleStart) 
-				errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than "+tva.e_Schedule+"@"+tva.a_start);
-			if (scheduleEnd && PublishedStartTime > scheduleEnd) 
-				errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"+tva.a_end);	
 
-			var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
-			if (pdElem && scheduleEnd) {
-				var parsedPublishedDuration = parseISOduration(pdElem.text());
-				if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
-					errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after "+tva.e_Schedule+"@"+tva.a_end);
+			if (isUTCDateTime(pstElem.text())) {
+				var PublishedStartTime=new Date(pstElem.text());
+				
+				if (scheduleStart && PublishedStartTime < scheduleStart) 
+					errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than "+tva.e_Schedule+"@"+tva.a_start);
+				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
+					errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"+tva.a_end);	
+
+				var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
+				if (pdElem && scheduleEnd) {
+					var parsedPublishedDuration = parseISOduration(pdElem.text());
+					if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
+						errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after "+tva.e_Schedule+"@"+tva.a_end);
+				}
 			}
+			else 
+				errs.pushCode("SE049", tva.e_PublishedStartTime+" is not expressed in UTC format ("+pstElem.text()+")");
 		}
+		
+		// <ActualStartTime> 
+		var astElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ActualStartTime, CG_SCHEMA);
+		if (astElem && !isUTCDateTime(astElem.text())) 
+				errs.pushCode("SE051", tva.e_ActualStartTime+" is not expressed in UTC format ("+astElem.text()+")");
+
+		// <FirstShowing>
+		var FirstShowing=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_FirstShowing, CG_SCHEMA);
+		if (FirstShowing) BooleanValue(FirstShowing, tva.a_value, "SE060", errs);
+		
+		// <Free>
+		var Free=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_Free, CG_SCHEMA);
+		if (Free) BooleanValue(Free, tva.a_value, "SE070", errs);
 	}
 }
 
