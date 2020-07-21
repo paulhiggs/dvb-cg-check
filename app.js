@@ -2607,13 +2607,13 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 			if (scheduleStart && PublishedStartTime < scheduleStart) 
 				errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than "+tva.e_Schedule+"@"+tva.a_start);
 			if (scheduleEnd && PublishedStartTime > scheduleEnd) 
-				errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"tva.a_end);	
+				errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"+tva.a_end);	
 
 			var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
 			if (pdElem && scheduleEnd) {
 				var parsedPublishedDuration = parseISOduration(pdElem.text());
 				if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
-					errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after "+tva.e_Schedule+"@"tva.a_end);
+					errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after "+tva.e_Schedule+"@"+tva.a_end);
 			}
 		}
 	}
