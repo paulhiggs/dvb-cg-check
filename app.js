@@ -21,7 +21,7 @@ const IANAlanguages=require("./dvb-common/IANAlanguages.js");
 const libxml=require("libxmljs");
 
 //LINT: validation against schema
-const xmllint=require("xmllint");
+//const xmllint=require("xmllint");
 
 // morgan - https://github.com/expressjs/morgan
 const morgan=require("morgan")
