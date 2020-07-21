@@ -685,7 +685,7 @@ function checkTAGUri(elem, errs, errCode=null) {
  * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
  * @param {string} errCode             error code prefix to be used in reports, if not present then use local codes
  */
-function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
+function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
 	
 	function synopsisLengthError(label, length) {
 		return "length of <"+tva.e_Synopsis+" length=\""+label+"\"> exceeds "+length+" characters"; }
@@ -695,7 +695,7 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
 		return "a "+tva.e_Synopsis+" with @length=\""+length+"\" is required"; }
 	
 	if (!BasicDescription) {
-		errs.pushCode("SY000", "Validate_Synopsis() called with BasicDescription=null")
+		errs.pushCode("SY000", "ValidateSynopsis() called with BasicDescription=null")
 		return
 	}
 	var s=1, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
@@ -752,7 +752,6 @@ function Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredL
 		}
 	}
 	
-	// note that current DVB-I specifiction only mandates "medium" length, but all three are checked here
 	if (isIn(requiredLengths, dvbi.SYNOPSIS_SHORT_LABEL) && !hasShort)
 		errs.pushCode(errCode?errCode+"-9":"SY019",requiredSynopsisError(dvbi.SYNOPSIS_SHORT_LABEL));	
 	if (isIn(requiredLengths, dvbi.SYNOPSIS_MEDIUM_LABEL) && !hasMedium)
@@ -1057,10 +1056,10 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
  * @param {integer} maxRMelements       the maximum number of RelatedMaterial elements
  * @param {Class}   errs                errors found in validaton
  */
-function Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
+function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("RM000", "Validate_RelatedMaterial() called with BasicDescription=null")
+		errs.pushCode("RM000", "ValidateRelatedMaterial() called with BasicDescription=null")
 		return
 	}	
 	var rm=1, RelatedMaterial, countRelatedMaterial=0;
@@ -1154,10 +1153,10 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
  * @param {Object}  BasicDescription    the element whose children should be checked
  * @param {Class}   errs                errors found in validaton
  */
-function Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
+function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("RMME000", "Validate_RelatedMaterialMoreEpisodes() called with BasicDescription=null")
+		errs.pushCode("RMME000", "ValidateRelatedMaterial_MoreEpisodes() called with BasicDescription=null")
 		return
 	}
 	switch (BasicDescription.parent().name()) {
@@ -1383,10 +1382,10 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
  * @param {integer} maxRMelements       the maximum number of RelatedMaterial elements
  * @param {Class}   errs                errors found in validaton
  */
-function Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
+function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("MB000", "Validate_RelatedMaterialBoxSetList() called with BasicDescription=null")
+		errs.pushCode("MB000", "ValidateRelatedMaterial_BoxSetList() called with BasicDescription=null")
 		return
 	}
 	var countImage=0, countTemplateAIT=0, hasPagination=false;
@@ -1527,31 +1526,31 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				case CG_REQUEST_SCHEDULE_TIME:
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD010");	
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
-					Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL], requestType, errs, bdLang);
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL], requestType, errs, bdLang);
 					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
-					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
 				case CG_REQUEST_PROGRAM:	// 6.10.5.3
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_Genre, tva.e_ParentalGuidance, tva.e_CreditsList, tva.e_RelatedMaterial], errs, "BD020");
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
-					Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL,dvbi.SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_LONG_LABEL], requestType, errs, bdLang);
 					ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
 					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);	
 					ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);	
-					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);						
+					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);						
 					break;
 				case CG_REQUEST_BS_CONTENTS:  // 6.10.5.4					
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_Synopsis, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD030");
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, bdLang);
-					Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [dvbi.SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [dvbi.SYNOPSIS_MEDIUM_LABEL], requestType, errs, bdLang);
 					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
-					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
 				case CG_REQUEST_MORE_EPISODES:
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_RelatedMaterial], errs, "BD040");
-					Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+					ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					break;
 			//	default:
 			//		errs.pushCode("BD050", "ValidateBasicDescription() called with invalid requestType/element ("+requestType+"/"+parentElement.name()+")");
@@ -1571,14 +1570,14 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 					
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);						
 					if (!isParentGroup) {
-						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs,bdLang);
+						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs,bdLang);
 						ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, bdLang);
-						Validate_RelatedMaterialBoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+						ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					}
 			break;
 				case CG_REQUEST_MORE_EPISODES: 
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.e_RelatedMaterial], errs, "BD070");	
-					Validate_RelatedMaterialMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+					ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					break;
 				case CG_REQUEST_BS_CATEGORIES:
 					if (isParentGroup) 
@@ -1587,9 +1586,9 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_RelatedMaterial], errs, "BD081");
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, bdLang);
 					if (!isParentGroup)
-						Validate_Synopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_SHORT_LABEL], [], requestType, errs, bdLang);
+						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_SHORT_LABEL], [], requestType, errs, bdLang);
 					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-					Validate_RelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
 				// default:
 				//	errs.pushCode("BD100", "ValidateBasicDescription() called with invalid requestType/element ("+requestType+"/"+parentElement.name()+")");
