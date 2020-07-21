@@ -851,7 +851,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 	}
 	var pg=1, ParentalGuidance, countParentalGuidance=0;
 	
-	while (ParentalGuidance=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_ParentalGuidance+"["+ pg++ +"]", CS_SCHEMA)) {
+	while (ParentalGuidance=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_ParentalGuidance+"["+ pg++ +"]", CG_SCHEMA)) {
 		countParentalGuidance++;
 		
 		var pgc=0, pgChild, countExplanatoryText=0;
@@ -1453,7 +1453,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 	
 	var mainSet=[], secondarySet=[];
 	var t=0, Title;
-	while (Title=BasicDescription.child(SCHEMA_PREFIX+":"+tva.e_Title+"["+ t++ +"]", CG_SCHEMA)) {
+	while (Title=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Title+"["+ t++ +"]", CG_SCHEMA)) {
 		var titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : dvbi.DEFAULT_TITLE_TYPE; // MPEG7 default type is "main"
 		var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT001");
 
@@ -2760,25 +2760,25 @@ function validateContentGuide(CGtext, requestType, errs) {
 		}
 		var progDescrLang=GetLanguage(knownLanguages, errs, ProgramDescription, tvaMainLang);
 		var programCRIDs=[], groupIds=[], o={childCount:0};
-		
+console.log("requestType=", requestType)		
 		switch (requestType) {
 		case CG_REQUEST_SCHEDULE_TIME:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG011"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable], [], errs, "CG011"); 
 			
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, null, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG021"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG021"); 
 		
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, groupIds, requestType, errs);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_WINDOW:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG031"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG031"); 
 
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, groupIds, requestType, errs);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupIds, requestType, errs);
@@ -2787,7 +2787,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
 			
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable], [], errs, "CG041"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable], [], errs, "CG041"); 
 		
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, null, requestType, errs);
 			break;
@@ -2845,7 +2845,7 @@ function processQuery(req, res) {
     if (isEmpty(req.query)) 
         drawForm(true, res);    
     else if (!checkQuery(req)) {
-        drawForm(true, res, req.query.CGurl, req.query.requestType, {error:"URL not specified"});
+        drawForm(true, res, req.query.CGurl, req.body.requestType, {error:"URL not specified"});
         res.status(400);
     }
     else {
@@ -2858,9 +2858,9 @@ function processQuery(req, res) {
             errs.pushCode("PQ001", "retrieval of URL ("+req.query.CGurl+") failed");
         }
 		if (CGxml) 
-			validateContentGuide(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), req.query.requestType, errs);
+			validateContentGuide(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), req.body.requestType, errs);
 
-        drawForm(true, res, req.query.CGurl, req.query.requestType, {errors:errs});
+        drawForm(true, res, req.query.CGurl, req.body.requestType, {errors:errs});
     }
     res.end();
 }
