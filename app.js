@@ -1452,7 +1452,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 	}
 	
 	var mainSet=[], secondarySet=[];
-	var t=0, Title;
+	var t=1, Title;
 	while (Title=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Title+"["+ t++ +"]", CG_SCHEMA)) {
 		var titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : dvbi.DEFAULT_TITLE_TYPE; // MPEG7 default type is "main"
 		var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT001");
@@ -2001,7 +2001,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
  * @param {integer} o.childCount       the value from the @numItems attribute of the "category group"
  */
 function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, requestType, groupIds, errs, o) { 
-	var gi=0, GroupInformation;
+	var gi, GroupInformation;
 	var GroupInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_GroupInformationTable, CG_SCHEMA);
 	
 	if (!GroupInformationTable) {
@@ -2222,7 +2222,6 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	}
 
 	// <CaptioningAttributes>
-	var c=0, CaptioningAttributes;
 	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_CaptioningAttributes, CG_SCHEMA);
 	if (CaptioningAttributes) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding/*, tva.e_BitRate*/], errs, "CA000");
@@ -2570,7 +2569,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
  */
 function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, scheduleStart, scheduleEnd, requestType, errs) {
 
-	var se=0, ScheduleEvent;
+	var se=1, ScheduleEvent;
 	while (ScheduleEvent=Schedule.get(SCHEMA_PREFIX+":"+tva.e_ScheduleEvent+"["+ se++ +"]", CG_SCHEMA)) {
 		var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE000");
 		
@@ -2592,7 +2591,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		var ProgramURL=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL, CG_SCHEMA);
 		if (ProgramURL) 
 			if (!isDVBLocator(ProgramURL.text()))
-				errs.pushCode("SE021", tva.e_ScheduleEvent+"."+tva.e_ProgramURL+" ("+ProgramURL.text()+")is not a valid DVB locator");		
+				errs.pushCode("SE021", tva.e_ScheduleEvent+"."+tva.e_ProgramURL+" ("+ProgramURL.text()+") is not a valid DVB locator");		
 		
 		// <InstanceDescription>
 		var InstanceDescription=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription, CG_SCHEMA);
@@ -2604,16 +2603,17 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 
 		if (pstElem) {
 			var PublishedStartTime=new Date(pstElem.text());
+			
 			if (scheduleStart && PublishedStartTime < scheduleStart) 
-				errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than Schedule@start");
+				errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than "+tva.e_Schedule+"@"+tva.a_start);
 			if (scheduleEnd && PublishedStartTime > scheduleEnd) 
-				errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after Schedule@end");	
+				errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"tva.a_end);	
 
 			var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
 			if (pdElem && scheduleEnd) {
 				var parsedPublishedDuration = parseISOduration(pdElem.text());
 				if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
-					errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after Schedule@end");
+					errs.pushCode("SE043", tva.e_PublishedStartTime+"+"+tva.e_PublishedDuration+" of event is after "+tva.e_Schedule+"@"tva.a_end);
 			}
 		}
 	}
@@ -2644,6 +2644,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	if (startSchedule)
 		if (isUTCDateTime(startSchedule.value())) 
 			fr=new Date(startSchedule.value());
+
 		else {
 			errs.pushCode("VS010", Schedule.name()+"@"+tva.a_start+" is not expressed in UTC format ("+startSchedule.value()+")");
 			startSchedule=null;
@@ -2656,8 +2657,9 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 			errs.pushCode("VS011", Schedule.name()+"@"+tva.a_end+" is not expressed in UTC format ("+endSchedule.value()+")");
 			endSchedule=null;
 		}
+
 	if (startSchedule && endSchedule) {
-		if (to.getTime() < fr.getTime()) 
+		if (to.getTime() <= fr.getTime()) 
 			errs.pushCode("VS012", Schedule.name()+"@"+tva.a_start+" must be earlier than @"+tva.a_end);
 	}
 	
