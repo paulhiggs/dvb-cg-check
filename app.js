@@ -1616,11 +1616,18 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
 	
 	if (!ProgramInformation) {
-		errs.pushCode("PI000", "ValidateProgramInformation() claled with ProgramInformation=null")
+		errs.pushCode("PI000", "ValidateProgramInformation() called with ProgramInformation=null")
 		return;
 	}
 	
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI001");
+	// <MemberOf> is required for Now/Next and Window responses
+	switch (requestType) {
+		case CG_REQUEST_SCHEDULE_NOWNEXT:
+		case CG_REQUEST_SCHEDULE_WINDOW:
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription, tva.e_MemberOf], [tva.e_OtherIdentifier, tva.e_EpisodeOf], errs, "PI001a");
+		default:
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI001b");
+	}		
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI002")
 
 	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
