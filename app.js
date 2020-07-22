@@ -909,7 +909,7 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	}
 	
 	if (!elem) {
-		errs.pushCode("VN000", "ValidateName() called with elem=null")
+		errs.pushCode("VN000", "ValidateName() called with elem==null")
 		return
 	}
 	var se=0, subElem;
@@ -947,7 +947,7 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, errCode=null) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("CL000", "ValidateCreditsList() called with BasicDescription=null")
+		errs.pushCode("CL000", "ValidateCreditsList() called with BasicDescription==null")
 		return
 	}
 	var CreditsList=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_CreditsList, CG_SCHEMA);
@@ -1018,7 +1018,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
 
 	if (!RelatedMaterial) {
-		errs.pushCode("IRM000", "CheckImageRelatedMaterial() called with RelatedMaterial=null")
+		errs.pushCode("IRM000", "CheckImageRelatedMaterial() called with RelatedMaterial==null")
 		return
 	}
 	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
@@ -1059,7 +1059,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("RM000", "ValidateRelatedMaterial() called with BasicDescription=null")
+		errs.pushCode("RM000", "ValidateRelatedMaterial() called with BasicDescription==null")
 		return
 	}	
 	var rm=1, RelatedMaterial, countRelatedMaterial=0;
@@ -1093,7 +1093,7 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 	}
 	
 	if (!BasicDescription) {
-		errs.pushCode("VP000", "ValidatePagination() called with BasicDescription=null")
+		errs.pushCode("VP000", "ValidatePagination() called with BasicDescription==null")
 		return
 	}
 	var countPaginationFirst=0, countPaginationPrev=0, countPaginationNext=0, countPaginationLast=0;
@@ -1156,7 +1156,7 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("RMME000", "ValidateRelatedMaterial_MoreEpisodes() called with BasicDescription=null")
+		errs.pushCode("RMME000", "ValidateRelatedMaterial_MoreEpisodes() called with BasicDescription==null")
 		return
 	}
 	switch (BasicDescription.parent().name()) {
@@ -1239,7 +1239,7 @@ function NoAuxiliaryURI(errs, src, loc, errno=null) {
 function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location) {
 	
 	if (!RelatedMaterial) {
-		errs.pushCode("TA000", "ValidateTemplateAIT() called with RelatedMaterial=null")
+		errs.pushCode("TA000", "ValidateTemplateAIT() called with RelatedMaterial==null")
 		return
 	}
     var HowRelated=null, Format=null, MediaLocator=[];
@@ -1299,7 +1299,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
 	
 	if (!RelatedMaterial) {
-		errs.pushCode("PS000", "ValidatePromotionalStillImage() called with RelatedMaterial=null")
+		errs.pushCode("PS000", "ValidatePromotionalStillImage() called with RelatedMaterial==null")
 		return
 	}
     var HowRelated=null, Format=null, MediaLocator=[];
@@ -1385,7 +1385,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("MB000", "ValidateRelatedMaterial_BoxSetList() called with BasicDescription=null")
+		errs.pushCode("MB000", "ValidateRelatedMaterial_BoxSetList() called with BasicDescription==null")
 		return
 	}
 	var countImage=0, countTemplateAIT=0, hasPagination=false;
@@ -1447,7 +1447,7 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondary, errs, parentLanguage, errCode=null) {
 	
 	if (!BasicDescription) {
-		errs.pushCode("VT000", "ValidateTitle() called with BasicDescription=null")
+		errs.pushCode("VT000", "ValidateTitle() called with BasicDescription==null")
 		return
 	}
 	
@@ -1616,7 +1616,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
 	
 	if (!ProgramInformation) {
-		errs.pushCode("PI000", "ValidateProgramInformation() called with ProgramInformation=null")
+		errs.pushCode("PI000", "ValidateProgramInformation() called with ProgramInformation==null")
 		return;
 	}
 	
@@ -1714,7 +1714,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
  */
 function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, progDescrLang, programCRIDs, groupCRIDs, requestType, errs, o=null) { 
 	if (!ProgramDescription) {
-		errs.pushCode("PI000", "CheckProgramInformation() called with ProgramDescription=null");
+		errs.pushCode("PI000", "CheckProgramInformation() called with ProgramDescription==null");
 		return;
 	}
 		
@@ -2296,13 +2296,13 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
 	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
 	
-	function checkGenre(node, parentNode, hrefAttribute) {
+	function checkGenre(node) {
 		if (!node) return null;
 		var GenreType=(node.attr(tva.a_type)?node.attr(tva.a_type).value():"other");
 		if (GenreType!="other")
-			errs.pushCode("ID001", parentNode.name()+"."+node.name()+"@"+tva.a_type+" must contain \"other\"");
+			errs.pushCode("ID001", node.parent().name()+"."+node.name()+"@"+tva.a_type+" must contain \"other\"");
 		if (!node.attr(tva.a_href))
-			NoHrefAttribute(errs, node.name(), parentNode.name());
+			NoHrefAttribute(errs, node.name(), node.parent().name());
 		return (node.attr(tva.a_href)?node.attr(tva.a_href).value():null);
 	}
 
@@ -2331,18 +2331,18 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		if (Genre3 || !Genre2 || !Genre1)
 			errs.pushCode("ID010", "exactly 2 <"+InstanceDescription.name()+"."+tva.e_Genre+"> elements are required for "+VerifyType);
 
-		var g1href=checkGenre(Genre1, InstanceDescription);
-		if (Genre1 && !isAvailability(g1href))
+		var g1href=checkGenre(Genre1);
+		if (g1href && !isAvailability(g1href))
 			errs.pushCode("ID011", InstanceDescription.name()+"."+tva.e_Genre+" 1 must contain a media or fepg availability indicator");
 
-		var g2href=checkGenre(Genre2, InstanceDescription);		
-		if (Genre2 && !isAvailability(g2href))
+		var g2href=checkGenre(Genre2);		
+		if (g2href && !isAvailability(g2href))
 			errs.pushCode("ID012", InstanceDescription.name()+"."+tva.e_Genre+" 2 must contain a media or fepg availability indicator");
 		
 		if (Genre1 && Genre2) {
 			if ((isMediaAvailability(g1href) && isMediaAvailability(g2href))
 			 || (isEPGAvailability(g1href) && isEPGAvailability(g2href)))
-				errs.pushCode("ID013", InstanceDescripton.name()+"."+tva.e_Genre+" elements must indicate different availabilities")
+				errs.pushCode("ID013", InstanceDescription.name()+"."+tva.e_Genre+" elements must indicate different availabilities")
 		}
 	} else if (VerifyType==tva.e_ScheduleEvent) {
 		var Genre=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre, CG_SCHEMA);
