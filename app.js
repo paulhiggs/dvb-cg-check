@@ -1505,7 +1505,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 		errs.pushCode("BD000", "ValidateBasicDescription() called with parentElement==null")
 		return;
 	}
-	// TODO: need to determine if Now/Next and Prev/Now/Next (windowed) is needed for these request types (see A177v2 6.10.16.2)
+	// TODO: need to determine if Now/Next and Prev/Now/Next (windowed) is needed for these request types (see A177r1 6.10.16.2)
 	// if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW)
 	//	return;
 
@@ -2242,7 +2242,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 
 
 /**
- * validate a <RelatedMaterial> element iconforms to the Restart Application Linking rules (A177v2 clause 6.5.5)
+ * validate a <RelatedMaterial> element iconforms to the Restart Application Linking rules (A177r1 clause 6.5.5)
  *
  * @param {string} CG_SCHEMA           Used when constructing Xpath queries
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
@@ -2306,19 +2306,23 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		return (node.attr(tva.a_href)?node.attr(tva.a_href).value():null);
 	}
 
+	if (!InstanceDescription) {
+		errs.pushCode("ID000", "ValidateInstanceDescription() called with InstanceDescription==null")
+		return
+	}
 	if (VerifyType==tva.e_OnDemandProgram) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [tva.e_Genre], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier], errs, "IDO000");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [tva.e_Genre], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier], errs, "ID002");
 	} else if (VerifyType==tva.e_ScheduleEvent) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier, tva.e_Genre, tva.e_RelatedMaterial], errs, "IDS000");	
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier, tva.e_Genre, tva.e_RelatedMaterial], errs, "ID003");	
 	}
 	else
-		errs.pushCode("ID000", "--> ValidateInstanceDescription called with VerifyType="+VerifyType);
+		errs.pushCode("ID001", "--> ValidateInstanceDescription called with VerifyType="+VerifyType);
 	
 	var restartGenre=null, restartRelatedMaterial=null;
 	
 	// <Genre>
 	if (VerifyType==tva.e_OnDemandProgram) {
-		// A177ve Table 54 - must be 2 elements
+		// A177r1 Table 54 - must be 2 elements
 		
 		var Genre1=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"[1]", CG_SCHEMA);
 		var Genre2=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"[2]", CG_SCHEMA);
