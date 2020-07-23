@@ -1480,8 +1480,8 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 		
 		secondarySet.forEach(lang => {
 			if (!isIn(mainSet, lang)) {
-				var t=lang!=DEFAULT_LANGUAGE ? " for @xml:lang=\""+lang+"\"" : "";
-				errs.pushCode(errCode?errCode+"-6":"VT016", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @type=\""+dvbi.TITLE_MAIN_TYPE+"\""+t);
+				var tLoc=lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"=\""+lang+"\"" : "";
+				errs.pushCode(errCode?errCode+"-6":"VT016", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\""+tLloc);
 			}
 		});
 	}
