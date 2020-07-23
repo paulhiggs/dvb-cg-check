@@ -14,7 +14,7 @@ const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js");
 const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js");
 const {loadCS}=require("./dvb-common/CS_handler.js");
 
-const ISOcountries=require("./dvb-common/ISOcountries.js");
+//const ISOcountries=require("./dvb-common/ISOcountries.js");
 const IANAlanguages=require("./dvb-common/IANAlanguages.js");
 
 // libxmljs - https://github.com/libxmljs/libxmljs
@@ -86,7 +86,7 @@ const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-re
       IANA_Subtag_Registry_URL="https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry";
 
 var allowedGenres=[], allowedCreditItemRoles=[];
-var knownCountries=new ISOcountries(false, true);
+//var knownCountries=new ISOcountries(false, true);
 var knownLanguages=new IANAlanguages();
 /* // LINT
 var TVAschema, MPEG7schema, XMLschema;
@@ -645,7 +645,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
  * @param {Object} parentElement    The element to check
  * @param {string} childElement     The name of the element to look for
  * @returns {boolean}  true if the parentElement contains an element with the name specified in childElement else false
- */
+ */ /*
 function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
 	var c=0, child;
 	while (child=parentElement.child(c++)) {
@@ -654,7 +654,7 @@ function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
 	}
 	return false;
 }
-
+*/
 
 /**
  * check that the serviceIdRef attribute is a TAG URI and report warnings
@@ -695,7 +695,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 		return "a "+tva.e_Synopsis+" with @length=\""+length+"\" is required"; }
 	
 	if (!BasicDescription) {
-		errs.pushCode("SY000", "ValidateSynopsis() called with BasicDescription=null")
+		errs.pushCode("SY000", "ValidateSynopsis() called with BasicDescription==null")
 		return
 	}
 	var s=1, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
@@ -3024,8 +3024,8 @@ function loadDataFiles(useURLs) {
 	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
 	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
 
-	console.log("loading countries...");
-	knownCountries.loadCountriesFromFile(ISO3166_Filename, true);
+	// console.log("loading countries...");
+	// knownCountries.loadCountriesFromFile(ISO3166_Filename, true);
   
     console.log("loading languages...");
 	knownLanguages.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
