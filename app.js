@@ -57,6 +57,7 @@ const CG_REQUEST_BS_LISTS="bsLists";
 const CG_REQUEST_BS_CONTENTS="bsContents";
 
 const MAX_UNSIGNED_SHORT=65535;
+const OTHER_ELEMENTS_OK="!!!";
 
 const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
       TVA_FormatCSFilename=path.join("dvb-common/tva","FormatCS.xml"),
@@ -64,11 +65,11 @@ const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
 	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
 	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt");
 
-// LINT:
+/* // LINT:
 const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
 	  MPEG7schemaFileName=path.join("schema","tva_mpeg7.xsd"),
 	  XMLschemaFileName=path.join("schema","xml.xsd");
-
+*/
 const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
       COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
       TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
@@ -583,27 +584,35 @@ function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
  * @param {Array}  optionalChildElements  the names of elements that are optional within the element
  * @param {Class}  errs                   errors found in validaton
  * @param {string} errCode                error code to be used for any error found 
+ * @returns {boolean} true if no errors are found (all mandatory elements are present and no extra elements are specified)
  */
 function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChildElements, optionalChildElements, errs, errCode=null) {
 	if (!parentElement) {
 		errs.pushCode(errCode?errCode+"-0":"TE000", "checkTopElements() called with a 'null' element to check");
-		return;
+		return false;
 	}
-	var thisElem="<"+parentElement.parent().name()+"."+parentElement.name()+">";
+	var rv=true, thisElem="<"+parentElement.parent().name()+"."+parentElement.name()+">";
 	// check that each of the specifid childElements exists
 	mandatoryChildElements.forEach(elem => {
-		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) 
+		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) {
 			errs.pushCode(errCode?errCode+"-1":"TE010", "Mandatory element <"+elem+"> not specified in "+thisElem);
+			rv=false;
+		}
 	});
 	
-	// check that no additional child elements existance
-	var c=0, child;
-	while (child=parentElement.child(c++)) {
-		var childName=child.name();
-		if (childName!='text')
-			if (!isIn(mandatoryChildElements, childName) &&!isIn(optionalChildElements, childName)) 		
-				errs.pushCode(errCode?errCode+"-2":"TE011", "Element <"+childName+"> is not permitted in "+thisElem);
+	// check that no additional child elements existance if the "Other Child Elements are OK" flag is not set
+	if (!isIn(optionalChildElements, OTHER_ELEMENTS_OK)) {
+		var c=0, child;
+		while (child=parentElement.child(c++)) {
+			var childName=child.name();
+			if (childName!='text')
+				if (!isIn(mandatoryChildElements, childName) &&!isIn(optionalChildElements, childName)) {		
+					errs.pushCode(errCode?errCode+"-2":"TE011", "Element <"+childName+"> is not permitted in "+thisElem);
+					rv=false;
+				}
+		}
 	}
+	return rv;
 }
 
 
@@ -1226,7 +1235,7 @@ function NoHrefAttribute(errs, src, loc=null, errno=null) {
  * @param {String} loc The location of the element
  */
 function NoAuxiliaryURI(errs, src, loc, errno=null) {
-	NoChildElement(errs, "<"+tva.e_AuxiliaryUri+">", src+" <"+tva.e_MediaLocator+">", loc, errno?errno:"AU001")
+	NoChildElement(errs, "<"+tva.e_AuxiliaryURI+">", src+" <"+tva.e_MediaLocator+">", loc, errno?errno:"AU001")
 }
 
 
@@ -1617,7 +1626,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	
 	if (!ProgramInformation) {
 		errs.pushCode("PI000", "ValidateProgramInformation() called with ProgramInformation==null")
-		return;
+		return null;
 	}
 	
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI001");
@@ -1625,9 +1634,10 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI002")
 
 	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
-		
+	var isCurrentProgram=false, programCRID=null;
+	
 	if (ProgramInformation.attr(tva.a_programId)) {
-		var programCRID=ProgramInformation.attr(tva.a_programId).value();
+		programCRID=ProgramInformation.attr(tva.a_programId).value();
 		if (!isCRIDURI(programCRID)) 
 			errs.pushCode("PI011", ProgramInformation.name()+"@"+tva.a_programId+" is not a valid CRID ("+programCRID+")");
 		if (isIn(programCRIDs, programCRID))
@@ -1663,6 +1673,9 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 					case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
 					case CG_REQUEST_SCHEDULE_WINDOW:
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI013a");
+						if (child.attr(tva.a_crid) && child.attr(tva.a_crid).value()==dvbi.CRID_NOW)
+							isCurrentProgram=true;
+							
 						break;
 					default:
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI013z");
@@ -1695,6 +1708,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				break;			
 		}	
 	}
+	
+	return isCurrentProgram?programCRID:null;
 }
 
 
@@ -1710,30 +1725,33 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  * @param {integer} o.childCount       the number of child elements to be present (to match GroupInformation@numOfItems)
+ * @returns {string} the CRID of the currently airing program (that which is a member of the "now" structural crid)
  */
 function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, groupCRIDs, requestType, errs, o=null) { 
 	if (!ProgramDescription) {
 		errs.pushCode("PI000", "CheckProgramInformation() called with ProgramDescription==null");
-		return;
+		return null;
 	}
 		
 	var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformationTable, CG_SCHEMA);
 	if (!ProgramInformationTable) {
 		errs.pushCode("PI001", "<"+tva.e_ProgramInformationTable+"> not specified in <"+ProgramDescription.name()+">");
-		return;
+		return null;
 	}
 	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, parentLang, false, "PI102");
 
-	var pi=1, ProgramInformation, cnt=0, indexes=[];
-	while (ProgramInformation=ProgramInformationTable.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformation+"["+pi+"]", CG_SCHEMA)) {
-			ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
-			cnt++; pi++;
-		}
+	var pi=1, ProgramInformation, cnt=0, indexes=[], currentProgramCRID=null;
+	while (ProgramInformation=ProgramInformationTable.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformation+"["+ pi++ +"]", CG_SCHEMA)) {
+		var t=ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
+		if (t) currentProgramCRID=t;
+		cnt++; 
+	}
 
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
 			errs.pushCode("PI002", "number of items ("+cnt+") in the "+tva.e_ProgramInformationTable+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
+	return currentProgramCRID;
 }
 
 
@@ -2132,7 +2150,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 	while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) {	
 		switch (requestType) {
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
-				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, null, 1, 1, groupIds);
+				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 0, 1, 1, groupIds);
 				break;
 			case CG_REQUEST_SCHEDULE_WINDOW:
 				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
@@ -2257,18 +2275,26 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} RelatedMaterial     the <RelatedMaterial> node to be checked
  * @param {Class}  errs                errors found in validaton
+ * @param {boolean} true is this RelatedMaterial element contains a restart link (proper HowRelated@href and MediaLocator.MediaUri and MediaLocator.AuxiliaryURI)
  */
  function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs){
 	
 	function isRestartLink(str) { return str==dvbi.RESTART_LINK; }
 
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, [tva.e_HowRelated, tva.e_MediaLocator], [], errs, "RR000");
+	if (!RelatedMaterial) {
+		errs.pushCode("RR000", "ValidateRestartRelatedMaterial() called with RelatedMaterial==null")
+		return false;
+	}
+
+	var isRestart=checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, [tva.e_HowRelated, tva.e_MediaLocator], [], errs, "RR001");	
 	
 	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
 	if (HowRelated) {
 		if (HowRelated.attr(tva.a_href)) {
-			if (!isRestartLink(HowRelated.attr(tva.a_href)))
-				errs.pushCode("RR001", "invalid "+tva.e_HowRelated+"@"+tva.a_href+" for Restart Application Link");
+			if (!isRestartLink(HowRelated.attr(tva.a_href).value())) {
+				errs.pushCode("RR002", "invalid "+tva.e_HowRelated+"@"+tva.a_href+" ("+HowRelated.attr(tva.a_href).value()+") for Restart Application Link");
+				isRestart=false;
+			}
 		}
 		else 
 			NoHrefAttribute(errs, RelatedMaterial.name(), RelatedMaterial.parent()?RelatedMaterial.parent().name():null);
@@ -2276,7 +2302,10 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	
 	var MediaLocator=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator, CG_SCHEMA);
 	if (MediaLocator) 
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, MediaLocator, [tva.e_MediaUri, tva.e_AuxiliaryUri], [], errs, "ML000");
+		if (!checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, MediaLocator, [tva.e_MediaUri, tva.e_AuxiliaryURI], [OTHER_ELEMENTS_OK], errs, "ML001"))
+			isRestart=false;
+	
+	return isRestart;
 }
 
 
@@ -2287,12 +2316,13 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {string} VerifyType		   the type of verification to perform (OnDemandProgram | ScheduleEvent)
  * @param {Object} InstanceDescription the <InstanceDescription> node to be checked
+ * @param {boolean} isCurrentProgram   indicates if this <InstanceDescription> element is for the currently airing program
  * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
  * @param {array}  programCRIDs        array to record CRIDs for later use 
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, parentLanguage, programCRIDs, requestType, errs) {
+function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, isCurrentProgram, parentLanguage, programCRIDs, requestType, errs) {
 
 	function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
 		var count=1, elem;
@@ -2355,13 +2385,15 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		}
 	} else if (VerifyType==tva.e_ScheduleEvent) {
 		var Genre=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre, CG_SCHEMA);
-		if (Genre) {
-			restartGenre=Genre;
-			if (!Genre.attr(tva.a_href))
-				NoHrefAttribute(errs, tva.e_Genre, InstanceDescription.name())
+		if (Genre) {		
+			if (Genre.attr(tva.a_href)) {
+				if (isRestartAvailability(Genre.attr(tva.a_href).value())) 
+					restartGenre=Genre;
+				else 
+					errs.pushCode("ID014", InstanceDescription.name()+"."+tva.e_Genre+" must contain a restart link indicator")
+			}
 			else 
-			if (!isRestartAvailability(Genre.attr(tva.a_href).value()))
-				errs.pushCode("ID014", InstanceDescription.name()+"."+tva.e_Genre+" must contain a restart link indicator")
+				NoHrefAttribute(errs, tva.e_Genre, InstanceDescription.name())
 		}		
 	}
 	
@@ -2416,14 +2448,18 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	if (VerifyType==tva.e_ScheduleEvent) {
 		var RelatedMaterial=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial, CG_SCHEMA);
 		if (RelatedMaterial) {
-			restartRelatedMaterial=RelatedMaterial;
-			ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs); 		
+			if (ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs))
+				restartRelatedMaterial=RelatedMaterial; 		
 		}
 	}
 	
 	if (VerifyType==tva.e_ScheduleEvent) {
+		// Genre and RelatedMaterial for restart capability should only be specified for the "current" (ie. 'now') program
+		if (!isCurrentProgram && (restartGenre || restartRelatedMaterial))
+			errs.pushCode("ID060", "restart <"+tva.e_Genre+"> and <"+tva.e_RelatedMaterial+"> are only permitted for the current (\"now\") program");
+		
 		if ((restartGenre && !restartRelatedMaterial) || (restartRelatedMaterial && !restartGenre))
-			errs.pushCode("ID060", "both <"+tva.e_Genre+"> and <"+tva.e_RelatedMaterial+"> are required together for "+VerifyType);	
+			errs.pushCode("ID061", "both <"+tva.e_Genre+"> and <"+tva.e_RelatedMaterial+"> are required together for "+VerifyType);	
 	}
 }
 
@@ -2498,7 +2534,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 		}
 		else
 			errs.pushCode("OD012", OnDemandProgram.name()+"."+tva.e_Program+"@"+tva.a_crid+" is a required attribute");
-	
+
 	// <ProgramURL>
 	var ProgramURL=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL, CG_SCHEMA);
 	if (ProgramURL)
@@ -2512,7 +2548,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	// <InstanceDescription>
 	var InstanceDescription=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription, CG_SCHEMA);
 	if (InstanceDescription) 
-		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, odpLang, programCRIDs, requestType, errs);
+		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, false, odpLang, programCRIDs, requestType, errs);
 	
 	// <PublishedDuration>
 	var PublishedDuration=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
@@ -2630,13 +2666,15 @@ function FalseValue(elem, attrName, errno, errs, isRequired=true) {
  * @param {Object} Schedule            the <Schedule> node containing the <ScheduleEvent> element to be checked
  * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
  * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {string} currentProgramCRID  CRID of the currently airing program
  * @param {Date}   scheduleStart	   Date representation of Schedule@start
  * @param {Date}   scheduleEnd  	   Date representation of Schedule@end
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, scheduleStart, scheduleEnd, requestType, errs) {
+function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, currentProgramCRID, scheduleStart, scheduleEnd, requestType, errs) {
 	
+	var isCurrentProgram=false;
 	var se=1, ScheduleEvent;
 	while (ScheduleEvent=Schedule.get(SCHEMA_PREFIX+":"+tva.e_ScheduleEvent+"["+ se++ +"]", CG_SCHEMA)) {
 		var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE000");
@@ -2646,15 +2684,16 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		// <Program>
 		var Program=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
 		if (Program) {
-			var ProgramCRID=Program.attr(tva.e_crid);
+			var ProgramCRID=Program.attr(tva.a_crid);
 			if (ProgramCRID) {
 				if (!isCRIDURI(ProgramCRID.value()))
-					errs.pushCode("SE011", tva.e_Program+"@"+tva.e_crid+" is not a valid CRID ("+ProgramCRID.value()+")");
+					errs.pushCode("SE011", tva.e_Program+"@"+tva.a_crid+" is not a valid CRID ("+ProgramCRID.value()+")");
 				if (!isIn(programCRIDs, ProgramCRID.value()))
-					errs.pushCode("SE012", tva.e_Program+"@"+tva.e_crid+"=\""+ProgramCRID.value()+"\" does not refer to a program in the <"+tva.e_ProgramInformationTable+">")
+					errs.pushCode("SE012", tva.e_Program+"@"+tva.a_crid+"=\""+ProgramCRID.value()+"\" does not refer to a program in the <"+tva.e_ProgramInformationTable+">")
+				isCurrentProgram=(ProgramCRID.value()==currentProgramCRID) 
 			}
 		}
-		
+			
 		// <ProgramURL>
 		var ProgramURL=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL, CG_SCHEMA);
 		if (ProgramURL) 
@@ -2664,7 +2703,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		// <InstanceDescription>
 		var InstanceDescription=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription, CG_SCHEMA);
 		if (InstanceDescription) 
-			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, seLang, programCRIDs,requestType, errs);
+			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, isCurrentProgram, seLang, programCRIDs,requestType, errs);
 		
 		// <PublishedStartTime> and <PublishedDuration>
 		var pstElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedStartTime, CG_SCHEMA);
@@ -2713,10 +2752,11 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
  * @param {Object} Schedule            the node containing the <Schedule> being checked
  * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
  * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {string} currentProgramCRID  CRID of the currently airing program
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, requestType, errs) {
+function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, currentProgramCRID, requestType, errs) {
 
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [], [tva.e_ScheduleEvent], errs, "VS001");
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [tva.a_serviceIDRef, tva.a_start, tva.a_end], [], errs, "VS002");
@@ -2748,7 +2788,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 			errs.pushCode("VS012", Schedule.name()+"@"+tva.a_start+" must be earlier than @"+tva.a_end);
 	}
 	
-	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, fr, to, requestType, errs);
+	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, currentProgramCRID, fr, to, requestType, errs);
 }
 
 
@@ -2760,11 +2800,12 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
  * @param {Object} ProgramDescription  the element containing the <ProgramInformationTable>
  * @param {string} parentLang          XML language of the parent element (or its parent(s))
  * @param {array}  programCRIDs        array to record CRIDs for later use  
+ * @param {string} currentProgramCRID  CRID of the currently airing program
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  * @param {integer} o.childCount         the number of child elements to be present (to match GroupInformation@numOfItems)
  */
-function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, requestType, errs, o=null) {
+function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, currentProgramCRID, requestType, errs, o=null) {
 
 	if (!ProgramDescription) {
 		errs.pushCode("PL000", "CheckProgramLocation() called with ProgramDescription==null")
@@ -2789,7 +2830,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 				cnt++;
 				break;
 			case tva.e_Schedule:
-				ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, requestType, errs);
+				ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, currentProgramCRID, requestType, errs);
 				cnt++;
 				break;
 		}
@@ -2862,22 +2903,22 @@ function validateContentGuide(CGtext, requestType, errs) {
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable], [], errs, "CG011"); 
 			
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG021"); 
 		
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
-			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, requestType, errs);
+			var currentProgramCRID=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRID, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_WINDOW:
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG031"); 
 
 			CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
-			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, requestType, errs);
+			var currentProgramCRID=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRID, requestType, errs);
 			break;
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
@@ -2892,7 +2933,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, requestType, errs, o);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs, o);
 			break;
 		case CG_REQUEST_BS_CATEGORIES:
 			// box set categories response (6.8.2.3) has <GroupInformationTable> element
@@ -2912,7 +2953,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 			
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, requestType, errs, o);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs, o);
 			break;
 		}
 	}	
