@@ -1642,6 +1642,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	while (child=ProgramInformation.child(c++)) {
 		switch (child.name()) {
 			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
+				if (requestType==CG_REQUEST_MORE_EPISODES)
+					errs.pushCode("PI016", tva.e_OtherIdentifier+"is not permitted in this request type")
 				break;
 			case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
 				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI015a");
