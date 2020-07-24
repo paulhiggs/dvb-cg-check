@@ -1649,9 +1649,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI015a");
 				
 				// <ProgramInformation><EpisodeOf>@crid
-				var foundCRID=null;
 				if (child.attr(tva.a_crid)) {
-					foundCRID=child.attr(tva.a_crid).value();
+					var foundCRID=child.attr(tva.a_crid).value();
 					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
 						errs.pushCode("PI015b", ProgramInformation.name()+"."+tva.e_EpisodeOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a defined Group CRID for <"+tva.e_EpisodeOf+">")
 					else
@@ -1670,10 +1669,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				}
 						
 				// <ProgramInformation><MemberOf>@xsi:type
-				if (child.attr(tva.a_type)) {
-					if (child.attr(tva.a_type).value()!="MemberOfType")
-						errs.pushCode("PI014", "@xsi:"+tva.a_type+" must be \"MemberOfType\" for "+ProgramInformation.name()+"."+tva.e_MemberOf);
-				}
+				if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!="MemberOfType")
+					errs.pushCode("PI014", "@xsi:"+tva.a_type+" must be \"MemberOfType\" for "+ProgramInformation.name()+"."+tva.e_MemberOf);
 			
 				// <ProgramInformation><MemberOf>@crid
 				var foundCRID=null;
