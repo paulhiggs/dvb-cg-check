@@ -856,7 +856,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		
 		var pgc=0, pgChild, countExplanatoryText=0;
 		while (pgChild=ParentalGuidance.child(pgc++)) {
-			switch (pgChile.name()) {
+			switch (pgChild.name()) {
 				case tva.e_MinimumAge:
 				case tva.e_ParentalRating:
 					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
@@ -869,7 +869,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						if (!pgChild.attr(tva.a_href))
 							NoHrefAttribute(errs, tva.e_ParentalRating, tva.e_ParentalGuidance )
 					}
-					break;
+					break;		
 				case tva.e_ExplanatoryText:
 					countExplanatoryText++;
 					if (pgChild.attr(tva.a_length)) {
