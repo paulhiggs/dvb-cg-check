@@ -1305,11 +1305,11 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
-        if (elem.name()===tva.e_HowRelated)
+        if (elem.name()==tva.e_HowRelated)
             HowRelated=elem;
-        else if (elem.name()===tva.e_Format)
+        else if (elem.name()==tva.e_Format)
             Format=elem;
-        else if (elem.name()===tva.e_MediaLocator)
+        else if (elem.name()==tva.e_MediaLocator)
             MediaLocator.push(elem);
     }
 
