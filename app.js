@@ -647,25 +647,6 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
 
 
 /**
- * see if the named child element exists in the parent
- *
- * @param {string} CG_SCHEMA        Used when constructing Xpath queries
- * @param {string} SCHEMA_PREFIX    Used when constructing Xpath queries
- * @param {Object} parentElement    The element to check
- * @param {string} childElement     The name of the element to look for
- * @returns {boolean}  true if the parentElement contains an element with the name specified in childElement else false
- */ /*
-function ElementFound(CG_SCHEMA, SCHEMA_PREFIX, parentElement, childElement) {
-	var c=0, child;
-	while (child=parentElement.child(c++)) {
-		if (child.name()==childElement)
-			return true;
-	}
-	return false;
-}
-*/
-
-/**
  * check that the serviceIdRef attribute is a TAG URI and report warnings
  * 
  * @param {Object} elem       the node containing the element being checked
@@ -697,11 +678,11 @@ function checkTAGUri(elem, errs, errCode=null) {
 function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
 	
 	function synopsisLengthError(label, length) {
-		return "length of <"+tva.e_Synopsis+" length=\""+label+"\"> exceeds "+length+" characters"; }
+		return "length of <"+tva.e_Synopsis+" "+tva.a_length+"=\""+label+"\"> exceeds "+length+" characters"; }
 	function singleLengthLangError(length, lang) {
 		return "only a single "+tva.e_Synopsis+" is permitted per length ("+length+") and language ("+lang+")"; }
 	function requiredSynopsisError(length) {
-		return "a "+tva.e_Synopsis+" with @length=\""+length+"\" is required"; }
+		return "a "+tva.e_Synopsis+" with @"+tva.a_length+"=\""+length+"\" is required"; }
 	
 	if (!BasicDescription) {
 		errs.pushCode("SY000", "ValidateSynopsis() called with BasicDescription==null")
@@ -738,7 +719,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 				errs.pushCode(errCode?errCode+"-4":"SY014", "@"+tva.a_length+"=\""+synopsisLength+"\" is not permitted for this request type");
 		}
 		else 
-			errs.pushCode(errCode?errCode+"-5":"SY015","@"+tva.a_length+" attribute is required for <"+tva.e_Synopsis+">");
+			errs.pushCode(errCode?errCode+"-5":"SY015", "@"+tva.a_length+" attribute is required for <"+tva.e_Synopsis+">");
 	
 		if (synopsisLang && synopsisLength) {
 			switch (synopsisLength) {
@@ -799,7 +780,7 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 		if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
 			errs.pushCode(errCode?errCode+"-1":"KW011","@"+tva.a_type+"=\""+keywordType+"\" not permitted for <"+tva.e_Keyword+">");
 		if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
-			errs.pushCode(errCode?errCode+"-2":"KW012","<"+tva.e_Keyword+"> length is greater than "+dvbi.MAX_KEYWORD_LENGTH);
+			errs.pushCode(errCode?errCode+"-2":"KW012","length of <"+tva.e_Keyword+"> is greater than "+dvbi.MAX_KEYWORD_LENGTH);
 	}
 	
 	for (var i in counts) {
@@ -859,7 +840,6 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		return
 	}
 	var pg=1, ParentalGuidance, countParentalGuidance=0;
-	
 	while (ParentalGuidance=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_ParentalGuidance+"["+ pg++ +"]", CG_SCHEMA)) {
 		countParentalGuidance++;
 		
@@ -889,7 +869,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						errs.pushCode(errCode?errCode+"-4":"PG004", "@"+tva.a_length+"=\""+tva.v_lengthLong+"\" is required for <"+tva.e_ExplanatoryText+">");
 					
 					if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
-						errs.pushCode(errCode?errCode+"-5":"PG005", "length of <"+tva.e_ExplanatoryText+"> cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+"");
+						errs.pushCode(errCode?errCode+"-5":"PG005", "length of <"+tva.e_ExplanatoryText+"> cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters");
 					break;
 			}
 		}
@@ -908,13 +888,13 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
  * @param {string}  SCHEMA_PREFIX    Used when constructing Xpath queries
  * @param {Object}  elem             the element whose children should be checked
  * @param {Class}   errs             errors found in validaton
- * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
+ * @param {string}  errCode          error code prefix to be used in reports, if not present then use local codes
  */
 function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	
-	function checkNamePart(elem, parentElem, errs, errCode=null) {
+	function checkNamePart(elem, errs, errCode=null) {
 		if (unEntity(elem.text()).length > dvbi.MAX_NAME_PART_LENGTH)	
-			errs.pushCode(errCode?errCode:"VN001", "<"+elem.name()+"> in <"+parentElem.name()+"> is longer than "+dvbi.MAX_NAME_PART_LENGTH+" characters");
+			errs.pushCode(errCode?errCode:"VN001", "<"+elem.name()+"> in <"+elem.parent().name()+"> is longer than "+dvbi.MAX_NAME_PART_LENGTH+" characters");
 	}
 	
 	if (!elem) {
@@ -927,11 +907,11 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 		switch (subElem.name()) {
 			case tva.e_GivenName:
 				givenNameCount++;
-				checkNamePart(subElem, elem, errs, errCode?errCode+"-2":"VN002");
+				checkNamePart(subElem, errs, errCode?errCode+"-2":"VN002");
 			    break;
 			case tva.e_FamilyName:
 				familyNameCount++;
-				checkNamePart(subElem, elem, errs, errCode?errCode+"-3":"VN003");
+				checkNamePart(subElem, errs, errCode?errCode+"-3":"VN003");
 			    break;
 			default:
 				otherElemCount++;			
@@ -1040,7 +1020,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 		var errLocation="Promotional Still Image ("+tva.e_HowRelated+"@"+tva.a_href+"="+tva.cs_PromotionalStillImage+")";
 		var MediaUri=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator+"/"+SCHEMA_PREFIX+":"+tva.e_MediaUri, CG_SCHEMA);
 		if (!MediaUri) 
-			errs.pushCode("IRM001", tva.e_MediaUri+" not specified for "+errLocation);
+			errs.pushCode("IRM001", "<"+tva.e_MediaUri+"> not specified for "+errLocation);
 		if (MediaUri && !MediaUri.attr(tva.a_contentType))
 			errs.pushCode("IRM002", tva.e_MediaUri+"@"+tva.a_contentType+" not specified for "+errLocation );
 
@@ -1176,7 +1156,7 @@ function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 				ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes")
 			}
 			if (countRelatedMaterial > 1)
-				errs.pushCode("RMME001", "a maximum of 1 "+tva.e_RelatedMaterial+" element is permitted in "+BasicDescription.name()+" for this request type");	
+				errs.pushCode("RMME001", "a maximum of 1 <"+tva.e_RelatedMaterial+"> element is permitted in <"+BasicDescription.name()+"> for this request type");	
 			break;
 		case tva.e_GroupInformation:
 			// TODO: 
@@ -1363,7 +1343,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 							else {
 								var contentType=child.attr(tva.a_contentType).value();
 								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
-									errs.pushCode("PS002", "invalid @"+tva.a_contentType+"=\""+contentType+"\" specified for <RelatedMaterial><MediaLocator> in "+Location);
+									errs.pushCode("PS002", "invalid "+tva.e_MediaLocator+"@"+tva.a_contentType+"=\""+contentType+"\" specified for <"+RelatedMaterial.name()+"> in "+Location);
 								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) 
 									errs.pushCode("PS003", "conflicting media types in <"+tva.e_Format+"> and <"+tva.e_MediaUri+"> for "+Location);
 							}
@@ -1489,7 +1469,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 		
 		secondarySet.forEach(lang => {
 			if (!isIn(mainSet, lang)) {
-				var tLoc=lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"=\""+lang+"\"" : "";
+				var tLoc= lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"=\""+lang+"\"" : "";
 				errs.pushCode(errCode?errCode+"-6":"VT016", "@"+tva.a_type+"=\""+dvbi.TITLE_SECONDARY_TYPE+"\" specified without @"+tva.a_type+"=\""+dvbi.TITLE_MAIN_TYPE+"\""+tLloc);
 			}
 		});
@@ -1514,13 +1494,10 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 		errs.pushCode("BD000", "ValidateBasicDescription() called with parentElement==null")
 		return;
 	}
-	// TODO: need to determine if Now/Next and Prev/Now/Next (windowed) is needed for these request types (see A177r1 6.10.16.2)
-	// if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW)
-	//	return;
 
 	var isParentGroup=parentElement==categoryGroup;
+	
 	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":"+tva.e_BasicDescription, CG_SCHEMA);
-
 	if (!BasicDescription) {
 		NoChildElement(errs, "<"+tva.e_BasicDescription+">", parentElement.name());
 		return;
@@ -1682,8 +1659,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				}
 						
 				// <ProgramInformation><MemberOf>@xsi:type
-				if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!="MemberOfType")
-					errs.pushCode("PI014", "@xsi:"+tva.a_type+" must be \"MemberOfType\" for "+ProgramInformation.name()+"."+tva.e_MemberOf);
+				if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
+					errs.pushCode("PI014", "@xsi:"+tva.a_type+" must be \""+tva.t_MemberOfType+"\" for "+ProgramInformation.name()+"."+tva.e_MemberOf);
 			
 				// <ProgramInformation><MemberOf>@crid
 				var foundCRID=null;
@@ -2431,7 +2408,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	
 			if ((VerifyType==tva.e_ScheduleEvent
 						  && (oiType=="CPSIndex" || oiType==dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE))
-			  || (VerifyType=="OnDemandProgram" && oiType=="CPSIndex")) {
+			  || (VerifyType==tva.e_OnDemandProgram && oiType=="CPSIndex")) {
 					// all good
 				}
 				else 
