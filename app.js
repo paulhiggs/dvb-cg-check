@@ -1897,7 +1897,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 		return;
 	}
 	if (categoryGroup) 
-		errs.push("GIM001", CATEGORY_GROUP_NAME+" should not be specified for this request type")
+		errs.pushCode("GIM001", CATEGORY_GROUP_NAME+" should not be specified for this request type")
 	
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIM002")
 	
@@ -1943,7 +1943,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 
 	if (!GroupInformation) {
-		errs.push("GI000", "ValidateGroupInformation() called with GroupInformation==null");
+		errs.pushCode("GI000", "ValidateGroupInformation() called with GroupInformation==null");
 		return;
 	}
 
@@ -2064,9 +2064,14 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 
 	function ValidValues(errs, numOfItems, numAllowed, grp) {
 		if (numOfItems<=0)
-			errs.pushCode("NN101", tva.e_GroupInformation+"@"+tva.a_numOfItems+" must be > 0 for \""+grp+"\"");			
+			errs.pushCode("VNN101", tva.e_GroupInformation+"@"+tva.a_numOfItems+" must be > 0 for \""+grp+"\"");			
 		if (numOfItems>numAllowed)
-			errs.pushCode("NN102", va.e_GroupInformation+"@"+tva.a_numOfItems+" must be <= "+numAllowed+" for \""+grp+"\"");
+			errs.pushCode("VNN102", va.e_GroupInformation+"@"+tva.a_numOfItems+" must be <= "+numAllowed+" for \""+grp+"\"");
+	}
+	
+	if (!GroupInformation) {
+		errs.pushCode("VNN000", "ValidateGroupInformationNowNext() called with GroupInformation==null");
+		return
 	}
 
 	// NOWNEXT and WINDOW GroupInformationElements contains the same syntax as other GroupInformationElements
@@ -2088,12 +2093,12 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 					break;
 			}
 			if (isIn(groupCRIDsFound, grp))
-				errs.pushCode("NN001", "only a single "+grp+" structural CRID is premitted in this request");
+				errs.pushCode("VNN001", "only a single "+grp+" structural CRID is premitted in this request");
 			else 
 				groupCRIDsFound.push(grp);
 		}
 		else 
-			errs.pushCode("NN002", tva.e_GroupInformation+" for \""+grp+"\" is not permitted for this request type");
+			errs.pushCode("VNN002", tva.e_GroupInformation+" for \""+grp+"\" is not permitted for this request type");
 	}
 }
 
@@ -2156,18 +2161,23 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 		return purpose==dvbi.AUDIO_PURPOSE_MAIN || purpose==dvbi.AUDIO_PURPOSE_DESCRIPTION;
 	}
 	
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, [], [tva.e_AudioAttributes, tva.e_VideoAttributes, tva.e_CaptioningAttributes], errs, "AV000");
+	if (!AVAttributes) {
+		errs.pushCode("AV000", "ValidateAVAttributes() called with AVAttributes==null")
+		return		
+	}
+	
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, [], [tva.e_AudioAttributes, tva.e_VideoAttributes, tva.e_CaptioningAttributes], errs, "AV001");
 
 	// <AudioAttributes>
 	var a=1, AudioAttributes, foundAttributes=[], audioCounts=[];
 	while (AudioAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioAttributes+"["+ a++ +"]", CG_SCHEMA)) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], [tva.e_MixType, tva.e_AudioLanguage], errs, "AA000");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], [tva.e_MixType, tva.e_AudioLanguage], errs, "AV002");
 
 		var MixType=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_MixType, CG_SCHEMA);
 		if (MixType) {
 			if (MixType.attr(tva.a_href)) {
 				if (!isValidAudioMixType(MixType.attr(tva.a_href).value()))
-					errs.pushCode("AV001", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
+					errs.pushCode("AV003", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
 			}
 			else
 				NoHrefAttribute(errs, tva.e_MixType, tva.e_AudioAttributes);
@@ -2178,9 +2188,9 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 			var validLanguage=false, validPurpose=false, audioLang=AudioLanguage.text();
 			if (AudioLanguage.attr(tva.a_purpose)) {
 				if (!(validPurpose=isValidAudioLanguagePurpose(AudioLanguage.attr(tva.a_purpose).value())))
-					errs.pushCode("AV002", tva.e_AudioLanguage+"@"+tva.a_purpose+" is not valid");
+					errs.pushCode("AV004", tva.e_AudioLanguage+"@"+tva.a_purpose+" is not valid");
 			}
-			validLanguage=CheckLanguage(knownLanguages, errs, audioLang, tva.e_AudioAttributes+"."+tva.e_AudioLanguage, "AV102");
+			validLanguage=CheckLanguage(knownLanguages, errs, audioLang, tva.e_AudioAttributes+"."+tva.e_AudioLanguage, "AV005");
 			
 			if (validLanguage && validPurpose) {	
 				if (audioCounts[audioLang]===undefined)
@@ -2189,7 +2199,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 
 				var combo=audioLang+"!--!"+AudioLanguage.attr(tva.a_purpose).value();
 				if (isIn(foundAttributes, combo))
-					errs.pushCode("AV003", "audio @"+tva.a_purpose+" \""+AudioLanguage.attr(tva.a_purpose).value()+"\" already specified for language \""+audioLang+"\"");
+					errs.pushCode("AV005", "audio @"+tva.a_purpose+" \""+AudioLanguage.attr(tva.a_purpose).value()+"\" already specified for language \""+audioLang+"\"");
 				else
 					foundAttributes.push(combo);
 			}
@@ -2197,7 +2207,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	}
 	audioCounts.forEach(audioLang => {
 		if (audioCounts[audioLang]>2)
-			errs.pushCode("AV004", "more than 2 <"+tva.e_AudioAttributes+"> for language \""+audioLang+"\"");
+			errs.pushCode("AV007", "more than 2 <"+tva.e_AudioAttributes+"> for language \""+audioLang+"\"");
 	});
 	
 	// <VideoAttributes>
@@ -2222,7 +2232,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	// <CaptioningAttributes>
 	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_CaptioningAttributes, CG_SCHEMA);
 	if (CaptioningAttributes) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding/*, tva.e_BitRate*/], errs, "CA000");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding/*, tva.e_BitRate*/], errs, "AV020");
 		
 		var Coding=CaptioningAttributes.get(SCHEMA_PREFIX+":"+tva.e_Coding, CG_SCHEMA);
 		if (Coding) {
@@ -2279,7 +2289,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	
 	var MediaLocator=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator, CG_SCHEMA);
 	if (MediaLocator) 
-		if (!checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, MediaLocator, [tva.e_MediaUri, tva.e_AuxiliaryURI], [OTHER_ELEMENTS_OK], errs, "ML001"))
+		if (!checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, MediaLocator, [tva.e_MediaUri, tva.e_AuxiliaryURI], [OTHER_ELEMENTS_OK], errs, "RR003"))
 			isRestart=false;
 	
 	return isRestart;
@@ -2316,7 +2326,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		if (!node) return null;
 		var GenreType=(node.attr(tva.a_type)?node.attr(tva.a_type).value():"other");
 		if (GenreType!="other")
-			errs.pushCode("ID001", node.parent().name()+"."+node.name()+"@"+tva.a_type+" must contain \"other\"");
+			errs.pushCode("ID101", node.parent().name()+"."+node.name()+"@"+tva.a_type+" must contain \"other\"");
 		if (!node.attr(tva.a_href))
 			NoHrefAttribute(errs, node.name(), node.parent().name());
 		return (node.attr(tva.a_href)?node.attr(tva.a_href).value():null);
@@ -2327,12 +2337,12 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		return
 	}
 	if (VerifyType==tva.e_OnDemandProgram) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [tva.e_Genre], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier], errs, "ID002");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [tva.e_Genre], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier], errs, "ID001");
 	} else if (VerifyType==tva.e_ScheduleEvent) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier, tva.e_Genre, tva.e_RelatedMaterial], errs, "ID003");	
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, [], [tva.e_CaptionLanguage, tva.e_SignLanguage, tva.e_AVAttributes, tva.e_OtherIdentifier, tva.e_Genre, tva.e_RelatedMaterial], errs, "ID002");	
 	}
 	else
-		errs.pushCode("ID001", "--> ValidateInstanceDescription called with VerifyType="+VerifyType);
+		errs.pushCode("ID003", "--> ValidateInstanceDescription() called with VerifyType="+VerifyType);
 	
 	var restartGenre=null, restartRelatedMaterial=null;
 	
@@ -2380,8 +2390,8 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		errs.pushCode("ID020", "only a single "+tva.e_CaptionLanguage+" element is permitted in "+InstanceDescription.name());
 	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_CaptionLanguage, CG_SCHEMA);
 	if (CaptionLanguage) {
-		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name()+"."+tva.e_CaptionLanguage, "AV120");
-		BooleanValue(CaptionLanguage, tva.a_closed, "ID021", errs)
+		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name()+"."+tva.e_CaptionLanguage, "ID021");
+		BooleanValue(CaptionLanguage, tva.a_closed, "ID022", errs)
 	}
 	
 	// <SignLanguage>
@@ -2390,8 +2400,8 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		errs.pushCode("ID030", "only a single "+tva.e_SignLanguage+" element is premitted in "+InstanceDescription.name());
 	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_SignLanguage, CG_SCHEMA);
 	if (SignLanguage) {
-		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name()+"."+tva.e_SignLanguage, "AV130");
-		FalseValue(SignLanguage, tva.a_closed, "ID031", errs)
+		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name()+"."+tva.e_SignLanguage, "ID-310");
+		FalseValue(SignLanguage, tva.a_closed, "ID032", errs)
 		//TODO: need to consider language validation against ISO 639-3 [18].
 	}
 	
@@ -2479,23 +2489,23 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_InstanceDescription,tva.e_AuxiliaryURL,tva.e_DeliveryMode], errs, "OD001a");
 			break;
 		case CG_REQUEST_MORE_EPISODES:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD001b");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD002");
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 		case CG_REQUEST_SCHEDULE_TIME:
 		case CG_REQUEST_SCHEDULE_WINDOW:
 		case CG_REQUEST_PROGRAM:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_InstanceDescription,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_DeliveryMode,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD001c");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_InstanceDescription,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_DeliveryMode,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD003");
 			break;
 		default:
-			errs.puchCode("OD001z", "requestType="+requestType+" is not valid for "+OnDemandProgram.name())
+			errs.puchCode("OD004", "requestType="+requestType+" is not valid for "+OnDemandProgram.name())
 	}
 		
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [], [tva.a_serviceIDRef, tva.a_lang], errs, "OD002"); 
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [], [tva.a_serviceIDRef, tva.a_lang], errs, "OD005"); 
 
 	var odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage, false, "OD003");	
 	
-	checkTAGUri(OnDemandProgram, errs, "OD003");	
+	checkTAGUri(OnDemandProgram, errs, "OD006");	
 	
 	// <Program>
 	var Program=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
@@ -2651,12 +2661,17 @@ function FalseValue(elem, attrName, errno, errs, isRequired=true) {
  */
 function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, currentProgramCRID, scheduleStart, scheduleEnd, requestType, errs) {
 	
+	
+	if (!Schedule) {
+		errs.pushCode("SE000", "ValidateScheduleEvents() called with Schedule==null")
+		return		
+	}
 	var isCurrentProgram=false;
 	var se=1, ScheduleEvent;
 	while (ScheduleEvent=Schedule.get(SCHEMA_PREFIX+":"+tva.e_ScheduleEvent+"["+ se++ +"]", CG_SCHEMA)) {
-		var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE000");
+		var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE001");
 		
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, [tva.e_Program, tva.e_PublishedStartTime, tva.e_PublishedDuration], [tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_ActualStartTime, tva.e_FirstShowing, tva.e_Free], errs, "SE001");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, [tva.e_Program, tva.e_PublishedStartTime, tva.e_PublishedDuration], [tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_ActualStartTime, tva.e_FirstShowing, tva.e_Free], errs, "SE002");
 		
 		// <Program>
 		var Program=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
@@ -2690,9 +2705,9 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 				var PublishedStartTime=new Date(pstElem.text());
 				
 				if (scheduleStart && PublishedStartTime < scheduleStart) 
-					errs.pushCode("SE041", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is earlier than "+tva.e_Schedule+"@"+tva.a_start);
+					errs.pushCode("SE041", "<"+tva.e_PublishedStartTime+"> ("+PublishedStartTime+") is earlier than "+tva.e_Schedule+"@"+tva.a_start);
 				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
-					errs.pushCode("SE042", tva.e_PublishedStartTime+" ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"+tva.a_end);	
+					errs.pushCode("SE042", "<"+tva.e_PublishedStartTime+"> ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"+tva.a_end);	
 
 				var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
 				if (pdElem && scheduleEnd) {
@@ -2702,13 +2717,13 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 				}
 			}
 			else 
-				errs.pushCode("SE049", tva.e_PublishedStartTime+" is not expressed in UTC format ("+pstElem.text()+")");
+				errs.pushCode("SE049", "<"+tva.e_PublishedStartTime+"> is not expressed in UTC format ("+pstElem.text()+")");
 		}
 		
 		// <ActualStartTime> 
 		var astElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ActualStartTime, CG_SCHEMA);
 		if (astElem && !isUTCDateTime(astElem.text())) 
-				errs.pushCode("SE051", tva.e_ActualStartTime+" is not expressed in UTC format ("+astElem.text()+")");
+				errs.pushCode("SE051", "<"+tva.e_ActualStartTime+"> is not expressed in UTC format ("+astElem.text()+")");
 
 		// <FirstShowing>
 		var FirstShowing=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_FirstShowing, CG_SCHEMA);
@@ -2735,12 +2750,17 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
  */
 function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, currentProgramCRID, requestType, errs) {
 
+	if (!Schedule) {
+		errs.pushCode("VS000", "ValidateSchedule() called with Schedule==null")
+		return
+	}
+
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [], [tva.e_ScheduleEvent], errs, "VS001");
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [tva.a_serviceIDRef, tva.a_start, tva.a_end], [], errs, "VS002");
 	
 	var scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage, false, "VS003");	
 	
-	checkTAGUri(Schedule, errs, "VS003");
+	checkTAGUri(Schedule, errs, "VS004");
 	
 	var startSchedule=Schedule.attr(tva.a_start), fr=null, endSchedule=Schedule.attr(tva.a_end), to=null;
 	if (startSchedule)
@@ -2814,7 +2834,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	}
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PL020", "number of items ("+cnt+") in the "+tva.e_ProgramLocationTable+" does match "+ tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
+			errs.pushCode("PL020", "number of items ("+cnt+") in the <"+tva.e_ProgramLocationTable+"> does match "+tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
 }
 
