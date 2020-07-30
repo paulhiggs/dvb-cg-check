@@ -1312,22 +1312,27 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
-        if (elem.name()==tva.e_HowRelated)
+		switch (elem.name())
+        case tva.e_HowRelated:
             HowRelated=elem;
-        else if (elem.name()==tva.e_Format)
+			break;
+        case tva.e_Format:
             Format=elem;
-        else if (elem.name()==tva.e_MediaLocator)
+			break;
+        case tva.e_MediaLocator:
             MediaLocator.push(elem);
+			break;
     }
 
     if (!HowRelated) {
-		NochildElement(errs, "<"+tva.e_HowRelated+">", RelatedMaterial.name(), Location, "PS101");
+		NochildElement(errs, "<"+tva.e_HowRelated+">", RelatedMaterial.name(), Location, "PS001");
 		return;
     }
-	var HRhref=HowRelated.attr(tva.a_href);
-	if (HRhref) {
-		if (HRhref.value()!=dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
-			errs.pushCode("PS001", tva.e_HowRelated+"@"+tva.a_href+"=\""+HRhref.value()+"\" does not designate a Promotional Still Image");
+	
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "PS002")
+	if (HowRelated.attr(tva.a_href)) {
+		if (HowRelated.attr(tva.a_href).value()!=dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
+			errs.pushCode("PS010", tva.e_HowRelated+"@"+tva.a_href+"=\""+HowRelated.attr(tva.a_href).value()+"\" does not designate a Promotional Still Image");
 		else {
 			if (Format) {
 				var subElems=Format.childNodes(), hasStillPictureFormat=false;
@@ -1335,19 +1340,19 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					if (child.name()==tva.e_StillPictureFormat) {
 						hasStillPictureFormat=true;
 						
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_horizontalSize, tva.a_verticalSize, tva.a_href], [], errs, "PS102");
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_horizontalSize, tva.a_verticalSize, tva.a_href], [], errs, "PS021");
 						
 						if (child.attr(tva.a_href)) {
 							var href=child.attr(tva.a_href).value();
 							if (href!=JPEG_IMAGE_CS_VALUE && href!=PNG_IMAGE_CS_VALUE) 
-								InvalidHrefValue(errs, href, RelatedMaterial.name()+"."+tva.e_Format+"."+tva.e_StillPictureFormat, Location)
+								InvalidHrefValue(errs, href, RelatedMaterial.name()+"."+tva.e_Format+"."+tva.e_StillPictureFormat, Location, "PS022")
 							if (href==JPEG_IMAGE_CS_VALUE) isJPEG=true;
 							if (href==PNG_IMAGE_CS_VALUE) isPNG=true;
 						}
 					}
 				});
 				if (!hasStillPictureFormat) 
-					NoChildElement(errs, "<"+tva.e_StillPictureFormat+">", tva.e_Format, Location, "PS104");
+					NoChildElement(errs, "<"+tva.e_StillPictureFormat+">", tva.e_Format, Location, "PS023");
 			}
 
 			if (MediaLocator.length!=0) 
@@ -1357,13 +1362,13 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						if (child.name()==tva.e_MediaUri) {
 							hasMediaURI=true;
 							if (!child.attr(tva.a_contentType)) 
-								NoChildElement(errs, "@"+tva.a_contentType, "logo <"+tva.e_MediaUri+">", Location, "PS104");
+								NoChildElement(errs, "@"+tva.a_contentType, "logo <"+tva.e_MediaUri+">", Location, "PS031");
 							else {
 								var contentType=child.attr(tva.a_contentType).value();
 								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
-									errs.pushCode("PS002", "invalid "+tva.e_MediaLocator+"@"+tva.a_contentType+"=\""+contentType+"\" specified for <"+RelatedMaterial.name()+"> in "+Location);
+									errs.pushCode("PS032", "invalid "+tva.e_MediaLocator+"@"+tva.a_contentType+"=\""+contentType+"\" specified for <"+RelatedMaterial.name()+"> in "+Location);
 								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) 
-									errs.pushCode("PS003", "conflicting media types in <"+tva.e_Format+"> and <"+tva.e_MediaUri+"> for "+Location);
+									errs.pushCode("PS033", "conflicting media types in <"+tva.e_Format+"> and <"+tva.e_MediaUri+"> for "+Location);
 							}
 						}
 					});
@@ -1371,11 +1376,9 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						NoMediaLocator(errs, "logo", Location);
 				});
 			else 
-				NoChildElement(errs, tva.e_MediaLocator, "<"+RelatedMaterial.name()+">", Location, "PS106");
+				NoChildElement(errs, tva.e_MediaLocator, "<"+RelatedMaterial.name()+">", Location, "PS039");
 		}
 	}
-	else 
-		NoHrefAttribute(errs, RelatedMaterial.name()+"."+tva.e_HowRelated, Location);
 }
 
 
@@ -1401,10 +1404,9 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 		var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
 		if (!HowRelated) 
 			NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">")
-		else {				
-			if (!HowRelated.attr(tva.a_href)) 
-				NoHrefAttribute(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">");
-			else {
+		else {		
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "MB010")
+			if (HowRelated.attr(tva.a_href)) {
 				var hrHref=HowRelated.attr(tva.a_href).value();
 				switch (hrHref) {
 					case dvbi.TEMPLATE_AIT_URI:
@@ -1423,17 +1425,17 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 						ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, "<"+BasicDescription.name()+">");
 						break;
 					default:
-						InvalidHrefValue(errs, +hrHref, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+"> in Box Set List");
+						InvalidHrefValue(errs, hrHref, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+"> in Box Set List", "MB011");
 				}	
 			}
 		}
 	}
 	if (countTemplateAIT==0)
-		errs.pushCode("MB001", "a <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT must be specified for a Box Set List");
+		errs.pushCode("MB021", "a <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT must be specified for a Box Set List");
 	if (countTemplateAIT>1)
-		errs.pushCode("MB002", "only one <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT can be specified for a Box Set List");
+		errs.pushCode("MB022", "only one <"+tva.e_RelatedMaterial+"> element signalling the Template XML AIT can be specified for a Box Set List");
 	if (countImage>1)
-		errs.pushCode("MB003", "only one <"+tva.e_RelatedMaterial+"> element signalling the promotional still image can be specified for a Box Set List");
+		errs.pushCode("MB023", "only one <"+tva.e_RelatedMaterial+"> element signalling the promotional still image can be specified for a Box Set List");
 	
 	if (hasPagination)
 		ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "Box Set List");
@@ -1777,16 +1779,16 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	switch (requestType) {
 		case CG_REQUEST_BS_CATEGORIES:
 			if (isCategoryGroup) 
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB001a")
-			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB001b")
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB001")
+			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB002")
 			break;
 		case CG_REQUEST_BS_LISTS:
 			if (isCategoryGroup) 
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB001c")
-			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_serviceIDRef], [tva.a_lang], errs, "GIB001d")
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB003")
+			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_serviceIDRef], [tva.a_lang], errs, "GIB004")
 			break;
 		case CG_REQUEST_BS_CONTENTS:
-			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], [tva.a_lang], errs, "GIB001e")
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], [tva.a_lang], errs, "GIB005")
 			break;
 	}
 
@@ -1797,20 +1799,20 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 				groupsFound.push(groupId);				
 		}
 		else
-			errs.pushCode("GIB002", GroupInformation.name()+"@"+tva.a_groupId+" value \""+groupId+"\" is not a CRID")
+			errs.pushCode("GIB006", GroupInformation.name()+"@"+tva.a_groupId+" value \""+groupId+"\" is not a CRID")
 	}
 
 	var categoryCRID=(categoryGroup && categoryGroup.attr(tva.a_groupId)) ? categoryGroup.attr(tva.a_groupId).value() : "";
 
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES) {
 		if (!isCategoryGroup && GroupInformation.attr(tva.a_ordered)) 
-			errs.pushCode("GIB004", GroupInformation.name()+"@"+tva.a_ordered+" is only permitted in the "+CATEGORY_GROUP_NAME);
+			errs.pushCode("GIB010", GroupInformation.name()+"@"+tva.a_ordered+" is only permitted in the "+CATEGORY_GROUP_NAME);
 		if (isCategoryGroup && !GroupInformation.attr(tva.a_ordered)) 
-			errs.pushCode("GIB005", GroupInformation.name()+"@"+tva.a_ordered+" is required for this request type")
+			errs.pushCode("GIB011", GroupInformation.name()+"@"+tva.a_ordered+" is required for this request type")
 		if (!isCategoryGroup && GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GIB006", GroupInformation.name()+"@"+tva.a_numOfItems+" is only permitted in the "+CATEGORY_GROUP_NAME);
+			errs.pushCode("GIB012", GroupInformation.name()+"@"+tva.a_numOfItems+" is only permitted in the "+CATEGORY_GROUP_NAME);
 		if (isCategoryGroup && !GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GIB007", GroupInformation.name()+"@"+tva.a_numOfItems+" is required for this request type")
+			errs.pushCode("GIB013", GroupInformation.name()+"@"+tva.a_numOfItems+" is required for this request type")
 	}
 
 	if (!isCategoryGroup) {
@@ -1884,7 +1886,6 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 				errs.pushCode("GIS011", GroupInformation.name()+"@"+tva.a_groupId+" value \""+groupId+"\" is valid for this request type")
 		}
 	}
-	else errs.pushCode("GIS012", GroupInformation.name()+"@"+tva.a_groupId+" attribute is mandatory");
 
 	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
 		
@@ -1935,10 +1936,12 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 	
 	var GroupType=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_GroupType, CG_SCHEMA);
 	if (GroupType) {
-		if (!(GroupType.attr(tva.a_type) && GroupType.attr(tva.a_type).value()==tva.t_ProgramGroupTypeType)) 
-			errs.pushCode("GIM012", tva.e_GroupType+"@xsi:"+tva.a_type+"=\""+tva.t_ProgramGroupTypeType+"\" is required");
-		if (!(GroupType.attr(tva.a_value) && GroupType.attr(tva.a_value).value()=="otherCollection")) 
-			errs.pushCode("GIM013", tva.e_GroupType+"@"+tva.a_value+"=\"otherCollection\" is required");
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupType, [tva.a_type, tva.a_value], [], errs, "GIM010")
+		
+		if (GroupType.attr(tva.a_type) && GroupType.attr(tva.a_type).value()!=tva.t_ProgramGroupTypeType) 
+			errs.pushCode("GIM012", tva.e_GroupType+"@xsi:"+tva.a_type+" must be \""+tva.t_ProgramGroupTypeType+"\"");
+		if (GroupType.attr(tva.a_value) && GroupType.attr(tva.a_value).value()!="otherCollection")) 
+			errs.pushCode("GIM013", tva.e_GroupType+"@"+tva.a_value+"must be \"otherCollection\"");
 	}
 	else
 		errs.pushCode("GIM014", "<"+tva.e_GroupType+"> is required in <"+GroupInformation.name()+">"); 
