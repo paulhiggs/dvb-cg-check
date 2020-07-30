@@ -636,12 +636,12 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
 	
 	requiredAttributes.forEach(attributeName => {
 		if (!parentElement.attr(attributeName))
-			errs.pushCode(errCode?errCode+"-1":"AT001", parentElement.name()+"@"+attributeName+" is a required attribute");	
+			errs.pushCode(errCode?errCode+"-1":"AT001", (parentElement.parent()?parentElement.parent().name()+".":"")+parentElement.name()+"@"+attributeName+" is a required attribute");	
 	});
 	
 	parentElement.attrs().forEach(attribute => {
 		if (!isIn(requiredAttributes, attribute.name()) && !isIn(optionalAttributes, attribute.name()))
-			errs.pushCode(errCode?errCode+"-2":"AT002", "@"+attribute.name()+" is not permitted in <"+parentElement.name()+">");
+			errs.pushCode(errCode?errCode+"-2":"AT002", "@"+attribute.name()+" is not permitted in <"+(parentElement.parent()?parentElement.parent().name()+".":"")+parentElement.name()+">");
 	});
 }
 
@@ -1112,10 +1112,9 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 		var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
 		if (!HowRelated) 
 			NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP001")
-		else {				
-			if (!HowRelated.attr(tva.a_href)) 
-				NoHrefAttribute(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP002");
-			else {
+		else {	
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "VP002")
+			if (HowRelated.attr(tva.a_href)) 
 				switch (HowRelated.attr(tva.a_href).value()) {
 					case dvbi.PAGINATION_FIRST_URI:
 						countPaginationFirst++;
@@ -1262,14 +1261,14 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
     }
 
     if (!HowRelated) {
-		NoChildElement(errs, "<"+tva.e_HowRelated+">", RelatedMaterial.name(), Location, "TA100");
+		NoChildElement(errs, "<"+tva.e_HowRelated+">", RelatedMaterial.name(), Location, "TA001");
 		return;
     }
 	
-	var HRhref=HowRelated.attr(tva.a_href);
-	if (HRhref) {
-		if (HRhref.value()!=dvbi.TEMPLATE_AIT_URI) 
-			errs.pushCode("TA001", tva.e_HowRelated+"@"+tva.a_href+"=\""+HRhref.value()+"\" does not designate a Template AIT");
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.h_href], [], errs, "TA002")
+	if (HowRelated.attr(tva.a_href)) {
+		if (HowRelated.attr(tva.a_href).value()!=dvbi.TEMPLATE_AIT_URI) 
+			errs.pushCode("TA003", tva.e_HowRelated+"@"+tva.a_href+"=\""+HowRelated.attr(tva.a_href).value()+"\" does not designate a Template AIT");
 		else {		
 			if (MediaLocator.length!=0) 
 				MediaLocator.forEach(ml => {
@@ -1278,23 +1277,21 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 						if (child.name()==tva.e_AuxiliaryURI) {
 							hasAuxiliaryURI=true;
 							if (!child.attr(tva.a_contentType)) 
-								NoChildElement(errs, "@"+tva.a_contentType, "Template IT <"+tva.e_AuxiliaryURI+">", Location, "TA101");
+								NoChildElement(errs, "@"+tva.a_contentType, "Template IT <"+tva.e_AuxiliaryURI+">", Location, "TA010");
 							else {
 								var contentType=child.attr(tva.a_contentType).value();
 								if (contentType!=dvbi.XML_AIT_CONTENT_TYPE) 
-									errs.pushCode("TA002", "invalid @"+tva.a_contentType+"=\""+contentType+"\" specified for <"+RelatedMaterial.name()+"><"+tva.e_MediaLocator+"> in "+Location);
+									errs.pushCode("TA011", "invalid @"+tva.a_contentType+"=\""+contentType+"\" specified for <"+RelatedMaterial.name()+"><"+tva.e_MediaLocator+"> in "+Location);
 							}
 						}
 					});	
 					if (!hasAuxiliaryURI) 
-						NoAuxiliaryURI(errs, "template AIT", Location, "TA003");
+						NoAuxiliaryURI(errs, "template AIT", Location, "TA012");
 				});
 			else 
-				NoChildElement(errs, "<"+tva.e_MediaLocator+">", RelatedMaterial.name(), Location, "TA102");
+				NoChildElement(errs, "<"+tva.e_MediaLocator+">", RelatedMaterial.name(), Location, "TA013");
 		}
 	}
-	else 
-		NoHrefAttribute(errs, RelatedMaterial.name()+"."+tva.e_HowRelated, Location);
 }
 
 
@@ -2195,26 +2192,26 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	// <AudioAttributes>
 	var a=1, AudioAttributes, foundAttributes=[], audioCounts=[];
 	while (AudioAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioAttributes+"["+ a++ +"]", CG_SCHEMA)) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], [tva.e_MixType, tva.e_AudioLanguage], errs, "AV002");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], [tva.e_MixType, tva.e_AudioLanguage], errs, "AV010");
 
 		var MixType=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_MixType, CG_SCHEMA);
 		if (MixType) {
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MixType, [tva.a_href], [], errs, "AV011"); 
 			if (MixType.attr(tva.a_href)) {
 				if (!isValidAudioMixType(MixType.attr(tva.a_href).value()))
-					errs.pushCode("AV003", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
+					errs.pushCode("AV012", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
 			}
-			else
-				NoHrefAttribute(errs, tva.e_MixType, tva.e_AudioAttributes);
 		}
 				
 		var AudioLanguage=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioLanguage, CG_SCHEMA);
 		if (AudioLanguage) {
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, AudioLanguage, [tva.a_purpose], [], errs, "AV013" )
 			var validLanguage=false, validPurpose=false, audioLang=AudioLanguage.text();
 			if (AudioLanguage.attr(tva.a_purpose)) {
 				if (!(validPurpose=isValidAudioLanguagePurpose(AudioLanguage.attr(tva.a_purpose).value())))
-					errs.pushCode("AV004", tva.e_AudioLanguage+"@"+tva.a_purpose+" is not valid");
+					errs.pushCode("AV014", tva.e_AudioLanguage+"@"+tva.a_purpose+" is not valid");
 			}
-			validLanguage=CheckLanguage(knownLanguages, errs, audioLang, tva.e_AudioAttributes+"."+tva.e_AudioLanguage, "AV005");
+			validLanguage=CheckLanguage(knownLanguages, errs, audioLang, tva.e_AudioAttributes+"."+tva.e_AudioLanguage, "AV015");
 			
 			if (validLanguage && validPurpose) {	
 				if (audioCounts[audioLang]===undefined)
@@ -2223,7 +2220,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 
 				var combo=audioLang+"!--!"+AudioLanguage.attr(tva.a_purpose).value();
 				if (isIn(foundAttributes, combo))
-					errs.pushCode("AV005", "audio @"+tva.a_purpose+" \""+AudioLanguage.attr(tva.a_purpose).value()+"\" already specified for language \""+audioLang+"\"");
+					errs.pushCode("AV016", "audio @"+tva.a_purpose+" \""+AudioLanguage.attr(tva.a_purpose).value()+"\" already specified for language \""+audioLang+"\"");
 				else
 					foundAttributes.push(combo);
 			}
@@ -2231,43 +2228,44 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	}
 	audioCounts.forEach(audioLang => {
 		if (audioCounts[audioLang]>2)
-			errs.pushCode("AV007", "more than 2 <"+tva.e_AudioAttributes+"> for language \""+audioLang+"\"");
+			errs.pushCode("AV020", "more than 2 <"+tva.e_AudioAttributes+"> for language \""+audioLang+"\"");
 	});
 	
 	// <VideoAttributes>
 	var v=1, VideoAttributes;
 	while (VideoAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_VideoAttributes+"["+ v++ +"]", CG_SCHEMA)) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "VA000");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "AV030");
 		
 		var HorizontalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_HorizontalSize, CG_SCHEMA);
 		if (HorizontalSize) 
 			if (valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
-				errs.pushCode("AV010", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+				errs.pushCode("AV031", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+		
 		var VerticalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_VerticalSize, CG_SCHEMA);
 		if (VerticalSize) 
 			if (valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
-				errs.pushCode("AV011", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+				errs.pushCode("AV032", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+		
 		var AspectRatio=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_AspectRatio, CG_SCHEMA);
 		if (AspectRatio) 
 			if (!isRatioType(AspectRatio.text()))
-				errs.pushCode("AV012", tva.e_AspectRatio+" is not a valid aspect ratio");
+				errs.pushCode("AV033", tva.e_AspectRatio+" is not a valid aspect ratio");
 	}
 
 	// <CaptioningAttributes>
 	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_CaptioningAttributes, CG_SCHEMA);
 	if (CaptioningAttributes) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding/*, tva.e_BitRate*/], errs, "AV020");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding/*, tva.e_BitRate*/], errs, "AV040");
 		
 		var Coding=CaptioningAttributes.get(SCHEMA_PREFIX+":"+tva.e_Coding, CG_SCHEMA);
 		if (Coding) {
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Coding, [tva.a_href], [], errs, "AV041")
 			if (Coding.attr(tva.a_href)) {
 				var codingHref=Coding.attr(tva.a_href).value();
 				if (codingHref!=dvbi.DVB_BITMAP_SUBTITLES && codingHref!=DVB_CHARACTER_SUBTITLES 
 				  && codingHref!=dvbi.EBU_TT_D)
-					errs.pushCode("AV021", tva.e_CaptioningAttributes+"."+tva.e_Coding+"@"+tva.a_href+" is not valid - should be DVB (bitmap or character) or EBU TT-D")
+					errs.pushCode("AV042", tva.e_CaptioningAttributes+"."+tva.e_Coding+"@"+tva.a_href+" is not valid - should be DVB (bitmap or character) or EBU TT-D")
 			}
-			else
-				NoHrefAttribute(errs, tva.e_Coding, AVAttributes.name()+"."+tva.e_CaptioningAttributes);			
 		}
 /*		
 		var BitRate=CaptioningAttributes.get(SCHEMA_PREFIX+":"+tva.e_BitRate", CG_SCHEMA);
@@ -2301,14 +2299,13 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	
 	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
 	if (HowRelated) {
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "RR002")
 		if (HowRelated.attr(tva.a_href)) {
 			if (!isRestartLink(HowRelated.attr(tva.a_href).value())) {
-				errs.pushCode("RR002", "invalid "+tva.e_HowRelated+"@"+tva.a_href+" ("+HowRelated.attr(tva.a_href).value()+") for Restart Application Link");
+				errs.pushCode("RR003", "invalid "+tva.e_HowRelated+"@"+tva.a_href+" ("+HowRelated.attr(tva.a_href).value()+") for Restart Application Link");
 				isRestart=false;
 			}
 		}
-		else 
-			NoHrefAttribute(errs, RelatedMaterial.name(), RelatedMaterial.parent()?RelatedMaterial.parent().name():null);
 	}
 	
 	var MediaLocator=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator, CG_SCHEMA);
