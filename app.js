@@ -693,7 +693,7 @@ function checkTAGUri(elem, errs, errCode=null) {
 function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
 	
 	function synopsisLengthError(label, length) {
-		return "length of <"+tva.e_Synopsis+" "+tva.a_length+"=\""+label+"\"> exceeds "+length+" characters"; }
+		return "length of <"+tva.e_Synopsis+"@"+tva.a_length+"=\""+label+"\"> exceeds "+length+" characters"; }
 	function singleLengthLangError(length, lang) {
 		return "only a single "+tva.e_Synopsis+" is permitted per length ("+length+") and language ("+lang+")"; }
 	function requiredSynopsisError(length) {
@@ -736,8 +736,6 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 			else
 				errs.pushCode(errCode?errCode+"-4":"SY014", "@"+tva.a_length+"=\""+synopsisLength+"\" is not permitted for this request type");
 		}
-		else 
-			errs.pushCode(errCode?errCode+"-5":"SY015", "@"+tva.a_length+" attribute is required for <"+tva.e_Synopsis+">");
 	
 		if (synopsisLang && synopsisLength) {
 			switch (synopsisLength) {
@@ -792,7 +790,7 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 		
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Keyword, [], [tva.a_lang, tva.a_type], errs, "KW001");
 
-		var keywordType=Keyword.attr(tva.a_type) ? Keyword.attr(tva.a_type).value() : dvbi.DEFAULT_KEYWORD_TYPE;
+		var keywordType=Keyword.attr(tva.a_type)?Keyword.attr(tva.a_type).value():dvbi.DEFAULT_KEYWORD_TYPE;
 		var keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW002");
 
 		if (counts[keywordLang]===undefined)
@@ -830,11 +828,11 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 	var g=1, Genre, count=0;
 	while (Genre=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"["+ g++ +"]",CG_SCHEMA)) {
 		count++;
-		var genreType=Genre.attr(tva.a_type) ? Genre.attr(tva.a_type).value() : dvbi.DEFAULT_GENRE_TYPE;
+		var genreType=Genre.attr(tva.a_type)?Genre.attr(tva.a_type).value():dvbi.DEFAULT_GENRE_TYPE;
 		if (genreType!=dvbi.GENRE_TYPE_MAIN)
 			errs.pushCode(errCode?errCode+"-1":"GE001","@"+tva.a_type+"=\""+genreType+"\" not permitted for <"+tva.e_Genre+">");
 		
-		var genreValue=Genre.attr(tva.a_href) ? Genre.attr(tva.a_href).value() : "";
+		var genreValue=Genre.attr(tva.a_href)?Genre.attr(tva.a_href).value():"";
 		if (!isIn(allowedGenres, genreValue))
 			errs.pushCode(errCode?errCode+"-2":"GE002","invalid @"+tva.a_href+" value \""+genreValue+"\" for <"+tva.e_Genre+">");
 	}
@@ -2147,10 +2145,10 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 	
 	var GroupInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_GroupInformationTable, CG_SCHEMA);
 	if (!GroupInformationTable) {
-		errs.pushCode("NN201", "<"+tva.e_GroupInformationTable+"> not specified in <"+ProgramDescription.name()+">");
+		errs.pushCode("NN001", "<"+tva.e_GroupInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
-	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "NN202");
+	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "NN002");
 	
 	var gi=1, GroupInformation;
 	while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) {	
@@ -2161,6 +2159,8 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 			case CG_REQUEST_SCHEDULE_WINDOW:
 				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
 				break;
+			default:
+				errs.push("NN003", "<"+tva.e_GroupInformation+"> not processed for this request type")
 		}
 	}
 }
