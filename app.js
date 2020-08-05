@@ -2258,7 +2258,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	// <CaptioningAttributes>
 	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_CaptioningAttributes, CG_SCHEMA);
 	if (CaptioningAttributes) {
-		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding/*, tva.e_BitRate*/], errs, "AV040");
+		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding], errs, "AV040");
 		
 		var Coding=CaptioningAttributes.get(SCHEMA_PREFIX+":"+tva.e_Coding, CG_SCHEMA);
 		if (Coding) {
@@ -2269,13 +2269,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 				  && codingHref!=dvbi.EBU_TT_D)
 					errs.pushCode("AV042", tva.e_CaptioningAttributes+"."+tva.e_Coding+"@"+tva.a_href+" is not valid - should be DVB (bitmap or character) or EBU TT-D")
 			}
-		}
-/*		
-		var BitRate=CaptioningAttributes.get(SCHEMA_PREFIX+":"+tva.e_BitRate", CG_SCHEMA);
-		if (BitRate) {
-			//TODO: unsure if this is needed in DVB-I profile, see bug 2813 - https://bugzilla.dvb.org/show_bug.cgi?id=2813
-		}
-*/		
+		}		
 	}
 }
 
