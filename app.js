@@ -1112,7 +1112,7 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 			NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP001")
 		else {	
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "VP002")
-			if (HowRelated.attr(tva.a_href)) 
+			if (HowRelated.attr(tva.a_href)) {
 				switch (HowRelated.attr(tva.a_href).value()) {
 					case dvbi.PAGINATION_FIRST_URI:
 						countPaginationFirst++;
@@ -1310,16 +1310,17 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
-		switch (elem.name())
-        case tva.e_HowRelated:
-            HowRelated=elem;
-			break;
-        case tva.e_Format:
-            Format=elem;
-			break;
-        case tva.e_MediaLocator:
-            MediaLocator.push(elem);
-			break;
+		switch (elem.name()) {
+			case tva.e_HowRelated:
+				HowRelated=elem;
+				break;
+			case tva.e_Format:
+				Format=elem;
+				break;
+			case tva.e_MediaLocator:
+				MediaLocator.push(elem);
+				break;
+		}
     }
 
     if (!HowRelated) {
@@ -1622,23 +1623,23 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
 	
 	if (!ProgramInformation) {
-		errs.pushCode("PI000", "ValidateProgramInformation() called with ProgramInformation==null")
+		errs.pushCode("PI100", "ValidateProgramInformation() called with ProgramInformation==null")
 		return null;
 	}
 	
-	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI001");
+	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.e_BasicDescription], [tva.e_OtherIdentifier, tva.e_MemberOf, tva.e_EpisodeOf], errs, "PI101");
 	
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI002")
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI102")
 
-	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
+	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI110");
 	var isCurrentProgram=false, programCRID=null;
 	
 	if (ProgramInformation.attr(tva.a_programId)) {
 		programCRID=ProgramInformation.attr(tva.a_programId).value();
 		if (!isCRIDURI(programCRID)) 
-			errs.pushCode("PI011", ProgramInformation.name()+"@"+tva.a_programId+" is not a valid CRID ("+programCRID+")");
+			errs.pushCode("PI111", ProgramInformation.name()+"@"+tva.a_programId+" is not a valid CRID ("+programCRID+")");
 		if (isIn(programCRIDs, programCRID))
-			errs.pushCode("PI012", ProgramInformation.name()+"@"+tva.a_programId+"=\""+programCRID+"\" is already used");
+			errs.pushCode("PI112", ProgramInformation.name()+"@"+tva.a_programId+"=\""+programCRID+"\" is already used");
 		else programCRIDs.push(programCRID);
 	}
 
@@ -1650,47 +1651,47 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		switch (child.name()) {
 			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
 				if (requestType==CG_REQUEST_MORE_EPISODES)
-					errs.pushCode("PI016", tva.e_OtherIdentifier+"is not permitted in this request type")
+					errs.pushCode("PI116", tva.e_OtherIdentifier+"is not permitted in this request type")
 				break;
 			case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI015a");
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI115a");
 				
 				// <ProgramInformation><EpisodeOf>@crid
 				if (child.attr(tva.a_crid)) {
 					var foundCRID=child.attr(tva.a_crid).value();
 					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
-						errs.pushCode("PI015b", ProgramInformation.name()+"."+tva.e_EpisodeOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a defined Group CRID for <"+tva.e_EpisodeOf+">")
+						errs.pushCode("PI115b", ProgramInformation.name()+"."+tva.e_EpisodeOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a defined Group CRID for <"+tva.e_EpisodeOf+">")
 					else
 						if (!isCRIDURI(foundCRID))
-							errs.pushCode("PI015c", ProgramInformation.name()+"."+tva.e_EpisodeOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a valid CRID")
+							errs.pushCode("PI115c", ProgramInformation.name()+"."+tva.e_EpisodeOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a valid CRID")
 				}
 				break;
 			case tva.e_MemberOf:			// <ProgramInformation><MemberOf>
 				switch (requestType) {
 					case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
 					case CG_REQUEST_SCHEDULE_WINDOW:
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI013a");
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI113a");
 						if (child.attr(tva.a_crid) && child.attr(tva.a_crid).value()==dvbi.CRID_NOW)
 							isCurrentProgram=true;
 							
 						break;
 					default:
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI013z");
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI113z");
 				}
 						
 				// <ProgramInformation><MemberOf>@xsi:type
 				if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
-					errs.pushCode("PI014", "@xsi:"+tva.a_type+" must be \""+tva.t_MemberOfType+"\" for "+ProgramInformation.name()+"."+tva.e_MemberOf);
+					errs.pushCode("PI114", "@xsi:"+tva.a_type+" must be \""+tva.t_MemberOfType+"\" for "+ProgramInformation.name()+"."+tva.e_MemberOf);
 			
 				// <ProgramInformation><MemberOf>@crid
 				var foundCRID=null;
 				if (child.attr(tva.a_crid)) {
 					foundCRID=child.attr(tva.a_crid).value();
 					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
-						errs.pushCode("PI020", ProgramInformation.name()+"."+tva.e_MemberOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a defined Group CRID for <"+tva.e_MemberOf+">")
+						errs.pushCode("PI120", ProgramInformation.name()+"."+tva.e_MemberOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a defined Group CRID for <"+tva.e_MemberOf+">")
 					else
 						if (!isCRIDURI(foundCRID))
-							errs.pushCode("PI021", ProgramInformation.name()+"."+tva.e_MemberOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a valid CRID")
+							errs.pushCode("PI121", ProgramInformation.name()+"."+tva.e_MemberOf+"@"+tva.a_crid+"=\""+foundCRID+"\" is not a valid CRID")
 				}
 				
 				// <ProgramInformation><MemberOf>@index
@@ -1698,7 +1699,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 					var index=valUnsignedInt(child.attr(tva.a_index).value());
 					var indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")";
 					if (isIn(indexes, indexInCRID))
-						errs.pushCode("PI030", tva.e_MemberOf+"@"+tva.a_index+"="+index+" is in use by another "+ProgramInformation.name()+" element")
+						errs.pushCode("PI130", tva.e_MemberOf+"@"+tva.a_index+"="+index+" is in use by another "+ProgramInformation.name()+" element")
 					else 
 						indexes.push(indexInCRID);
 				}
@@ -1735,7 +1736,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		errs.pushCode("PI001", "<"+tva.e_ProgramInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return null;
 	}
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformationTable, [tva.a_type], [tva.a_lang], errs, "PI002");
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformationTable, [], [tva.a_lang], errs, "PI002");
 	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, parentLang, false, "PI003");
 
 	var pi=1, ProgramInformation, cnt=0, indexes=[], currentProgramCRID=null;
@@ -1938,7 +1939,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 		
 		if (GroupType.attr(tva.a_type) && GroupType.attr(tva.a_type).value()!=tva.t_ProgramGroupTypeType) 
 			errs.pushCode("GIM012", tva.e_GroupType+"@xsi:"+tva.a_type+" must be \""+tva.t_ProgramGroupTypeType+"\"");
-		if (GroupType.attr(tva.a_value) && GroupType.attr(tva.a_value).value()!="otherCollection")) 
+		if (GroupType.attr(tva.a_value) && GroupType.attr(tva.a_value).value()!="otherCollection") 
 			errs.pushCode("GIM013", tva.e_GroupType+"@"+tva.a_value+"must be \"otherCollection\"");
 	}
 	else
@@ -2283,7 +2284,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
  * @param {Class}  errs                errors found in validaton
  * @param {boolean} true is this RelatedMaterial element contains a restart link (proper HowRelated@href and MediaLocator.MediaUri and MediaLocator.AuxiliaryURI)
  */
- function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs){
+function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
 	
 	function isRestartLink(str) { return str==dvbi.RESTART_LINK; }
 
@@ -2678,7 +2679,6 @@ function FalseValue(elem, attrName, errno, errs, isRequired=true) {
  * @param {Class}  errs                errors found in validaton
  */
 function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, currentProgramCRID, scheduleStart, scheduleEnd, requestType, errs) {
-	
 	
 	if (!Schedule) {
 		errs.pushCode("SE000", "ValidateScheduleEvents() called with Schedule==null")
