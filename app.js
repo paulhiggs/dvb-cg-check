@@ -567,6 +567,21 @@ function xPath(SCHEMA_PREFIX, elementName, index=null) {
 
 
 /**
+ * constructs an XPath based on the provided arguments
+ * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
+ * @param {array} elementNames the name of the element to be searched for
+ * @returns {string} the XPath selector
+ */
+function xPathM(SCHEMA_PREFIX, elementNames) {
+	var t="";
+	elementNames.forEach(elementName => {
+		if (t.length) { t+="/"; first=false;}
+		t+=(SCHEMA_PREFIX+":"+elementName)	
+	});
+	return t
+}
+
+/**
  * check if the node provided contains an RelatedMaterial element for a signalled application
  *
  * @param {Object} node The XML tree node (either a <Service> or a <ServiceInstance>) to be checked
@@ -1048,7 +1063,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 		// Promotional Still Image
 		
 		var errLocation="Promotional Still Image ("+tva.e_HowRelated+"@"+tva.a_href+"="+tva.cs_PromotionalStillImage+")";
-		var MediaUri=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator+"/"+SCHEMA_PREFIX+":"+tva.e_MediaUri, CG_SCHEMA);  //!!!! see if I can xPath() this
+		var MediaUri=RelatedMaterial.get(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]), CG_SCHEMA);  
 		if (!MediaUri) 
 			errs.pushCode("IRM001", "<"+tva.e_MediaUri+"> not specified for "+errLocation);
 		if (MediaUri && !MediaUri.attr(tva.a_contentType))
@@ -3185,3 +3200,5 @@ if (https_options.key && https_options.cert) {
         console.log("HTTPS listening on port number", https_server.address().port);
     });
 }
+
+console.log(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]));
