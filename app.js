@@ -2189,7 +2189,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
 				break;
 			default:
-				errs.push("NN003", "<"+tva.e_GroupInformation+"> not processed for this request type")
+				errs.pushCode("NN003", "<"+tva.e_GroupInformation+"> not processed for this request type")
 		}
 	}
 }
@@ -2526,11 +2526,12 @@ function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs, errco
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} OnDemandProgram     the node containing the <OnDemandProgram> being checked
  * @param {string} parentLang          XML language of the parent element (expliclt or implicit from its parent(s))
- * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {array}  programCRIDs        array of program crids defined in <ProgramInformationTable> 
+ * @param {array}  plCRIDs        	   array of program crids defined in <ProgramLocationTable>
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, requestType, errs) {
+function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, plCRIDs, requestType, errs) {
 
 	switch (requestType) {
 		case CG_REQUEST_BS_CONTENTS:
@@ -2566,12 +2567,13 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 				if (!isIn(programCRIDs, programCRID))
 					errs.pushCode("OD011", OnDemandProgram.name()+"."+tva.e_Program+"@"+tva.a_crid+"=\""+programCRID+"\" does not refer to a program in the <"+tva.e_ProgramInformationTable+">");
 			}
+			plCRIDs.push(programCRID)
 		}
 		else
 			errs.pushCode("OD012", OnDemandProgram.name()+"."+tva.e_Program+"@"+tva.a_crid+" is a required attribute");		
 	}
-	if (prog>1)
-		errs.push("OD013", "only a single <"+tva.e_Program+"> is permitted in <"+OnDemandProgram.name()+">")
+	if (--prog>1)
+		errs.pushCode("OD013", "only a single <"+tva.e_Program+"> is permitted in <"+OnDemandProgram.name()+">")
 
 	// <ProgramURL>
 	var pUrl=0, ProgramURL;
@@ -2715,19 +2717,21 @@ function FalseValue(elem, attrName, errno, errs, isRequired=true) {
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} Schedule            the <Schedule> node containing the <ScheduleEvent> element to be checked
  * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
- * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {array}  programCRIDs        array of program crids defined in <ProgramInformationTable> 
+ * @param {array}  plCRIDs             array of program crids defined in <ProgramLocationTable>
  * @param {string} currentProgramCRID  CRID of the currently airing program
  * @param {Date}   scheduleStart	   Date representation of Schedule@start
  * @param {Date}   scheduleEnd  	   Date representation of Schedule@end
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, currentProgramCRID, scheduleStart, scheduleEnd, requestType, errs) {
+function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, plCRIDs, currentProgramCRID, scheduleStart, scheduleEnd, requestType, errs) {
 	
 	if (!Schedule) {
 		errs.pushCode("SE000", "ValidateScheduleEvents() called with Schedule==null")
 		return		
 	}
+	
 	var isCurrentProgram=false;
 	var se=0, ScheduleEvent;
 	while (ScheduleEvent=Schedule.get(xPath(SCHEMA_PREFIX, tva.e_ScheduleEvent, ++se), CG_SCHEMA)) {
@@ -2744,6 +2748,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 					errs.pushCode("SE011", tva.e_Program+"@"+tva.a_crid+" is not a valid CRID ("+ProgramCRID.value()+")");
 				if (!isIn(programCRIDs, ProgramCRID.value()))
 					errs.pushCode("SE012", tva.e_Program+"@"+tva.a_crid+"=\""+ProgramCRID.value()+"\" does not refer to a program in the <"+tva.e_ProgramInformationTable+">")
+				plCRIDs.push(ProgramCRID.value())
 				isCurrentProgram=(ProgramCRID.value()==currentProgramCRID) 
 			}
 		}
@@ -2805,13 +2810,14 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
  * @param {string} SCHEMA_PREFIX       Used when constructing Xpath queries
  * @param {Object} Schedule            the node containing the <Schedule> being checked
  * @param {string} parentLanguage      XML language of the parent element (expliclt or implicit from its parent(s))
- * @param {array}  programCRIDs        array to record CRIDs for later use 
+ * @param {array}  programCRIDs        array of program crids defined in <ProgramInformationTable> 
+ * @param {array}  plCRIDs             array of program crids defined in <ProgramLocationTable>
  * @param {string} currentProgramCRID  CRID of the currently airing program
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  * @returns {string} the serviceIdRef for this <Schedule> element
  */
-function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, currentProgramCRID, requestType, errs) {
+function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, plCRIDs, currentProgramCRID, requestType, errs) {
 
 	if (!Schedule) {
 		errs.pushCode("VS000", "ValidateSchedule() called with Schedule==null")
@@ -2848,7 +2854,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 			errs.pushCode("VS012", Schedule.name()+"@"+tva.a_start+" must be earlier than @"+tva.a_end);
 	}
 	
-	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, currentProgramCRID, fr, to, requestType, errs);
+	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, plCRIDs, currentProgramCRID, fr, to, requestType, errs);
 	
 	return serviceIdRef;
 }
@@ -2884,15 +2890,16 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	
 	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, parentLang, false, "PL012");	
 	
-	var c=0, child, cnt=0, foundServiceIds=[];
+	var c=0, child, cnt=0, foundServiceIds=[], plCRIDs=[];
+
 	while (child=ProgramLocationTable.child(c++)) {		
 		switch (child.name()) {
 			case tva.e_OnDemandProgram:
-				ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, requestType, errs);
+				ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
 				cnt++;
 				break;
 			case tva.e_Schedule:
-				var thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, currentProgramCRID, requestType, errs);
+				var thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs);
 				if (thisServiceIdRef.length)
 					if (isIn(foundServiceIds, thisServiceIdRef))
 						errs.pushCode("PL020", "A <"+tva.e_Schedule+"> element with @"+tva.a_serviceIDRef+"=\""+thisServiceIdRef+"\" is already specified")
@@ -2906,6 +2913,12 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 		if (o.childCount!=cnt)
 			errs.pushCode("PL021", "number of items ("+cnt+") in the <"+tva.e_ProgramLocationTable+"> does match "+tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
+
+	programCRIDs.forEach(programCRID => {
+		if (!isIn(plCRIDs, programCRID))
+			errs.pushCode("PL022", "CRID \""+programCRID+"\" specified in <"+tva.e_ProgramInformationTable+"> is not specified in <"+tva.e_ProgramLocationTable+">" );
+		
+	})
 }
 
 
