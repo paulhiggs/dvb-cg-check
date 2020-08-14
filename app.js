@@ -2486,7 +2486,7 @@ function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs) {
 			errs.pushCode("TA001", node.name()+"@"+tva.a_contentType+"=\""+node.attr(tva.a_contentType).value()+"\" is not valid for a template AIT")		
 	}
 	else
-		errs.pushCode("TA001", "@"+tva.a_contentType+" attribute is required when signalling a template AIT in "+node.name());
+		errs.pushCode("TA002", "@"+tva.a_contentType+" attribute is required when signalling a template AIT in "+node.name());
 }
 
 
