@@ -1742,7 +1742,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		return null;
 	}
 		
-	var ProgramInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformationTable, CG_SCHEMA);
+	var ProgramInformationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_ProgramInformationTable), CG_SCHEMA);
 	if (!ProgramInformationTable) {
 		errs.pushCode("PI101", "<"+tva.e_ProgramInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return null;
