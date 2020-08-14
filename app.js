@@ -2378,11 +2378,11 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 
 		var g1href=checkGenre(Genre1);
 		if (g1href && !isAvailability(g1href))
-			errs.pushCode("ID011", InstanceDescription.name()+"."+tva.e_Genre+" 1 must contain a media or fepg availability indicator");
+			errs.pushCode("ID011", "first "+InstanceDescription.name()+"."+tva.e_Genre+" must contain a media or fepg availability indicator");
 
 		var g2href=checkGenre(Genre2);		
 		if (g2href && !isAvailability(g2href))
-			errs.pushCode("ID012", InstanceDescription.name()+"."+tva.e_Genre+" 2 must contain a media or fepg availability indicator");
+			errs.pushCode("ID012", "second "+InstanceDescription.name()+"."+tva.e_Genre+" must contain a media or fepg availability indicator");
 		
 		if (Genre1 && Genre2) {
 			if ((isMediaAvailability(g1href) && isMediaAvailability(g2href))
@@ -2505,7 +2505,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 
 	switch (requestType) {
 		case CG_REQUEST_BS_CONTENTS:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_InstanceDescription,tva.e_AuxiliaryURL,tva.e_DeliveryMode], errs, "OD001a");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_InstanceDescription,tva.e_AuxiliaryURL,tva.e_DeliveryMode], errs, "OD001");
 			break;
 		case CG_REQUEST_MORE_EPISODES:
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD002");
