@@ -2943,6 +2943,8 @@ function validateContentGuide(CGtext, requestType, errs) {
 			SCHEMA_NAMESPACE=CG.root().namespace()?CG.root().namespace().href():"";
 		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
+console.log(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]));
+
 		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
 		
 		var ProgramDescription=CG.get(xPath(SCHEMA_PREFIX, tva.e_ProgramDescription), CG_SCHEMA);
@@ -3200,5 +3202,3 @@ if (https_options.key && https_options.cert) {
         console.log("HTTPS listening on port number", https_server.address().port);
     });
 }
-
-console.log(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]));
