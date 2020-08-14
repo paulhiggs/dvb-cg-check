@@ -693,13 +693,15 @@ function  hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
  * @param {Object} elem       the node containing the element being checked
  * @param {Class}  errs       errors found in validaton
  * @param {string} errCode    error code prefix to be used in reports, if not present then use local codes
+ * @returns {string} the serviceIdRef, whether it is valid of not
  */
 function checkTAGUri(elem, errs, errCode=null) {
-	if (!elem) return;
-	if (elem.attr(tva.a_serviceIDRef)) {
+	if (elem && elem.attr(tva.a_serviceIDRef)) {
 		if (!isTAGURI(elem.attr(tva.a_serviceIDRef).value()))
 			errs.pushCodeW(errCode?errCode:"UR001", elem.name()+"@"+tva.a_serviceIDRef+" is not a TAG URI")
+		return elem.attr(tva.a_serviceIDRef).value();
 	}
+	return "";
 }
 
 
@@ -2807,6 +2809,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
  * @param {string} currentProgramCRID  CRID of the currently airing program
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
+ * @returns {string} the serviceIdRef for this <Schedule> element
  */
 function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, currentProgramCRID, requestType, errs) {
 
@@ -2820,7 +2823,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	
 	var scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage, false, "VS003");	
 	
-	checkTAGUri(Schedule, errs, "VS004");
+	var serviceIdRef=checkTAGUri(Schedule, errs, "VS004");
 	
 	var startSchedule=Schedule.attr(tva.a_start), fr=null, endSchedule=Schedule.attr(tva.a_end), to=null;
 	if (startSchedule)
@@ -2846,6 +2849,8 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	}
 	
 	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, currentProgramCRID, fr, to, requestType, errs);
+	
+	return serviceIdRef;
 }
 
 
@@ -2879,7 +2884,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	
 	var pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, parentLang, false, "PL012");	
 	
-	var c=0, child, cnt=0;
+	var c=0, child, cnt=0, foundServiceIds=[];
 	while (child=ProgramLocationTable.child(c++)) {		
 		switch (child.name()) {
 			case tva.e_OnDemandProgram:
@@ -2887,14 +2892,19 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 				cnt++;
 				break;
 			case tva.e_Schedule:
-				ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, currentProgramCRID, requestType, errs);
+				var thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, currentProgramCRID, requestType, errs);
+				if (thisServiceIdRef.length)
+					if (isIn(foundServiceIds, thisServiceIdRef))
+						errs.pushCode("PL020", "A <"+tva.e_Schedule+"> element with @"+tva.a_serviceIDRef+"=\""+thisServiceIdRef+"\" is already specified")
+					else 
+						foundServiceIds.push(thisServiceIdRef);
 				cnt++;
 				break;
 		}
 	}
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PL020", "number of items ("+cnt+") in the <"+tva.e_ProgramLocationTable+"> does match "+tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
+			errs.pushCode("PL021", "number of items ("+cnt+") in the <"+tva.e_ProgramLocationTable+"> does match "+tva.e_GroupInformation+"@"+tva.a_numOfItems+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
 	}
 }
 
