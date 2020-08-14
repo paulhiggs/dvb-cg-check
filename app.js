@@ -2477,16 +2477,17 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
  * @param {string} SCHEMA_PREFIX     Used when constructing Xpath queries
  * @param {Object} node              the element node containing the an XML AIT reference
  * @param {Class}  errs              errors found in validaton
+ * @param {string} errcode           error code to be used with any errors founf
  */
-function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs) {
+function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs, errcode=null) {
 	if (!node) return;
 	
 	if (node.attr(tva.a_contentType)) {
 		if (node.attr(tva.a_contentType).value() != dvbi.XML_AIT_CONTENT_TYPE) 
-			errs.pushCode("TA001", node.name()+"@"+tva.a_contentType+"=\""+node.attr(tva.a_contentType).value()+"\" is not valid for a template AIT")		
+			errs.pushCode(errcode?errcode+"-1":"TA001", node.name()+"@"+tva.a_contentType+"=\""+node.attr(tva.a_contentType).value()+"\" is not valid for a template AIT")		
 	}
 	else
-		errs.pushCode("TA002", "@"+tva.a_contentType+" attribute is required when signalling a template AIT in "+node.name());
+		errs.pushCode(errcode?errcode+"-2":"TA002", "@"+tva.a_contentType+" attribute is required when signalling a template AIT in "+node.name());
 }
 
 
@@ -2527,8 +2528,8 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	checkTAGUri(OnDemandProgram, errs, "OD006");	
 	
 	// <Program>
-	var Program=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
-	if (Program)
+	var prog=0, Program
+	while (Program=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Program+"["+ ++prog +"]", CG_SCHEMA)) {
 		if (Program.attr(tva.a_crid)) {
 			var programCRID=Program.attr(tva.a_crid).value();
 			if (!isCRIDURI(programCRID))
@@ -2539,31 +2540,40 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 			}
 		}
 		else
-			errs.pushCode("OD012", OnDemandProgram.name()+"."+tva.e_Program+"@"+tva.a_crid+" is a required attribute");
+			errs.pushCode("OD012", OnDemandProgram.name()+"."+tva.e_Program+"@"+tva.a_crid+" is a required attribute");		
+	}
+	if (prog>1)
+		errs.push("OD013", "only a single <"+tva.e_Program+"> is permitted in <"+OnDemandProgram.name()+">")
 
 	// <ProgramURL>
 	var pUrl=0, ProgramURL;
-	while (ProgramURL=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL+"["+ ++pUrl +"]", CG_SCHEMA)) {
-		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, ProgramURL, errs);
-	}
-	if (pUrl > 0)
-		errs.push("OD020", "only a single <"+tva.e_ProgramURL+"> is permitted in <"+OnDemandProgram.name()+">")
+	while (ProgramURL=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL+"["+ ++pUrl +"]", CG_SCHEMA)) 
+		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, ProgramURL, errs, "OD020");
+	if (pUrl>1)
+		errs.push("OD021", "only a single <"+tva.e_ProgramURL+"> is permitted in <"+OnDemandProgram.name()+">")
+
 
 	// <AuxiliaryURL>
-	var AuxiliaryURL=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_AuxiliaryURL, CG_SCHEMA);
-	if (AuxiliaryURL)
-		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, AuxiliaryURL, errs);
+	var aux=0, AuxiliaryURL; 
+	while (AuxiliaryURL=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_AuxiliaryURL+"["+ ++aux +"]", CG_SCHEMA)) 
+		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, AuxiliaryURL, errs, "OD030");
+	if (aux>1)
+		errs.push("OD031", "only a single <"+tva.e_AuxiliaryURL+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <InstanceDescription>
-	var InstanceDescription=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription, CG_SCHEMA);
-	if (InstanceDescription) 
+	var id=0, InstanceDescription;
+	while (InstanceDescription=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription+"["+ ++id +"]", CG_SCHEMA))
 		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, false, odpLang, programCRIDs, requestType, errs);
+	if (id>1)
+		errs.push("OD041", "only a single <"+tva.e_InstanceDescription+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <PublishedDuration>
-	var PublishedDuration=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
-	if (PublishedDuration)
+	var pd=0, PublishedDuration; 
+	while (PublishedDuration=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration+"["+ ++pd +"]", CG_SCHEMA)) 
 		if (!isISODuration(PublishedDuration.text()))
 			errs.pushCode("OD050", OnDemandProgram.name()+"."+tva.e_PublishedDuration+" is not a valid ISO Duration (xs:duration)");
+	if (pd>1)
+		errs.push("OD051", "only a single <"+tva.e_PublishedDuration+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <StartOfAvailability> and <EndOfAvailability>
 	var soa=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_StartOfAvailability, CG_SCHEMA),
@@ -2586,16 +2596,19 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	}
 	
 	// <DeliveryMode>
-	var DeliveryMode=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_DeliveryMode, CG_SCHEMA);
-	if (DeliveryMode) { // existance check and report done previously
+	var dm=0, DeliveryMode;
+	while (DeliveryMode=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_DeliveryMode+"["+ ++dm +"]", CG_SCHEMA))
 		if (DeliveryMode.text()!="streaming")
 			errs.pushCode("OD070", OnDemandProgram.name()+"."+tva.e_DeliveryMode+" must be \"streaming\"");
-	}
+	if (dm>1)
+		errs.push("OD071", "only a single <"+tva.e_DeliveryMode+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <Free>
-	var Free=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Free, CG_SCHEMA);
-	if (Free)  // existance check and report done previously
+	var fr=0, Free;
+	while (Free=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Free+"["+ ++fr +"]", CG_SCHEMA))
 		TrueValue(Free, tva.a_value, "OD080", errs)
+	if (fr>1)
+		errs.push("OD081", "only a single <"+tva.e_Free+"> is permitted in <"+OnDemandProgram.name()+">")
 }	
 
 
