@@ -554,6 +554,17 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
     }
 }
 
+/**
+ * constructs an XPath based on the provided arguments
+ * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
+ * @param {string} elementName the name of the element to be searched for
+ * @param {int} index the instance of the named element to be searched for (if specified)
+ * @returns {string} the XPath selector
+ */
+function xPath(SCHEMA_PREFIX, elementName, index=null) {
+	return SCHEMA_PREFIX+":"+elementName+(index?"["+index+"]":"")
+}
+
 
 /**
  * check if the node provided contains an RelatedMaterial element for a signalled application
@@ -564,9 +575,9 @@ function drawForm(URLmode, res, lastInput, lastType, o) {
  * @returns {boolean}  true if the node contains a <RelatedMaterial> element which signals an application else false
  */
 function hasSignalledApplication(node, SCHEMA_PREFIX, CG_SCHEMA) {
-	var i=1, elem;
-    while (elem=node.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"[" + i++ + "]", CG_SCHEMA)) {
-        var hr=elem.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+	var i=0, elem;
+    while (elem=node.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++i), CG_SCHEMA)) {
+        var hr=elem.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 		if (hr && validServiceApplication(hr)) 
 			return true;			
     }
@@ -594,7 +605,7 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	var rv=true, thisElem="<"+parentElement.parent().name()+"."+parentElement.name()+">";
 	// check that each of the specifid childElements exists
 	mandatoryChildElements.forEach(elem => {
-		if (!parentElement.get(SCHEMA_PREFIX+":"+elem, CG_SCHEMA)) {
+		if (!parentElement.get(xPath(SCHEMA_PREFIX, elem), CG_SCHEMA)) {
 			errs.pushCode(errCode?errCode+"-1":"TE010", "Mandatory element <"+elem+"> not specified in "+thisElem);
 			rv=false;
 		}
@@ -657,7 +668,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
  */
 function  hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
 	if (!node) return false;
-	return (node.get(SCHEMA_PREFIX+":"+elementName, CG_SCHEMA)!=null);
+	return (node.get(xPath(SCHEMA_PREFIX, elementName), CG_SCHEMA)!=null);
 }
 
 
@@ -703,9 +714,9 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 		errs.pushCode("SY000", "ValidateSynopsis() called with BasicDescription==null")
 		return
 	}
-	var s=1, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
+	var s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false;
 	var shortLangs=[], mediumLangs=[], longLangs=[];
-	while (Synopsis=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Synopsis+"["+ s++ +"]", CG_SCHEMA)) {
+	while (Synopsis=BasicDescription.get(xPath(SCHEMA_PREFIX,tva.e_Synopsis, ++s), CG_SCHEMA)) {
 		
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Synopsis, [tva.a_length], [tva.a_lang], errs, "SY001");
 
@@ -785,8 +796,8 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 		errs.pushCode("KW000", "ValidateKeyword() called with BasicDescription=null")
 		return
 	}
-	var k=1, Keyword, counts=[];
-	while (Keyword=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Keyword+"["+ k++ +"]", CG_SCHEMA)) {
+	var k=0, Keyword, counts=[];
+	while (Keyword=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Keyword, ++k), CG_SCHEMA)) {
 		
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Keyword, [], [tva.a_lang, tva.a_type], errs, "KW001");
 
@@ -825,8 +836,8 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 		errs.pushCode("GE000", "ValidateGenre() called with BasicDescription=null")
 		return
 	}
-	var g=1, Genre, count=0;
-	while (Genre=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"["+ g++ +"]",CG_SCHEMA)) {
+	var g=0, Genre, count=0;
+	while (Genre=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, ++g), CG_SCHEMA)) {
 		count++;
 		var genreType=Genre.attr(tva.a_type)?Genre.attr(tva.a_type).value():dvbi.DEFAULT_GENRE_TYPE;
 		if (genreType!=dvbi.GENRE_TYPE_MAIN)
@@ -858,8 +869,8 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		errs.pushCode("PG000", "ValidateParentalGuidance() called with BasicDescription=null")
 		return
 	}
-	var pg=1, ParentalGuidance, countParentalGuidance=0;
-	while (ParentalGuidance=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_ParentalGuidance+"["+ pg++ +"]", CG_SCHEMA)) {
+	var pg=0, ParentalGuidance, countParentalGuidance=0;
+	while (ParentalGuidance=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_ParentalGuidance, ++pg), CG_SCHEMA)) {
 		countParentalGuidance++;
 		
 		var pgc=0, pgChild, countExplanatoryText=0;
@@ -958,10 +969,10 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 		errs.pushCode("CL000", "ValidateCreditsList() called with BasicDescription==null")
 		return
 	}
-	var CreditsList=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_CreditsList, CG_SCHEMA);
+	var CreditsList=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_CreditsList), CG_SCHEMA);
 	if (CreditsList) {
-		var ci=1, CreditsItem;		
-		while (CreditsItem=CreditsList.get(SCHEMA_PREFIX+":"+tva.e_CreditsItem+"["+ ci++ +"]", CG_SCHEMA)) {
+		var ci=0, CreditsItem;		
+		while (CreditsItem=CreditsList.get(xPath(SCHEMA_PREFIX,tva.e_CreditsItem, ++ci), CG_SCHEMA)) {
 			if (CreditsItem.attr(tva.a_role)) {
 				var CreditsItemRole=CreditsItem.attr(tva.a_role).value();
 				if (!isIn(allowedCreditItemRoles, CreditsItemRole))
@@ -1029,7 +1040,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 		errs.pushCode("IRM000", "CheckImageRelatedMaterial() called with RelatedMaterial==null")
 		return
 	}
-	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+	var HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 	if (!HowRelated || !HowRelated.attr(tva.a_href)) return false;
 	var hrHref=HowRelated.attr(tva.a_href).value();
 
@@ -1037,7 +1048,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 		// Promotional Still Image
 		
 		var errLocation="Promotional Still Image ("+tva.e_HowRelated+"@"+tva.a_href+"="+tva.cs_PromotionalStillImage+")";
-		var MediaUri=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator+"/"+SCHEMA_PREFIX+":"+tva.e_MediaUri, CG_SCHEMA);
+		var MediaUri=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator+"/"+SCHEMA_PREFIX+":"+tva.e_MediaUri, CG_SCHEMA);  //!!!! see if I can xPath() this
 		if (!MediaUri) 
 			errs.pushCode("IRM001", "<"+tva.e_MediaUri+"> not specified for "+errLocation);
 		if (MediaUri && !MediaUri.attr(tva.a_contentType))
@@ -1070,8 +1081,8 @@ function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, min
 		errs.pushCode("RM000", "ValidateRelatedMaterial() called with BasicDescription==null")
 		return
 	}	
-	var rm=1, RelatedMaterial, countRelatedMaterial=0;
-	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
+	var rm=0, RelatedMaterial, countRelatedMaterial=0;
+	while (RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA)) {
 		countRelatedMaterial++;
 		
 		var evaluated=CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs);
@@ -1105,9 +1116,9 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 		return
 	}
 	var countPaginationFirst=0, countPaginationPrev=0, countPaginationNext=0, countPaginationLast=0;
-	var rm=1, RelatedMaterial;
-	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
-		var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+	var rm=0, RelatedMaterial;
+	while (RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA)) {
+		var HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 		if (!HowRelated) 
 			NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">", "VP001")
 		else {	
@@ -1168,8 +1179,8 @@ function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 	}
 	switch (BasicDescription.parent().name()) {
 		case tva.e_ProgramInformation:
-			var rm=1, RelatedMaterial, countRelatedMaterial=0;
-			while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm++ +"]", CG_SCHEMA)) {
+			var rm=0, RelatedMaterial, countRelatedMaterial=0;
+			while (RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA)) {
 				countRelatedMaterial++;
 				ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes")
 			}
@@ -1398,9 +1409,9 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 		return
 	}
 	var countImage=0, countTemplateAIT=0, hasPagination=false;
-	var rm=1, RelatedMaterial;
-	while (RelatedMaterial=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial+"["+ rm+++ "]", CG_SCHEMA)) {
-		var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+	var rm=0, RelatedMaterial;
+	while (RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA)) {
+		var HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 		if (!HowRelated) 
 			NoChildElement(errs, "<"+tva.e_HowRelated+">", "<"+tva.e_RelatedMaterial+">")
 		else {		
@@ -1460,8 +1471,8 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 	}
 	
 	var mainSet=[], secondarySet=[];
-	var t=1, Title;
-	while (Title=BasicDescription.get(SCHEMA_PREFIX+":"+tva.e_Title+"["+ t++ +"]", CG_SCHEMA)) {
+	var t=0, Title;
+	while (Title=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Title, ++t), CG_SCHEMA)) {
 
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Title, [tva.a_type], [tva.a_lang], errs, "VT001");
 		
@@ -1519,7 +1530,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 
 	var isParentGroup=parentElement==categoryGroup;
 	
-	var BasicDescription=parentElement.get(SCHEMA_PREFIX+":"+tva.e_BasicDescription, CG_SCHEMA);
+	var BasicDescription=parentElement.get(xPath(SCHEMA_PREFIX, tva.e_BasicDescription), CG_SCHEMA);
 	if (!BasicDescription) {
 		NoChildElement(errs, "<"+tva.e_BasicDescription+">", parentElement.name());
 		return;
@@ -1739,8 +1750,8 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformationTable, [], [tva.a_lang], errs, "PI102");
 	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, parentLang, false, "PI103");
 
-	var pi=1, ProgramInformation, cnt=0, indexes=[], currentProgramCRID=null;
-	while (ProgramInformation=ProgramInformationTable.get(SCHEMA_PREFIX+":"+tva.e_ProgramInformation+"["+ pi++ +"]", CG_SCHEMA)) {
+	var pi=0, ProgramInformation, cnt=0, indexes=[], currentProgramCRID=null;
+	while (ProgramInformation=ProgramInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_ProgramInformation, ++pi), CG_SCHEMA)) {
 		var t=ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
 		if (t) currentProgramCRID=t;
 		cnt++; 
@@ -1815,7 +1826,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	}
 
 	if (!isCategoryGroup) {
-		var MemberOf=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_MemberOf, CG_SCHEMA);
+		var MemberOf=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_MemberOf), CG_SCHEMA);
 		if (MemberOf) {
 			if (MemberOf.attr(tva.a_type)) {
 				if (MemberOf.attr(tva.a_type).value()!=tva.t_MemberOfType)
@@ -1933,7 +1944,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 
 	TrueValue(GroupInformation, tva.a_ordered, "GIM004", errs, false)
 	
-	var GroupType=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_GroupType, CG_SCHEMA);
+	var GroupType=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_GroupType), CG_SCHEMA);
 	if (GroupType) {
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupType, [tva.a_type, tva.a_value], [], errs, "GIM010")
 		
@@ -1987,7 +1998,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 			break;				
 	}
 
-	var GroupType=GroupInformation.get(SCHEMA_PREFIX+":"+tva.e_GroupType, CG_SCHEMA);
+	var GroupType=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_GroupType), CG_SCHEMA);
 	if (GroupType) {
 		if (!(GroupType.attr(tva.a_type) && GroupType.attr(tva.a_type).value()==tva.t_ProgramGroupTypeType)) 
 			errs.pushCode("GI051", tva.e_GroupType+"@xsi:"+tva.a_type+"=\""+tva.t_ProgramGroupTypeType+"\" is required");
@@ -2018,7 +2029,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 		return
 	}
 	var gi, GroupInformation;
-	var GroupInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_GroupInformationTable, CG_SCHEMA);
+	var GroupInformationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformationTable), CG_SCHEMA);
 	
 	if (!GroupInformationTable) {
 		errs.pushCode("GI100", "<"+tva.e_GroupInformationTable+"> not specified in <"+ProgramDescription.name()+">");
@@ -2029,8 +2040,8 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 	// find which GroupInformation element is the "category group"
 	var categoryGroup=null;
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES || requestType==CG_REQUEST_BS_CONTENTS) {
-		gi=1;
-		while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) 
+		gi=0;
+		while (GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformation, ++gi), CG_SCHEMA)) 
 			var countMemberOf=0;
 			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
 			var e=0, elem;
@@ -2049,8 +2060,8 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 	}
 	
 	var indexes=[], giCount=0;
-	gi=1;
-	while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) {
+	gi=0;
+	while (GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformation, ++gi), CG_SCHEMA)) {
 		ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, categoryGroup, indexes, groupIds);
 		if (GroupInformation!=categoryGroup) 
 			giCount++;
@@ -2144,15 +2155,15 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 		return
 	}
 	
-	var GroupInformationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_GroupInformationTable, CG_SCHEMA);
+	var GroupInformationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformationTable), CG_SCHEMA);
 	if (!GroupInformationTable) {
 		errs.pushCode("NN001", "<"+tva.e_GroupInformationTable+"> not specified in <"+ProgramDescription.name()+">");
 		return;
 	}
 	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "NN002");
 	
-	var gi=1, GroupInformation;
-	while (GroupInformation=GroupInformationTable.get(SCHEMA_PREFIX+":"+tva.e_GroupInformation+"["+ gi++ +"]", CG_SCHEMA)) {	
+	var gi=0, GroupInformation;
+	while (GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX,tva.e_GroupInformation, ++gi), CG_SCHEMA)) {	
 		switch (requestType) {
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
 				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 0, 1, 1, groupIds);
@@ -2194,11 +2205,11 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, [], [tva.e_AudioAttributes, tva.e_VideoAttributes, tva.e_CaptioningAttributes], errs, "AV001");
 
 	// <AudioAttributes>
-	var a=1, AudioAttributes, foundAttributes=[], audioCounts=[];
-	while (AudioAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioAttributes+"["+ a++ +"]", CG_SCHEMA)) {
+	var aa=0, AudioAttributes, foundAttributes=[], audioCounts=[];
+	while (AudioAttributes=AVAttributes.get(xPath(SCHEMA_PREFIX, tva.e_AudioAttributes, ++aa), CG_SCHEMA)) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, AudioAttributes, [], [tva.e_MixType, tva.e_AudioLanguage], errs, "AV010");
 
-		var MixType=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_MixType, CG_SCHEMA);
+		var MixType=AudioAttributes.get(xPath(SCHEMA_PREFIX, tva.e_MixType), CG_SCHEMA);
 		if (MixType) {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MixType, [tva.a_href], [], errs, "AV011"); 
 			if (MixType.attr(tva.a_href)) {
@@ -2207,7 +2218,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 			}
 		}
 				
-		var AudioLanguage=AudioAttributes.get(SCHEMA_PREFIX+":"+tva.e_AudioLanguage, CG_SCHEMA);
+		var AudioLanguage=AudioAttributes.get(xPath(SCHEMA_PREFIX, tva.e_AudioLanguage), CG_SCHEMA);
 		if (AudioLanguage) {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, AudioLanguage, [tva.a_purpose], [], errs, "AV013" )
 			var validLanguage=false, validPurpose=false, audioLang=AudioLanguage.text();
@@ -2236,32 +2247,32 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	});
 	
 	// <VideoAttributes>
-	var v=1, VideoAttributes;
-	while (VideoAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_VideoAttributes+"["+ v++ +"]", CG_SCHEMA)) {
+	var va=0, VideoAttributes;
+	while (VideoAttributes=AVAttributes.get(xPath(SCHEMA_PREFIX, tva.e_VideoAttributes, ++va), CG_SCHEMA)) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "AV030");
 		
-		var HorizontalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_HorizontalSize, CG_SCHEMA);
+		var HorizontalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_HorizontalSize), CG_SCHEMA);
 		if (HorizontalSize) 
 			if (valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
 				errs.pushCode("AV031", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
 		
-		var VerticalSize=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_VerticalSize, CG_SCHEMA);
+		var VerticalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_VerticalSize), CG_SCHEMA);
 		if (VerticalSize) 
 			if (valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
 				errs.pushCode("AV032", tva.e_HorizontalSize+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
 		
-		var AspectRatio=VideoAttributes.get(SCHEMA_PREFIX+":"+tva.e_AspectRatio, CG_SCHEMA);
+		var AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX,tva.e_AspectRatio), CG_SCHEMA);
 		if (AspectRatio) 
 			if (!isRatioType(AspectRatio.text()))
 				errs.pushCode("AV033", tva.e_AspectRatio+" is not a valid aspect ratio");
 	}
 
 	// <CaptioningAttributes>
-	var CaptioningAttributes=AVAttributes.get(SCHEMA_PREFIX+":"+tva.e_CaptioningAttributes, CG_SCHEMA);
+	var CaptioningAttributes=AVAttributes.get(xPath(SCHEMA_PREFIX, tva.e_CaptioningAttributes), CG_SCHEMA);
 	if (CaptioningAttributes) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding], errs, "AV040");
 		
-		var Coding=CaptioningAttributes.get(SCHEMA_PREFIX+":"+tva.e_Coding, CG_SCHEMA);
+		var Coding=CaptioningAttributes.get(xPath(SCHEMA_PREFIX, tva.e_Coding), CG_SCHEMA);
 		if (Coding) {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Coding, [tva.a_href], [], errs, "AV041")
 			if (Coding.attr(tva.a_href)) {
@@ -2295,7 +2306,7 @@ function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMateria
 
 	var isRestart=checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, [tva.e_HowRelated, tva.e_MediaLocator], [], errs, "RR001");	
 	
-	var HowRelated=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_HowRelated, CG_SCHEMA);
+	var HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 	if (HowRelated) {
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "RR002")
 		if (HowRelated.attr(tva.a_href)) {
@@ -2306,7 +2317,7 @@ function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMateria
 		}
 	}
 	
-	var MediaLocator=RelatedMaterial.get(SCHEMA_PREFIX+":"+tva.e_MediaLocator, CG_SCHEMA);
+	var MediaLocator=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_MediaLocator), CG_SCHEMA);
 	if (MediaLocator) 
 		if (!checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, MediaLocator, [tva.e_MediaUri, tva.e_AuxiliaryURI], [OTHER_ELEMENTS_OK], errs, "RR003"))
 			isRestart=false;
@@ -2331,8 +2342,8 @@ function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMateria
 function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, isCurrentProgram, parentLanguage, programCRIDs, requestType, errs) {
 
 	function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
-		var count=1, elem;
-		while (elem=node.get(SCHEMA_PREFIX+":"+elementName+"["+count+"]", CG_SCHEMA)) count++;
+		var count=0, elem;
+		while (elem=node.get(xPath(SCHEMA_PREFIX, elementName, ++count), CG_SCHEMA));
 		return count-1;
 	}
 
@@ -2369,9 +2380,9 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	if (VerifyType==tva.e_OnDemandProgram) {
 		// A177r1 Table 54 - must be 2 elements
 		
-		var Genre1=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"[1]", CG_SCHEMA);
-		var Genre2=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"[2]", CG_SCHEMA);
-		var Genre3=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre+"[3]", CG_SCHEMA);
+		var Genre1=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, 1), CG_SCHEMA);
+		var Genre2=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, 2), CG_SCHEMA);
+		var Genre3=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, 3), CG_SCHEMA);
 			
 		if (Genre3 || !Genre2 || !Genre1)
 			errs.pushCode("ID010", "exactly 2 <"+InstanceDescription.name()+"."+tva.e_Genre+"> elements are required for "+VerifyType);
@@ -2390,7 +2401,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 				errs.pushCode("ID013", InstanceDescription.name()+"."+tva.e_Genre+" elements must indicate different availabilities")
 		}
 	} else if (VerifyType==tva.e_ScheduleEvent) {
-		var Genre=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_Genre, CG_SCHEMA);
+		var Genre=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre), CG_SCHEMA);
 		if (Genre) {		
 			if (Genre.attr(tva.a_href)) {
 				if (isRestartAvailability(Genre.attr(tva.a_href).value())) 
@@ -2407,7 +2418,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	var captionCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, tva.e_CaptionLanguage);
 	if (captionCount > 1)
 		errs.pushCode("ID020", "only a single "+tva.e_CaptionLanguage+" element is permitted in "+InstanceDescription.name());
-	var CaptionLanguage=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_CaptionLanguage, CG_SCHEMA);
+	var CaptionLanguage=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_CaptionLanguage), CG_SCHEMA);
 	if (CaptionLanguage) {
 		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name()+"."+tva.e_CaptionLanguage, "ID021");
 		BooleanValue(CaptionLanguage, tva.a_closed, "ID022", errs)
@@ -2417,7 +2428,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	var signCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, tva.e_SignLanguage);
 	if (signCount > 1)
 		errs.pushCode("ID030", "only a single "+tva.e_SignLanguage+" element is premitted in "+InstanceDescription.name());
-	var SignLanguage=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_SignLanguage, CG_SCHEMA);
+	var SignLanguage=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_SignLanguage), CG_SCHEMA);
 	if (SignLanguage) {
 		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name()+"."+tva.e_SignLanguage, "ID-310");
 		FalseValue(SignLanguage, tva.a_closed, "ID032", errs)
@@ -2425,13 +2436,13 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	}
 	
 	// <AVAttributes>
-	var AVAttributes=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_AVAttributes, CG_SCHEMA);
+	var AVAttributes=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_AVAttributes), CG_SCHEMA);
 	if (AVAttributes)
 		ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs);
 	
 	// <OtherIdentifier>
-	var oi=1, OtherIdentifier;
-	while (OtherIdentifier=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_OtherIdentifier+"["+ oi++ +"]", CG_SCHEMA)) {
+	var oi=0, OtherIdentifier;
+	while (OtherIdentifier=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_OtherIdentifier, ++oi), CG_SCHEMA)) {
 		if (OtherIdentifier.attr(tva.a_type)) {			
 			var oiType=OtherIdentifier.attr(tva.a_type).value();
 	
@@ -2452,7 +2463,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	
 	// <RelatedMaterial>
 	if (VerifyType==tva.e_ScheduleEvent) {
-		var RelatedMaterial=InstanceDescription.get(SCHEMA_PREFIX+":"+tva.e_RelatedMaterial, CG_SCHEMA);
+		var RelatedMaterial=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial), CG_SCHEMA);
 		if (RelatedMaterial) {
 			if (ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs))
 				restartRelatedMaterial=RelatedMaterial; 		
@@ -2529,7 +2540,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	
 	// <Program>
 	var prog=0, Program
-	while (Program=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Program+"["+ ++prog +"]", CG_SCHEMA)) {
+	while (Program=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_Program, ++prog), CG_SCHEMA)) {
 		if (Program.attr(tva.a_crid)) {
 			var programCRID=Program.attr(tva.a_crid).value();
 			if (!isCRIDURI(programCRID))
@@ -2547,37 +2558,37 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 
 	// <ProgramURL>
 	var pUrl=0, ProgramURL;
-	while (ProgramURL=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL+"["+ ++pUrl +"]", CG_SCHEMA)) 
+	while (ProgramURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_ProgramURL, ++pUrl), CG_SCHEMA)) 
 		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, ProgramURL, errs, "OD020");
-	if (pUrl>1)
-		errs.push("OD021", "only a single <"+tva.e_ProgramURL+"> is permitted in <"+OnDemandProgram.name()+">")
+	if (--pUrl>1)
+		errs.pushCode("OD021", "only a single <"+tva.e_ProgramURL+"> is permitted in <"+OnDemandProgram.name()+">")
 
 
 	// <AuxiliaryURL>
 	var aux=0, AuxiliaryURL; 
-	while (AuxiliaryURL=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_AuxiliaryURL+"["+ ++aux +"]", CG_SCHEMA)) 
+	while (AuxiliaryURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_AuxiliaryURL, ++aux), CG_SCHEMA)) 
 		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, AuxiliaryURL, errs, "OD030");
-	if (aux>1)
-		errs.push("OD031", "only a single <"+tva.e_AuxiliaryURL+"> is permitted in <"+OnDemandProgram.name()+">")
+	if (--aux>1)
+		errs.pushCode("OD031", "only a single <"+tva.e_AuxiliaryURL+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <InstanceDescription>
 	var id=0, InstanceDescription;
-	while (InstanceDescription=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription+"["+ ++id +"]", CG_SCHEMA))
+	while (InstanceDescription=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_InstanceDescription, ++id), CG_SCHEMA))
 		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, false, odpLang, programCRIDs, requestType, errs);
-	if (id>1)
-		errs.push("OD041", "only a single <"+tva.e_InstanceDescription+"> is permitted in <"+OnDemandProgram.name()+">")
+	if (--id>1)
+		errs.pushCode("OD041", "only a single <"+tva.e_InstanceDescription+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <PublishedDuration>
 	var pd=0, PublishedDuration; 
-	while (PublishedDuration=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration+"["+ ++pd +"]", CG_SCHEMA)) 
+	while (PublishedDuration=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration, ++pd), CG_SCHEMA)) 
 		if (!isISODuration(PublishedDuration.text()))
 			errs.pushCode("OD050", OnDemandProgram.name()+"."+tva.e_PublishedDuration+" is not a valid ISO Duration (xs:duration)");
-	if (pd>1)
-		errs.push("OD051", "only a single <"+tva.e_PublishedDuration+"> is permitted in <"+OnDemandProgram.name()+">")
+	if (--pd>1)
+		errs.pushCode("OD051", "only a single <"+tva.e_PublishedDuration+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <StartOfAvailability> and <EndOfAvailability>
-	var soa=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_StartOfAvailability, CG_SCHEMA),
-	    eoa=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_EndOfAvailability, CG_SCHEMA);
+	var soa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_StartOfAvailability), CG_SCHEMA),
+	    eoa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_EndOfAvailability), CG_SCHEMA);
 	
 	if (soa) 
 		if (!isUTCDateTime(soa.text())) {
@@ -2597,18 +2608,18 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	
 	// <DeliveryMode>
 	var dm=0, DeliveryMode;
-	while (DeliveryMode=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_DeliveryMode+"["+ ++dm +"]", CG_SCHEMA))
+	while (DeliveryMode=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_DeliveryMode, ++dm), CG_SCHEMA))
 		if (DeliveryMode.text()!="streaming")
 			errs.pushCode("OD070", OnDemandProgram.name()+"."+tva.e_DeliveryMode+" must be \"streaming\"");
-	if (dm>1)
-		errs.push("OD071", "only a single <"+tva.e_DeliveryMode+"> is permitted in <"+OnDemandProgram.name()+">")
+	if (--dm>1)
+		errs.pushCode("OD071", "only a single <"+tva.e_DeliveryMode+"> is permitted in <"+OnDemandProgram.name()+">")
 	
 	// <Free>
 	var fr=0, Free;
-	while (Free=OnDemandProgram.get(SCHEMA_PREFIX+":"+tva.e_Free+"["+ ++fr +"]", CG_SCHEMA))
+	while (Free=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_Free, ++fr), CG_SCHEMA))
 		TrueValue(Free, tva.a_value, "OD080", errs)
-	if (fr>1)
-		errs.push("OD081", "only a single <"+tva.e_Free+"> is permitted in <"+OnDemandProgram.name()+">")
+	if (--fr>1)
+		errs.pushCode("OD081", "only a single <"+tva.e_Free+"> is permitted in <"+OnDemandProgram.name()+">")
 }	
 
 
@@ -2701,14 +2712,14 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		return		
 	}
 	var isCurrentProgram=false;
-	var se=1, ScheduleEvent;
-	while (ScheduleEvent=Schedule.get(SCHEMA_PREFIX+":"+tva.e_ScheduleEvent+"["+ se++ +"]", CG_SCHEMA)) {
+	var se=0, ScheduleEvent;
+	while (ScheduleEvent=Schedule.get(xPath(SCHEMA_PREFIX, tva.e_ScheduleEvent, ++se), CG_SCHEMA)) {
 		var seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE001");
 		
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, [tva.e_Program, tva.e_PublishedStartTime, tva.e_PublishedDuration], [tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_ActualStartTime, tva.e_FirstShowing, tva.e_Free], errs, "SE002");
 		
 		// <Program>
-		var Program=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_Program, CG_SCHEMA);
+		var Program=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_Program), CG_SCHEMA);
 		if (Program) {
 			var ProgramCRID=Program.attr(tva.a_crid);
 			if (ProgramCRID) {
@@ -2721,18 +2732,18 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		}
 			
 		// <ProgramURL>
-		var ProgramURL=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ProgramURL, CG_SCHEMA);
+		var ProgramURL=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_ProgramURL), CG_SCHEMA);
 		if (ProgramURL) 
 			if (!isDVBLocator(ProgramURL.text()))
 				errs.pushCode("SE021", tva.e_ScheduleEvent+"."+tva.e_ProgramURL+" ("+ProgramURL.text()+") is not a valid DVB locator");		
 		
 		// <InstanceDescription>
-		var InstanceDescription=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_InstanceDescription, CG_SCHEMA);
+		var InstanceDescription=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_InstanceDescription), CG_SCHEMA);
 		if (InstanceDescription) 
 			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, isCurrentProgram, seLang, programCRIDs,requestType, errs);
 		
 		// <PublishedStartTime> and <PublishedDuration>
-		var pstElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedStartTime, CG_SCHEMA);
+		var pstElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedStartTime), CG_SCHEMA);
 		if (pstElem) {
 
 			if (isUTCDateTime(pstElem.text())) {
@@ -2743,7 +2754,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
 					errs.pushCode("SE042", "<"+tva.e_PublishedStartTime+"> ("+PublishedStartTime+") is after "+tva.e_Schedule+"@"+tva.a_end);	
 
-				var pdElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_PublishedDuration, CG_SCHEMA);
+				var pdElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration), CG_SCHEMA);
 				if (pdElem && scheduleEnd) {
 					var parsedPublishedDuration = parseISOduration(pdElem.text());
 					if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
@@ -2755,16 +2766,16 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		}
 		
 		// <ActualStartTime> 
-		var astElem=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_ActualStartTime, CG_SCHEMA);
+		var astElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_ActualStartTime), CG_SCHEMA);
 		if (astElem && !isUTCDateTime(astElem.text())) 
 				errs.pushCode("SE051", "<"+tva.e_ActualStartTime+"> is not expressed in UTC format ("+astElem.text()+")");
 
 		// <FirstShowing>
-		var FirstShowing=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_FirstShowing, CG_SCHEMA);
+		var FirstShowing=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_FirstShowing), CG_SCHEMA);
 		if (FirstShowing) BooleanValue(FirstShowing, tva.a_value, "SE060", errs);
 		
 		// <Free>
-		var Free=ScheduleEvent.get(SCHEMA_PREFIX+":"+tva.e_Free, CG_SCHEMA);
+		var Free=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_Free), CG_SCHEMA);
 		if (Free) BooleanValue(Free, tva.a_value, "SE070", errs);
 	}
 }
@@ -2843,7 +2854,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 		return
 	}
 
-	var ProgramLocationTable=ProgramDescription.get(SCHEMA_PREFIX+":"+tva.e_ProgramLocationTable, CG_SCHEMA);
+	var ProgramLocationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_ProgramLocationTable), CG_SCHEMA);
 	if (!ProgramLocationTable) {
 		errs.pushCode("PL001", "<"+tva.e_ProgramLocationTable+"> is not specified");
 		return;
@@ -2919,7 +2930,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 
 		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
 		
-		var ProgramDescription=CG.get(SCHEMA_PREFIX+":"+tva.e_ProgramDescription, CG_SCHEMA);
+		var ProgramDescription=CG.get(xPath(SCHEMA_PREFIX, tva.e_ProgramDescription), CG_SCHEMA);
 		if (!ProgramDescription) {
 			errs.pushCode("CG004", "No <"+tva.e_ProgramDescription+"> element specified.");
 			return;
