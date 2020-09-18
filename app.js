@@ -1,7 +1,6 @@
 // node.js - https://nodejs.org/en/
 // express framework - https://expressjs.com/en/4x/api.html
 const express=require("express");
-var app=express();
 
 const fs=require("fs"), path=require("path");
 const {parse}=require("querystring");
@@ -92,23 +91,6 @@ var knownLanguages=new IANAlanguages();
 /* // LINT
 var TVAschema, MPEG7schema, XMLschema;
 */
-morgan.token("protocol", function getProtocol(req) {
-    return req.protocol;
-});
-morgan.token("parseErr",function getParseErr(req) {
-    if (req.parseErr) return "("+req.parseErr+")";
-    return "";
-});
-morgan.token("agent",function getAgent(req) {
-    return "("+req.headers["user-agent"]+")";
-});
-morgan.token("cgLoc",function getCheckedLocation(req) {
-	if (req.files && req.files.CGfile) return "["+req.files.CGfile.name+"]";
-    if (req.query.CGurl) return "["+req.query.CGurl+"]";
-	return "[*]";
-});
-
-app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length] - :response-time ms :agent :parseErr :cgLoc"));
 
 
 /**
@@ -161,6 +143,9 @@ function HTMLize(str) {
  */
 function elementize(str) {
 	return "<"+str+">";
+}
+String.prototype.elementize = function() {
+	return "<"+this+">";
 }
  
  
@@ -3107,6 +3092,26 @@ function processQuery(req, res) {
 
 
 //middleware
+
+morgan.token("protocol", function getProtocol(req) {
+    return req.protocol;
+});
+morgan.token("parseErr",function getParseErr(req) {
+    if (req.parseErr) return "("+req.parseErr+")";
+    return "";
+});
+morgan.token("agent",function getAgent(req) {
+    return "("+req.headers["user-agent"]+")";
+});
+morgan.token("cgLoc",function getCheckedLocation(req) {
+	if (req.files && req.files.CGfile) return "["+req.files.CGfile.name+"]";
+    if (req.query.CGurl) return "["+req.query.CGurl+"]";
+	return "[*]";
+});
+
+var app=express();
+app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length] - :response-time ms :agent :parseErr :cgLoc"));
+
 app.use(express.static(__dirname));
 app.set('view engine', 'ejs');
 app.use(fileUpload());
