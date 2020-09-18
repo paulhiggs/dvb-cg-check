@@ -557,7 +557,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errs=
 		});
 		if (tableHeader) res.write("</table>");        
 	}
-	if (!resultsShown) res.write("no errors or warnings");
+	if (!error && !resultsShown) res.write("no errors or warnings");
 }
 
 /**
