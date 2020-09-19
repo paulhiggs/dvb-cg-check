@@ -1,7 +1,7 @@
 {
 	"name": "DVB-ContentGuide-Check",
 	"description": "DVB Content Guide metadata validator",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"private": true,
 	"dependencies": {
 		"express": "4.x",

@@ -1,44 +1,44 @@
 // node.js - https://nodejs.org/en/
 // express framework - https://expressjs.com/en/4x/api.html
-const express=require("express");
+const express=require("express")
 
-const fs=require("fs"), path=require("path");
-const {parse}=require("querystring");
+const fs=require("fs"), path=require("path")
+const {parse}=require("querystring")
 
-const ErrorList=require("./dvb-common/ErrorList.js");
-const dvbi=require("./dvb-common/DVB-I_definitions.js");
-const tva=require("./dvb-common/TVA_definitions.js");
+const ErrorList=require("./dvb-common/ErrorList.js")
+const dvbi=require("./dvb-common/DVB-I_definitions.js")
+const tva=require("./dvb-common/TVA_definitions.js")
 
-const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js");
-const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js");
-const {loadCS}=require("./dvb-common/CS_handler.js");
+const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js")
+const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js")
+const {loadCS}=require("./dvb-common/CS_handler.js")
 
-//const ISOcountries=require("./dvb-common/ISOcountries.js");
-const IANAlanguages=require("./dvb-common/IANAlanguages.js");
+//const ISOcountries=require("./dvb-common/ISOcountries.js")
+const IANAlanguages=require("./dvb-common/IANAlanguages.js")
 
 // libxmljs - https://github.com/libxmljs/libxmljs
-const libxml=require("libxmljs");
+const libxml=require("libxmljs")
 
 //LINT: validation against schema
-//const xmllint=require("xmllint");
+//const xmllint=require("xmllint")
 
 // morgan - https://github.com/expressjs/morgan
 const morgan=require("morgan")
 
 // sync-request - https://github.com/ForbesLindesay/sync-request
-const syncRequest=require("sync-request");
+const syncRequest=require("sync-request")
 
 // express-fileupload - https://github.com/richardgirges/express-fileupload#readme
-const fileUpload=require('express-fileupload');
+const fileUpload=require('express-fileupload')
 
 // https://github.com/alexei/sprintf.js
 var sprintf=require("sprintf-js").sprintf,
     vsprintf=require("sprintf-js").vsprintf
 	
-const https=require("https");
+const https=require("https")
 const HTTP_SERVICE_PORT=3020;
 const HTTPS_SERVICE_PORT=HTTP_SERVICE_PORT+1;
-const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt");
+const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt")
 
 
 // convenience/readability values
@@ -3049,6 +3049,39 @@ function validateContentGuide(CGtext, requestType, errs) {
 
 
 /**
+ * Load classification schemes and other configuration files
+ *
+ * @param {boolean} useURLs when true, load configuration files from network locations
+ */ 
+function loadDataFiles(useURLs) {
+	console.log("loading classification schemes...");
+    allowedGenres=[];
+	loadCS(allowedGenres, useURLs, TVA_ContentCSFilename, TVA_ContentCSURL);
+	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
+	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
+
+	// console.log("loading countries...");
+	// knownCountries.loadCountriesFromFile(ISO3166_Filename, true);
+  
+    console.log("loading languages...");
+	knownLanguages.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
+	//knownLanguages.loadLanguagesFromURL(IANA_Subtag_Registry_URL, true);
+	
+	console.log("loading CreditItem roles...");
+	allowedCreditItemRoles=[];
+	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
+	loadRoles(allowedCreditItemRoles, useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
+/*	
+	// LINT
+	console.log("loading Schemas...");
+	TVAschema=loadSchema(false, TVAschemaFileName);
+	MPEG7schema=loadSchema(false, MPEG7schemaFileName);
+	XMLschema=loadSchema(false, XMLschemaFileName);
+*/
+}
+
+
+/**
  * Process the content guide specificed for errors and display them
  *
  * @param {Object} req The request from Express
@@ -3088,32 +3121,6 @@ function processQuery(req, res) {
     }
     res.end();
 }
-
-
-//middleware
-
-morgan.token("protocol", function getProtocol(req) {
-    return req.protocol;
-});
-morgan.token("parseErr",function getParseErr(req) {
-    if (req.parseErr) return "("+req.parseErr+")";
-    return "";
-});
-morgan.token("agent",function getAgent(req) {
-    return "("+req.headers["user-agent"]+")";
-});
-morgan.token("cgLoc",function getCheckedLocation(req) {
-	if (req.files && req.files.CGfile) return "["+req.files.CGfile.name+"]";
-    if (req.query.CGurl) return "["+req.query.CGurl+"]";
-	return "[*]";
-});
-
-var app=express();
-app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length] - :response-time ms :agent :parseErr :cgLoc"));
-
-app.use(express.static(__dirname));
-app.set('view engine', 'ejs');
-app.use(fileUpload());
 
 
 /**
@@ -3160,41 +3167,33 @@ function processFile(req,res) {
     res.end();
 }
 
-/**
- * Load classification schemes and other configuration files
- *
- * @param {boolean} useURLs when true, load configuration files from network locations
- */ 
-function loadDataFiles(useURLs) {
-	console.log("loading classification schemes...");
-    allowedGenres=[];
-	loadCS(allowedGenres, useURLs, TVA_ContentCSFilename, TVA_ContentCSURL);
-	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
-	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
-
-	// console.log("loading countries...");
-	// knownCountries.loadCountriesFromFile(ISO3166_Filename, true);
-  
-    console.log("loading languages...");
-	knownLanguages.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
-	//knownLanguages.loadLanguagesFromURL(IANA_Subtag_Registry_URL, true);
-	
-	console.log("loading CreditItem roles...");
-	allowedCreditItemRoles=[];
-	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
-	loadRoles(allowedCreditItemRoles, useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
-/*	
-	// LINT
-	console.log("loading Schemas...");
-	TVAschema=loadSchema(false, TVAschemaFileName);
-	MPEG7schema=loadSchema(false, MPEG7schemaFileName);
-	XMLschema=loadSchema(false, XMLschemaFileName);
-*/
-}
-
 
 // read in the validation data
 loadDataFiles(false);
+
+//middleware
+morgan.token("protocol", function getProtocol(req) {
+    return req.protocol;
+});
+morgan.token("parseErr",function getParseErr(req) {
+    if (req.parseErr) return "("+req.parseErr+")";
+    return "";
+});
+morgan.token("agent",function getAgent(req) {
+    return "("+req.headers["user-agent"]+")";
+});
+morgan.token("cgLoc",function getCheckedLocation(req) {
+	if (req.files && req.files.CGfile) return "["+req.files.CGfile.name+"]";
+    if (req.query.CGurl) return "["+req.query.CGurl+"]";
+	return "[*]";
+});
+
+var app=express();
+app.use(morgan(":remote-addr :protocol :method :url :status :res[content-length] - :response-time ms :agent :parseErr :cgLoc"));
+
+app.use(express.static(__dirname));
+app.set('view engine', 'ejs');
+app.use(fileUpload());
 
 // initialize Express
 app.use(express.urlencoded({ extended: true }));
