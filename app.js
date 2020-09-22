@@ -8,13 +8,11 @@ const {parse}=require("querystring")
 const ErrorList=require("./dvb-common/ErrorList.js")
 const dvbi=require("./dvb-common/DVB-I_definitions.js")
 const tva=require("./dvb-common/TVA_definitions.js")
+const mpeg7=require("./dvb-common/MPEG7_definitions.js")
 
 const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js")
 const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js")
 const {loadCS}=require("./dvb-common/CS_handler.js")
-
-//const ISOcountries=require("./dvb-common/ISOcountries.js")
-const IANAlanguages=require("./dvb-common/IANAlanguages.js")
 
 // libxmljs - https://github.com/libxmljs/libxmljs
 const libxml=require("libxmljs")
@@ -36,38 +34,38 @@ var sprintf=require("sprintf-js").sprintf,
     vsprintf=require("sprintf-js").vsprintf
 	
 const https=require("https")
-const HTTP_SERVICE_PORT=3020;
-const HTTPS_SERVICE_PORT=HTTP_SERVICE_PORT+1;
+const HTTP_SERVICE_PORT=3020
+const HTTPS_SERVICE_PORT=HTTP_SERVICE_PORT+1
 const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt")
 
 
 // convenience/readability values
-const DEFAULT_LANGUAGE="***";
-const CATEGORY_GROUP_NAME="\"category group\"";
-const PARENT_GROUP_NAME="\"parent group\"";
+const DEFAULT_LANGUAGE="***"
+const CATEGORY_GROUP_NAME="\"category group\""
+const PARENT_GROUP_NAME="\"parent group\""
 
-const CG_REQUEST_SCHEDULE_TIME="Time";
-const CG_REQUEST_SCHEDULE_NOWNEXT="NowNext";
-const CG_REQUEST_SCHEDULE_WINDOW="Window";
-const CG_REQUEST_PROGRAM="ProgInfo";
-const CG_REQUEST_MORE_EPISODES="MoreEpisodes";
-const CG_REQUEST_BS_CATEGORIES="bsCategories";
-const CG_REQUEST_BS_LISTS="bsLists";
-const CG_REQUEST_BS_CONTENTS="bsContents";
+const CG_REQUEST_SCHEDULE_TIME="Time"
+const CG_REQUEST_SCHEDULE_NOWNEXT="NowNext"
+const CG_REQUEST_SCHEDULE_WINDOW="Window"
+const CG_REQUEST_PROGRAM="ProgInfo"
+const CG_REQUEST_MORE_EPISODES="MoreEpisodes"
+const CG_REQUEST_BS_CATEGORIES="bsCategories"
+const CG_REQUEST_BS_LISTS="bsLists"
+const CG_REQUEST_BS_CONTENTS="bsContents"
 
-const MAX_UNSIGNED_SHORT=65535;
-const OTHER_ELEMENTS_OK="!!!";
+const MAX_UNSIGNED_SHORT=65535
+const OTHER_ELEMENTS_OK="!!!"
 
 const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
       TVA_FormatCSFilename=path.join("dvb-common/tva","FormatCS.xml"),
       DVBI_ContentSubjectFilename=path.join("dvb-common/dvbi","DVBContentSubjectCS-2019.xml"),
 	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
-	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt");
+	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt")
 
 /* // LINT:
 const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
 	  MPEG7schemaFileName=path.join("schema","tva_mpeg7.xsd"),
-	  XMLschemaFileName=path.join("schema","xml.xsd");
+	  XMLschemaFileName=path.join("schema","xml.xsd")
 */
 const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
       COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
@@ -75,19 +73,23 @@ const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/
       TVA_FormatCSURL=COMMON_REPO_RAW + "tva/" + "FormatCS.xml",
       DVBI_ContentSubjectURL=COMMON_REPO_RAW + "dvbi/" + "DVBContentSubjectCS-2019.xml",
 	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt",
-	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt";
+	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt"
 
 const ISO3166_URL=COMMON_REPO_RAW + "iso3166-countries.json",
-	  ISO3166_Filename=path.join("dvb-common","iso3166-countries.json");
+	  ISO3166_Filename=path.join("dvb-common","iso3166-countries.json")
       
 
 // curl from https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
 const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-registry"),
-      IANA_Subtag_Registry_URL="https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry";
+      IANA_Subtag_Registry_URL="https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry"
 
-var allowedGenres=[], allowedCreditItemRoles=[];
-//var knownCountries=new ISOcountries(false, true);
-var knownLanguages=new IANAlanguages();
+const IANAlanguages=require("./dvb-common/IANAlanguages.js")
+var allowedGenres=[], allowedCreditItemRoles=[]
+
+//const ISOcountries=require("./dvb-common/ISOcountries.js")
+//var knownCountries=new ISOcountries(false, true)
+
+var knownLanguages=new IANAlanguages()
 /* // LINT
 var TVAschema, MPEG7schema, XMLschema;
 */
@@ -2213,7 +2215,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs) {
 	
 	function isValidAudioMixType(mixType) {
-		return mixType==dvbi.AUDIO_MIX_MONO || mixType==dvbi.AUDIO_MIX_STEREO || mixType==dvbi.AUDIO_MIX_5_1;
+		return mixType==mpeg7.AUDIO_MIX_MONO || mixType==mpeg7.AUDIO_MIX_STEREO || mixType==mpeg7.AUDIO_MIX_5_1;
 	}
 	function isValidAudioLanguagePurpose(purpose) {
 		return purpose==dvbi.AUDIO_PURPOSE_MAIN || purpose==dvbi.AUDIO_PURPOSE_DESCRIPTION;
