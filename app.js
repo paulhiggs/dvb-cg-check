@@ -751,19 +751,19 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 		if (synopsisLength) {
 			if (isIn(requiredLengths, synopsisLength) || isIn(optionalLengths, synopsisLength)) {
 				switch (synopsisLength) {
-				case dvbi.SYNOPSIS_SHORT_LABEL:
-					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_SHORT_LENGTH)
-						errs.pushCode(errCode?errCode+"-1":"SY011", synopsisLengthError(dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_SHORT_LENGTH));
+				case tva.SYNOPSIS_SHORT_LABEL:
+					if ((unEntity(Synopsis.text()).length) > tva.SYNOPSIS_SHORT_LENGTH)
+						errs.pushCode(errCode?errCode+"-1":"SY011", synopsisLengthError(tva.SYNOPSIS_SHORT_LABEL, tva.SYNOPSIS_SHORT_LENGTH));
 					hasShort=true;
 					break;
-				case dvbi.SYNOPSIS_MEDIUM_LABEL:
-					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_MEDIUM_LENGTH)
-						errs.pushCode(errCode?errCode+"-2":"SY012", synopsisLengthError(dvbi.SYNOPSIS_MEDIUM_LABEL, dvbi.SYNOPSIS_MEDIUM_LENGTH));
+				case tva.SYNOPSIS_MEDIUM_LABEL:
+					if ((unEntity(Synopsis.text()).length) > tva.SYNOPSIS_MEDIUM_LENGTH)
+						errs.pushCode(errCode?errCode+"-2":"SY012", synopsisLengthError(tva.SYNOPSIS_MEDIUM_LABEL, tva.SYNOPSIS_MEDIUM_LENGTH));
 					hasMedium=true;
 					break;
-				case dvbi.SYNOPSIS_LONG_LABEL:
-					if ((unEntity(Synopsis.text()).length) > dvbi.SYNOPSIS_LONG_LENGTH)
-						errs.pushCode(errCode?errCode+"-3":"SY013", synopsisLengthError(dvbi.SYNOPSIS_LONG_LABEL, dvbi.SYNOPSIS_LONG_LENGTH));
+				case tva.SYNOPSIS_LONG_LABEL:
+					if ((unEntity(Synopsis.text()).length) > tva.SYNOPSIS_LONG_LENGTH)
+						errs.pushCode(errCode?errCode+"-3":"SY013", synopsisLengthError(tva.SYNOPSIS_LONG_LABEL, tva.SYNOPSIS_LONG_LENGTH));
 					hasLong=true;
 					hasLong=true;
 					break;						
@@ -775,17 +775,17 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 	
 		if (synopsisLang && synopsisLength) {
 			switch (synopsisLength) {
-				case dvbi.SYNOPSIS_SHORT_LABEL:
+				case tva.SYNOPSIS_SHORT_LABEL:
 					if (isIn(shortLangs, synopsisLang)) 
 						errs.pushCode(errCode?errCode+"-6":"SY016",singleLengthLangError(synopsisLength, synopsisLang));
 					else shortLangs.push(synopsisLang);
 					break;
-				case dvbi.SYNOPSIS_MEDIUM_LABEL:
+				case tva.SYNOPSIS_MEDIUM_LABEL:
 					if (isIn(mediumLangs, synopsisLang)) 
 						errs.pushCode(errCode?errCode+"-7":"SY017",singleLengthLangError(synopsisLength, synopsisLang));
 					else mediumLangs.push(synopsisLang);
 					break;
-				case dvbi.SYNOPSIS_LONG_LABEL:
+				case tva.SYNOPSIS_LONG_LABEL:
 					if (isIn(longLangs, synopsisLang)) 
 						errs.pushCode(errCode?errCode+"-8":"SY018",singleLengthLangError(synopsisLength, synopsisLang));
 					else longLangs.push(synopsisLang);
@@ -794,12 +794,12 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 		}
 	}
 	
-	if (isIn(requiredLengths, dvbi.SYNOPSIS_SHORT_LABEL) && !hasShort)
-		errs.pushCode(errCode?errCode+"-9":"SY019",requiredSynopsisError(dvbi.SYNOPSIS_SHORT_LABEL));	
-	if (isIn(requiredLengths, dvbi.SYNOPSIS_MEDIUM_LABEL) && !hasMedium)
-		errs.pushCode(errCode?errCode+"-10":"SY020",requiredSynopsisError(dvbi.SYNOPSIS_MEDIUM_LABEL));	
-	if (isIn(requiredLengths, dvbi.SYNOPSIS_LONG_LABEL) && !hasLong)
-		errs.pushCode(errCode?errCode+"-11":"SY021",requiredSynopsisError(dvbi.SYNOPSIS_LONG_LABEL));	
+	if (isIn(requiredLengths, tva.SYNOPSIS_SHORT_LABEL) && !hasShort)
+		errs.pushCode(errCode?errCode+"-9":"SY019",requiredSynopsisError(tva.SYNOPSIS_SHORT_LABEL));	
+	if (isIn(requiredLengths, tva.SYNOPSIS_MEDIUM_LABEL) && !hasMedium)
+		errs.pushCode(errCode?errCode+"-10":"SY020",requiredSynopsisError(tva.SYNOPSIS_MEDIUM_LABEL));	
+	if (isIn(requiredLengths, tva.SYNOPSIS_LONG_LABEL) && !hasLong)
+		errs.pushCode(errCode?errCode+"-11":"SY021",requiredSynopsisError(tva.SYNOPSIS_LONG_LABEL));	
 }
 
 
@@ -1568,7 +1568,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				case CG_REQUEST_SCHEDULE_TIME:
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD010");	
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
-					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL], requestType, errs, parentLanguage);
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [tva.SYNOPSIS_SHORT_LABEL], requestType, errs, parentLanguage);
 					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
 					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
@@ -1576,7 +1576,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				case CG_REQUEST_PROGRAM:	// 6.10.5.3
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_Genre, tva.e_ParentalGuidance, tva.e_CreditsList, tva.e_RelatedMaterial], errs, "BD020");
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
-					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [dvbi.SYNOPSIS_SHORT_LABEL, dvbi.SYNOPSIS_LONG_LABEL], requestType, errs, parentLanguage);
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [tva.SYNOPSIS_SHORT_LABEL, tva.SYNOPSIS_LONG_LABEL], requestType, errs, parentLanguage);
 					ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, parentLanguage);
 					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);	
@@ -1586,7 +1586,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				case CG_REQUEST_BS_CONTENTS:  // 6.10.5.4					
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_Synopsis, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD030");
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
-					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [dvbi.SYNOPSIS_MEDIUM_LABEL], requestType, errs, parentLanguage);
+					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.SYNOPSIS_MEDIUM_LABEL], requestType, errs, parentLanguage);
 					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
 					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
@@ -1612,7 +1612,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 					
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, parentLanguage);						
 					if (!isParentGroup) {
-						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, parentLanguage);
+						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, parentLanguage);
 						ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, parentLanguage);
 						ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					}
@@ -1628,7 +1628,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_RelatedMaterial], errs, "BD081");
 					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, parentLanguage);
 					if (!isParentGroup)
-						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [dvbi.SYNOPSIS_SHORT_LABEL], [], requestType, errs, parentLanguage);
+						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_SHORT_LABEL], [], requestType, errs, parentLanguage);
 					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
