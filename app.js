@@ -105,12 +105,10 @@ var TVAschema, MPEG7schema, XMLschema;
 function isIn(values, value){
     if (typeof(values)=="string")
         return values==value;
+   
+    if (typeof(values)=="object") 	
+		return values.includes(value)
     
-    if (typeof(values)=="object") {
-        for (var x=0; x<values.length; x++) 
-            if (values[x]==value)
-                return true;
-    }
     return false;
 }
 
