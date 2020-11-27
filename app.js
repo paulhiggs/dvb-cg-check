@@ -445,10 +445,10 @@ function isDVBLocator(locator) {
  * @param {Object}  res       the Express result 
  * @param {string}  lastInput the url or file name previously used - used to keep the form intact
  * @param {string}  lastType  the previously request type - used to keep the form intact
- * @param {string}  error     a single error message to display on the form, genrrally related to loading the content to validate
+ * @param {string}  error     a single error message to display on the form, generally related to loading the content to validate
  * @param {Object}  errors    the errors and warnings found during the content guide validation
  */
-function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errs=null) {
+function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errors=null) {
 	
 	const FORM_TOP="<html><head><title>DVB-I Content Guide Validator</title></head><body>";
 	const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
@@ -2934,7 +2934,8 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
  * @param {Class} errs errors found in validaton
  */
 function validateContentGuide(CGtext, requestType, errs) {
-	var CG=null;
+	let CG=null
+console.log(CGtext)
 	if (CGtext) try {
 		CG=libxml.parseXmlString(CGtext);
 	} catch (err) {
@@ -2962,26 +2963,26 @@ function validateContentGuide(CGtext, requestType, errs) {
 */
 
 	if (CG.root().name()!==tva.e_TVAMain) {
-		errs.pushCode("CG002", "Root element is not "+elementize(tva.e_TVAMain));
+		errs.pushCode("CG002", "Root element is not "+elementize(tva.e_TVAMain))
+		return
 	}
-	else {
-		var CG_SCHEMA={}, 
-			SCHEMA_PREFIX=CG.root().namespace()?CG.root().namespace().prefix():"", 
-			SCHEMA_NAMESPACE=CG.root().namespace()?CG.root().namespace().href():"";
-		CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
+	let CG_SCHEMA={}, 
+		SCHEMA_PREFIX=CG.root().namespace()?CG.root().namespace().prefix():"", 
+		SCHEMA_NAMESPACE=CG.root().namespace()?CG.root().namespace().href():"";
+	CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
-		var tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
-		
-		var ProgramDescription=CG.get(xPath(SCHEMA_PREFIX, tva.e_ProgramDescription), CG_SCHEMA);
-		if (!ProgramDescription) {
-			errs.pushCode("CG004", "No "+elementize(tva.e_ProgramDescription)+" element specified.");
-			return;
-		}
-		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [], [], errs, "CG005")
-		
-		var programCRIDs=[], groupIds=[], o={childCount:0};
-		
-		switch (requestType) {
+	let tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
+	
+	let ProgramDescription=CG.get(xPath(SCHEMA_PREFIX, tva.e_ProgramDescription), CG_SCHEMA);
+	if (!ProgramDescription) {
+		errs.pushCode("CG004", "No "+elementize(tva.e_ProgramDescription)+" element specified.");
+		return;
+	}
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [], [], errs, "CG005")
+	
+	let programCRIDs=[], groupIds=[], o={childCount:0};
+	
+	switch (requestType) {
 		case CG_REQUEST_SCHEDULE_TIME:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable], [], errs, "CG011"); 
@@ -2996,7 +2997,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 			// <GroupInformation> may become optional for now/next, the program sequence should be determined by ScheduleEvent.PublishedStartTime
 			if (hasElement(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tva.e_GroupInformationTable))
 				CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
-			var currentProgramCRID=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
+			let currentProgramCRID=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRID, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_WINDOW:
@@ -3005,7 +3006,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 			// <GroupInformation> may become optional for now/next, the program sequence should be determined by ScheduleEvent.PublishedStartTime
 			if (hasElement(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tva.e_GroupInformationTable))
 				CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
-			var currentProgramCRID=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
+			let currentProgramCRID=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRID, requestType, errs);
 			break;
 		case CG_REQUEST_PROGRAM:
@@ -3043,8 +3044,7 @@ function validateContentGuide(CGtext, requestType, errs) {
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
 			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs, o);
 			break;
-		}
-	}	
+	}
 }
 
 
