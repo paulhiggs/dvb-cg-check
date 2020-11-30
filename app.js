@@ -1256,7 +1256,7 @@ function NoChildElement(errs, missingElement, parentElement, schemaLocation=null
  * @param {string} errno   The error number to show in the log
  */
 function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
-	errs.pushCode(errno?errno:"HV001", "invalid @"+tva.a_href+"="+quote(value)+" specified for "+src+(loc)?" in "+loc:"");
+	errs.pushCode(errno?errno:"HV001", "invalid "+tva.a_href.attribute()+"="+quote(value)+" specified for "+src+(loc)?" in "+loc:"");
 }
 
 
@@ -1314,7 +1314,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 							else {
 								var contentType=child.attr(tva.a_contentType).value();
 								if (contentType!=dvbi.XML_AIT_CONTENT_TYPE) 
-									errs.pushCode("TA011", "invalid @"+tva.a_contentType+"="+quote(contentType)+" specified for "+elementize(RelatedMaterial.name())+elementize(tva.e_MediaLocator)+" in "+Location);
+									errs.pushCode("TA011", "invalid "+tva.a_contentType.attribute()+"="+quote(contentType)+" specified for "+elementize(RelatedMaterial.name())+elementize(tva.e_MediaLocator)+" in "+Location);
 							}
 						}
 					});	
@@ -1509,13 +1509,13 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 			errs.pushCode(errCode?errCode+"-1":"VT011", elementize(tva.e_Title)+" length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 		if (titleType==dvbi.TITLE_MAIN_TYPE) {
 			if (isIn(mainSet, titleLang))
-				errs.pushCode(errCode?errCode+"-2":"VT012", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"="+quote(dvbi.TITLE_MAIN_TYPE))
+				errs.pushCode(errCode?errCode+"-2":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+quote(dvbi.TITLE_MAIN_TYPE))
 			else mainSet.push(titleLang);
 		}
 		else if (titleType==dvbi.TITLE_SECONDARY_TYPE) {
 			if (allowSecondary) {
 				if (isIn(secondarySet, titleLang))
-					errs.pushCode(errCode?errCode+"-3":"VT013", "only a single language ("+titleLang+") is permitted for @"+tva.a_type+"="+quote(dvbi.TITLE_SECONDARY_TYPE))
+					errs.pushCode(errCode?errCode+"-3":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+quote(dvbi.TITLE_SECONDARY_TYPE))
 				else secondarySet.push(titleLang);
 			}
 			else 
@@ -1527,7 +1527,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 		secondarySet.forEach(lang => {
 			if (!isIn(mainSet, lang)) {
 				var tLoc= lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"="+quote(lang) : "";
-				errs.pushCode(errCode?errCode+"-6":"VT016", tva.a_type.attribute()+"="+quote(dvbi.TITLE_SECONDARY_TYPE)+" specified without @"+tva.a_type+"="+quote(dvbi.TITLE_MAIN_TYPE)+tLloc);
+				errs.pushCode(errCode?errCode+"-6":"VT016", tva.a_type.attribute()+"="+quote(dvbi.TITLE_SECONDARY_TYPE)+" specified without "+tva.a_type.attribute()+"="+quote(dvbi.TITLE_MAIN_TYPE)+tLloc);
 			}
 		});
 	}
@@ -2259,7 +2259,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 
 				var combo=audioLang+"!--!"+AudioLanguage.attr(tva.a_purpose).value();
 				if (isIn(foundAttributes, combo))
-					errs.pushCode("AV016", "audio @"+tva.a_purpose+" "+quote(AudioLanguage.attr(tva.a_purpose).value())+" already specified for language "+quote(audioLang));
+					errs.pushCode("AV016", "audio "+tva.a_purpose.attribute()+" "+quote(AudioLanguage.attr(tva.a_purpose).value())+" already specified for language "+quote(audioLang));
 				else
 					foundAttributes.push(combo);
 			}
@@ -2856,7 +2856,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 
 	if (startSchedule && endSchedule) {
 		if (to.getTime() <= fr.getTime()) 
-			errs.pushCode("VS012", tva.a_start.attribute(Schedule.name())+" must be earlier than @"+tva.a_end);
+			errs.pushCode("VS012", tva.a_start.attribute(Schedule.name())+" must be earlier than "+tva.a_end.attribute());
 	}
 	
 	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, plCRIDs, currentProgramCRID, fr, to, requestType, errs);
@@ -2907,7 +2907,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 				var thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs);
 				if (thisServiceIdRef.length)
 					if (isIn(foundServiceIds, thisServiceIdRef))
-						errs.pushCode("PL020", "A "+elementize(tva.e_Schedule)+" element with @"+tva.a_serviceIDRef+"="+quote(thisServiceIdRef)+" is already specified")
+						errs.pushCode("PL020", "A "+elementize(tva.e_Schedule)+" element with "+tva.a_serviceIDRef.attribute()+"="+quote(thisServiceIdRef)+" is already specified")
 					else 
 						foundServiceIds.push(thisServiceIdRef);
 				cnt++;
