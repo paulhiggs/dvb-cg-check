@@ -917,14 +917,13 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 				case tva.e_MinimumAge:
 				case tva.e_ParentalRating:
 					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-						errs.pushCode(errCode?errCode+"-1":"PG001", "first "+elementize(tva.e_ParentalGuidance)+" element must contain "+elementize("mpeg7:"+tva.e_MinimumAge));
+						errs.pushCode(errCode?errCode+"-1":"PG011", "first "+elementize(tva.e_ParentalGuidance)+" element must contain "+elementize("mpeg7:"+tva.e_MinimumAge));
 					
 					if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-						errs.pushCode(errCode?errCode+"-2":"PG002", elementize(tva.e_MinimumAge)+" must be in the first "+elementize(tva.e_ParentalGuidance)+" element");
+						errs.pushCode(errCode?errCode+"-2":"PG012", elementize(tva.e_MinimumAge)+" must be in the first "+elementize(tva.e_ParentalGuidance)+" element");
 					
 					if (pgChild.name()==tva.e_ParentalRating) {
-						if (!pgChild.attr(tva.a_href))
-							NoHrefAttribute(errs, tva.e_ParentalRating, tva.e_ParentalGuidance )
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
 					}
 					break;		
 				case tva.e_ExplanatoryText:
@@ -1258,18 +1257,6 @@ function NoChildElement(errs, missingElement, parentElement, schemaLocation=null
  */
 function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
 	errs.pushCode(errno?errno:"HV001", "invalid @"+tva.a_href+"="+quote(value)+" specified for "+src+(loc)?" in "+loc:"");
-}
-
-
-/**
- * Add an error message when the @href is not specified for an element
- *
- * @param {Object} errs Errors buffer
- * @param {String} src The element missing the @href
- * @param {String} loc The location of the element
- */
-function NoHrefAttribute(errs, src, loc=null, errno=null) {
-	errs.pushCode(errno?errno:"HA001","no @"+tva.a_href+" specified for "+src+((loc)?" in "+loc:""));
 }
 
 
@@ -2389,13 +2376,13 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
 	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
 	
-	function checkGenre(node) {
+	function checkGenre(node, CG_SCHEMA, SCHEMA_PREFIX, errs, errcode=null) {
 		if (!node) return null;
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, node, [tva.a_href], [tva.a_type], errs, errcode?errcode+"-1":"ChG001")
 		var GenreType=(node.attr(tva.a_type)?node.attr(tva.a_type).value():"other");
 		if (GenreType!="other")
-			errs.pushCode("ID101", tva.a_type.attribute(node.parent().name()+"."+node.name())+" must contain "+quote("other"));
-		if (!node.attr(tva.a_href))
-			NoHrefAttribute(errs, node.name(), node.parent().name());
+			errs.pushCode(errcode?errcode+"-2":"ChG002", tva.a_type.attribute(node.parent().name()+"."+node.name())+" must contain "+quote("other"));
+
 		return (node.attr(tva.a_href)?node.attr(tva.a_href).value():null);
 	}
 
@@ -2421,33 +2408,32 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		var Genre2=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, 2), CG_SCHEMA);
 		var Genre3=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, 3), CG_SCHEMA);
 			
-		if (Genre3 || !Genre2 || !Genre1)
+		if (Genre3)
 			errs.pushCode("ID010", "exactly 2 "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" elements are required for "+VerifyType);
 
-		var g1href=checkGenre(Genre1);
+		var g1href=checkGenre(Genre1, CG_SCHEMA, SCHEMA_PREFIX, errs, "ID011")
 		if (g1href && !isAvailability(g1href))
-			errs.pushCode("ID011", "first "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
+			errs.pushCode("ID012", "first "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
 
-		var g2href=checkGenre(Genre2);		
+		var g2href=checkGenre(Genre2, CG_SCHEMA, SCHEMA_PREFIX, errs, "IF013");		
 		if (g2href && !isAvailability(g2href))
-			errs.pushCode("ID012", "second "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
+			errs.pushCode("ID014", "second "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
 		
 		if (Genre1 && Genre2) {
 			if ((isMediaAvailability(g1href) && isMediaAvailability(g2href))
 			 || (isEPGAvailability(g1href) && isEPGAvailability(g2href)))
-				errs.pushCode("ID013", elementize(InstanceDescription.name()+"."+tva.e_Genre)+" elements must indicate different availabilities")
+				errs.pushCode("ID015", elementize(InstanceDescription.name()+"."+tva.e_Genre)+" elements must indicate different availabilities")
 		}
 	} else if (VerifyType==tva.e_ScheduleEvent) {
 		var Genre=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre), CG_SCHEMA);
-		if (Genre) {		
+		if (Genre) {
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Genre, [tva.a_href], [], errs, "ID016")
 			if (Genre.attr(tva.a_href)) {
 				if (isRestartAvailability(Genre.attr(tva.a_href).value())) 
 					restartGenre=Genre;
 				else 
-					errs.pushCode("ID014", elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a restart link indicator")
+					errs.pushCode("ID017", elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a restart link indicator")
 			}
-			else 
-				NoHrefAttribute(errs, tva.e_Genre, InstanceDescription.name())
 		}		
 	}
 	
