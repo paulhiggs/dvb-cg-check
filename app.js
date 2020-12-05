@@ -56,34 +56,40 @@ const CG_REQUEST_BS_CONTENTS="bsContents"
 const MAX_UNSIGNED_SHORT=65535
 const OTHER_ELEMENTS_OK="!!!"
 
-const TVA_ContentCSFilename=path.join("dvb-common/tva","ContentCS.xml"),
-      TVA_FormatCSFilename=path.join("dvb-common/tva","FormatCS.xml"),
-      DVBI_ContentSubjectFilename=path.join("dvb-common/dvbi","DVBContentSubjectCS-2019.xml"),
-	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
-	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt")
-
-/* // LINT:
-const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
-	  MPEG7schemaFileName=path.join("schema","tva_mpeg7.xsd"),
-	  XMLschemaFileName=path.join("schema","xml.xsd")
-*/
 const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
-      COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
-      TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
+	  COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
+	  DVB_COMMON_DIR="dvb-common"
+
+const TVA_ContentCSFilename=path.join(DVB_COMMON_DIR, "tva","ContentCS.xml"),
+	  TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
+
+	  TVA_FormatCSFilename=path.join(DVB_COMMON_DIR, "tva","FormatCS.xml"),
       TVA_FormatCSURL=COMMON_REPO_RAW + "tva/" + "FormatCS.xml",
+
+	  DVBI_ContentSubjectFilename=path.join(DVB_COMMON_DIR, "dvbi","DVBContentSubjectCS-2019.xml"),
       DVBI_ContentSubjectURL=COMMON_REPO_RAW + "dvbi/" + "DVBContentSubjectCS-2019.xml",
+
+	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
 	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt",
+
+	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt"),
 	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt"
 
 const ISO3166_URL=COMMON_REPO_RAW + "iso3166-countries.json",
 	  ISO3166_Filename=path.join("dvb-common","iso3166-countries.json")
       
+/* // TODO: LINT
+const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
+	  MPEG7schemaFileName=path.join("schema","tva_mpeg7.xsd"),
+	  XMLschemaFileName=path.join("schema","xml.xsd")
+*/
 
 // curl from https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
 const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-registry"),
       IANA_Subtag_Registry_URL="https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry"
 
-const IANAlanguages=require("./dvb-common/IANAlanguages.js")
+const IANAlanguages=require("./"+DVB_COMMON_DIR+"/IANAlanguages.js")
+
 var allowedGenres=[], allowedCreditItemRoles=[]
 
 //const ISOcountries=require("./dvb-common/ISOcountries.js")
@@ -142,7 +148,7 @@ function HTMLize(str) {
  * @returns {string} a string containing str formatted as an element
  */
 function elementize(str) {
-	return "<"+str+">"
+	return str.elementize()
 }
 String.prototype.elementize = function() {
 	return "<"+this+">"
@@ -156,11 +162,11 @@ String.prototype.elementize = function() {
  * @param {string} elem the element holding the attribute
  * @returns {string} a string containing str formatted as an attribute
  */
-function attribute(attr, elem=null) {
-	return (elem?elem:"")+"@"+attr
+function attribute(attr, elem="") {
+	return attr.attribute(elem)
 }
-String.prototype.attribute = function(elem=null) {
-	return (elem?elem:"")+"@"+this
+String.prototype.attribute = function(elem="") {
+	return elem+"@"+this
 } 
  
  
@@ -171,7 +177,10 @@ String.prototype.attribute = function(elem=null) {
  * @returns {string} a string containing a quoted vesrion of the argument
  */
 function quote(str) {
-	return "\""+str+"\"";
+	return str.quote()
+}
+String.prototype.quote = function() {
+	return "\""+this+"\"";
 }
 
 
@@ -234,6 +243,7 @@ if (typeof(String.prototype.trim)==="undefined") {
     };
 }
 
+
 /**
  * add the seperate lines from the buffer into the array 
  *
@@ -245,6 +255,7 @@ function addRoles(values, data) {
 	for (var line=0; line<lines.length; line++) 
 		values.push(lines[line].trim());	
 }
+
 
 /**
  * read the list of valid roles from a file 
@@ -261,6 +272,7 @@ function loadRolesFromFile(values, rolesFilename) {
             console.log(err);
     });
 }
+
 
 /**
  * read the list of valid roles from a network location referenced by a URL  
@@ -282,6 +294,7 @@ function loadRolesFromURL(values, rolesURL) {
 	xhttp.send();
 } 
 
+
 /**
  * loads role values from either a local file or an URL based location
  *
@@ -295,6 +308,8 @@ function loadRoles(values, useURL, roleFilename, roleURL) {
 		loadRolesFromURL(values,roleURL);
 	else loadRolesFromFile(values, roleFilename);	
 } 
+
+
 //----------------------------------------------------------
 
 function readmyfile(filename) {
@@ -305,6 +320,7 @@ function readmyfile(filename) {
     catch (err) {console.log(err.code,err.path);}
     return null;
 }
+
 	  
 /**
  * loads an XML schema from either a local file or an URL based location
@@ -359,20 +375,6 @@ function valUnsignedInt(str) {
 	var s=str.match(intRegex);
 	return s[0]===str?parseInt(str, 10):0;
 }
-
-
-/**
- * checks if the argument complies to an XML representation of UTC time
- *
- * @param {string} str string contining the UTC time
- * @returns {boolean}  true if the argment is formatted according to UTC ("Zulu") time
- */ /*
-function isUTCTime(str) {
-	//	<pattern value="(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z"/>
-	const UTCregex=/(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z/g;
-	var s=str.match(UTCregex);
-	return s?s[0]===str:false;
-} */
 
 
 /**
@@ -602,6 +604,7 @@ function xPathM(SCHEMA_PREFIX, elementNames) {
 	return t
 }
 
+
 /**
  * check if the node provided contains an RelatedMaterial element for a signalled application
  *
@@ -642,7 +645,7 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	// check that each of the specifid childElements exists
 	mandatoryChildElements.forEach(elem => {
 		if (!parentElement.get(xPath(SCHEMA_PREFIX, elem), CG_SCHEMA)) {
-			errs.pushCode(errCode?errCode+"-1":"TE010", "Mandatory element "+elementize(elem)+" not specified in "+thisElem);
+			errs.pushCode(errCode?errCode+"-1":"TE010", "Mandatory element "+elem.elementize()+" not specified in "+thisElem)
 			rv=false;
 		}
 	});
@@ -652,9 +655,9 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 		var c=0, child;
 		while (child=parentElement.child(c++)) {
 			var childName=child.name();
-			if (childName!='text')
+			if (child.type()=='element')
 				if (!isIn(mandatoryChildElements, childName) &&!isIn(optionalChildElements, childName)) {		
-					errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+elementize(childName)+" is not permitted in "+thisElem);
+					errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+childName/elementize()+" is not permitted in "+thisElem)
 					rv=false;
 				}
 		}
@@ -702,7 +705,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
  * @param {string} elementName     the name of the child element
  * @returns {boolean} true if an element named node.elementName exists, else false
  */
-function  hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
+function hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
 	if (!node) return false;
 	return (node.get(xPath(SCHEMA_PREFIX, elementName), CG_SCHEMA)!=null);
 }
@@ -742,11 +745,11 @@ function checkTAGUri(elem, errs, errCode=null) {
 function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
 	
 	function synopsisLengthError(label, length) {
-		return "length of "+elementize(tva.a_length.attribute(tva.e_Synopsis)+"="+quote(label))+" exceeds "+length+" characters"; }
+		return "length of "+tva.a_length.attribute(tva.e_Synopsis)+"="+quote(label)+" exceeds "+length+" characters" }
 	function singleLengthLangError(length, lang) {
-		return "only a single "+elementize(tva.e_Synopsis)+" is permitted per length ("+length+") and language ("+lang+")"; }
+		return "only a single "+tva.e_Synopsis.elementize()+" is permitted per length ("+length+") and language ("+lang+")" }
 	function requiredSynopsisError(length) {
-		return "a "+elementize(tva.e_Synopsis)+" with "+tva.a_length.attribute()+"="+quote(length)+" is required"; }
+		return "a "+tva.e_Synopsis.elementize()+" with "+tva.a_length.attribute()+"="+quote(length)+" is required" }
 	
 	if (!BasicDescription) {
 		errs.pushCode("SY000", "ValidateSynopsis() called with BasicDescription==null")
@@ -846,14 +849,14 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 			counts[keywordLang]=1
 		else counts[keywordLang]++;
 		if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
-			errs.pushCode(errCode?errCode+"-1":"KW011",tva.a_type.attribute()+"="+quote(keywordType)+" not permitted for "+elementize(tva.e_Keyword));
+			errs.pushCode(errCode?errCode+"-1":"KW011",tva.a_type.attribute()+"="+keywordType.quote()+" not permitted for "+tva.e_Keyword.elementize());
 		if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
-			errs.pushCode(errCode?errCode+"-2":"KW012","length of "+elementize(tva.e_Keyword)+" is greater than "+dvbi.MAX_KEYWORD_LENGTH);
+			errs.pushCode(errCode?errCode+"-2":"KW012","length of "+tva.e_Keyword.elementize()+" is greater than "+dvbi.MAX_KEYWORD_LENGTH)
 	}
 	
 	for (var i in counts) {
         if (counts[i]!=0 && counts[i]>maxKeywords) 
-            errs.pushCode(errCode?errCode+"-3":"KW013","More than "+maxKeywords+" "+elementize(tva.e_Keyword)+" element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language "+quote(i)));
+            errs.pushCode(errCode?errCode+"-3":"KW013","More than "+maxKeywords+" "+tva.e_Keyword.elementize()+" element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language "+i.quote()));
 	}
 }
 
@@ -879,14 +882,14 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 		count++;
 		var genreType=Genre.attr(tva.a_type)?Genre.attr(tva.a_type).value():dvbi.DEFAULT_GENRE_TYPE;
 		if (genreType!=dvbi.GENRE_TYPE_MAIN)
-			errs.pushCode(errCode?errCode+"-1":"GE001", tva.a_type.attribute()+"="+quote(genreType)+" not permitted for "+elementize(tva.e_Genre));
+			errs.pushCode(errCode?errCode+"-1":"GE001", tva.a_type.attribute()+"="+quote(genreType)+" not permitted for "+tva.e_Genre.elementize());
 		
 		var genreValue=Genre.attr(tva.a_href)?Genre.attr(tva.a_href).value():"";
 		if (!isIn(allowedGenres, genreValue))
-			errs.pushCode(errCode?errCode+"-2":"GE002", "invalid "+tva.a_href.attribute()+" value "+quote(genreValue)+" for "+elementize(tva.e_Genre));
+			errs.pushCode(errCode?errCode+"-2":"GE002", "invalid "+tva.a_href.attribute()+" value "+quote(genreValue)+" for "+tva.e_Genre.elementize());
 	}
 	if (count>maxGenres)
-		errs.pushCode(errCode?errCode+"-3":"GE003","More than "+maxGenres+" "+elementize(tva.e_Genre)+" element"+(maxGenres>1?"s":"")+" specified");
+		errs.pushCode(errCode?errCode+"-3":"GE003","More than "+maxGenres+" "+etva.e_Genre.elementize()+" element"+(maxGenres>1?"s":"")+" specified");
 }
 
 /**
@@ -917,10 +920,10 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 				case tva.e_MinimumAge:
 				case tva.e_ParentalRating:
 					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-						errs.pushCode(errCode?errCode+"-1":"PG011", "first "+elementize(tva.e_ParentalGuidance)+" element must contain "+elementize("mpeg7:"+tva.e_MinimumAge));
+						errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+elementize("mpeg7:"+tva.e_MinimumAge))
 					
 					if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-						errs.pushCode(errCode?errCode+"-2":"PG012", elementize(tva.e_MinimumAge)+" must be in the first "+elementize(tva.e_ParentalGuidance)+" element");
+						errs.pushCode(errCode?errCode+"-2":"PG012", etva.e_MinimumAge.lementize()+" must be in the first "+tva.e_ParentalGuidance.lementize()+" element");
 					
 					if (pgChild.name()==tva.e_ParentalRating) {
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
@@ -930,21 +933,21 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 					countExplanatoryText++;
 					if (pgChild.attr(tva.a_length)) {
 						if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
-							errs.pushCode(errCode?errCode+"-3":"PG003", tva.a_length.attribute()+"="+quote(pgChild.attr(tva.a_length).value())+" is not allowed for "+elementize(tva.e_ExplanatoryText))
+							errs.pushCode(errCode?errCode+"-3":"PG003", tva.a_length.attribute()+"="+pgChild.attr(tva.a_length).value().quote()+" is not allowed for "+tva.e_ExplanatoryText.elementize())
 					}
 					else 
-						errs.pushCode(errCode?errCode+"-4":"PG004", tva.a_length.attribute()+"="+quote(tva.v_lengthLong)+" is required for "+elementize(tva.e_ExplanatoryText));
+						errs.pushCode(errCode?errCode+"-4":"PG004", tva.a_length.attribute()+"="+tva.v_lengthLong.quote()+" is required for "+tva.e_ExplanatoryText.elementize())
 					
 					if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
-						errs.pushCode(errCode?errCode+"-5":"PG005", "length of "+elementize(tva.e_ExplanatoryText)+" cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters");
+						errs.pushCode(errCode?errCode+"-5":"PG005", "length of "+tva.e_ExplanatoryText.elementize()+" cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters")
 					break;
 			}
 		}
 		if (countExplanatoryText > 1)
-			errs.pushCode(errCode?errCode+"-7":"PG006", "only a single "+elementize(tva.e_ExplanatoryText)+" element is premitted in "+elementize(tva.e_ParentalGuidance))
+			errs.pushCode(errCode?errCode+"-7":"PG006", "only a single "+tva.e_ExplanatoryText.elementize()+" element is premitted in "+tva.e_ParentalGuidance.elementize())
 	}
 	if (countParentalGuidance>maxPGelements)
-		errs.pushCode(errCode?errCode+"-7":"PG007", "no more than "+maxPGelements+" "+elementize(tva.e_ParentalGuidance)+" elements are premitted");
+		errs.pushCode(errCode?errCode+"-7":"PG007", "no more than "+maxPGelements+" "+tva.e_ParentalGuidance.elementize()+" elements are premitted");
 }
 
 
@@ -961,7 +964,7 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	
 	function checkNamePart(elem, errs, errCode=null) {
 		if (unEntity(elem.text()).length > dvbi.MAX_NAME_PART_LENGTH)	
-			errs.pushCode(errCode?errCode:"VN001", elementize(elem.name())+" in "+elementize(elem.parent().name())+" is longer than "+dvbi.MAX_NAME_PART_LENGTH+" characters");
+			errs.pushCode(errCode?errCode:"VN001", elem.name().elementize()+" in "+elem.parent().name().elementize()+" is longer than "+dvbi.MAX_NAME_PART_LENGTH+" characters")
 	}
 	
 	if (!elem) {
@@ -985,9 +988,9 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 		}
 	}
 	if (givenNameCount==0)
-		errs.pushCode("VN004", elementize(tva.e_GivenName)+" is mandatory in "+elementize(elem.name()));
+		errs.pushCode("VN004", tva.e_GivenName.elementize()+" is mandatory in "+elem.name().elementize())
 	if (familyNameCount>1)
-		errs.pushCode("VN005", "only a single "+elementize(tva.e_FamilyName)+" is permitted in "+elementize(elem.name()));
+		errs.pushCode("VN005", "only a single "+tva.e_FamilyName.elementize()+" is permitted in "+elem.name().elementize())
 }
 
 
@@ -1013,7 +1016,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 			if (CreditsItem.attr(tva.a_role)) {
 				var CreditsItemRole=CreditsItem.attr(tva.a_role).value();
 				if (!isIn(allowedCreditItemRoles, CreditsItemRole))
-					errs.pushCode(errCode?errCode+"-1":"CL001", quote(CreditsItemRole)+" is not valid for "+tva.a_role.attribute(tva.e_CreditsItem))
+					errs.pushCode(errCode?errCode+"-1":"CL001", CreditsItemRole.quote()+" is not valid for "+tva.a_role.attribute(tva.e_CreditsItem))
 			}
 			else 
 				errs.pushCode(errCode?errCode+"-2":"CL002", tva.a_role.attribute(tva.e_CreditsItem)+" not specified")
@@ -1034,29 +1037,29 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 					case tva.e_OrganizationName:
 						foundOrganizationName++;
 						if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
-							errs.pushCode(errCode?errCode+"-3":"CL003", "length of "+elementize(tva.e_OrganizationName)+" in "+elementize(tva.e_CreditsItem)+" exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
+							errs.pushCode(errCode?errCode+"-3":"CL003", "length of "+tva.e_OrganizationName.elementize()+" in "+tva.e_CreditsItem.elementize()+" exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
 						break;
 					default:
 						if (elem.name()!="text")
-							errs.pushCode(errCode?errCode+"-4":"CL004", "extra element "+elementize(elem.name())+" found in "+elementize(tva.e_CreditsItem));
+							errs.pushCode(errCode?errCode+"-4":"CL004", "extra element "+elem.name().elementize()+" found in "+tva.e_CreditsItem.elementize())
 				}
 				if (foundPersonName>1)
-					errs.pushCode(errCode?errCode+"-5":"CL005", "only a single "+elementize(tva.e_PersonName)+" is permitted in "+elementize(tva.e_CreditsItem));
+					errs.pushCode(errCode?errCode+"-5":"CL005", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 				if (foundCharacter>1)
-					errs.pushCode(errCode?errCode+"-6":"CL006", "only a single "+elementize(tva.e_Character)+" is permitted in "+elementize(tva.e_CreditsItem));
+					errs.pushCode(errCode?errCode+"-6":"CL006", "only a single "+tva.e_Character.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 				if (foundOrganizationName>1)
-					errs.pushCode(errCode?errCode+"-7":"CL007", "only a single "+elementize(tva.e_OrganizationName)+" is permitted in "+elementize(tva.e_CreditsItem));
+					errs.pushCode(errCode?errCode+"-7":"CL007", "only a single "+tva.e_OrganizationName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 				if (foundCharacter>0 && foundPersonName==0)
-					errs.pushCode(errCode?errCode+"-8":"CL008", elementize(tva.e_Character)+" in "+elementize(tva.e_CreditsItem)+" requires "+elementize(tva.e_PersonName));
+					errs.pushCode(errCode?errCode+"-8":"CL008", tva.e_Character.elementize()+" in "+tva.e_CreditsItem.elementize()+" requires "+tva.e_PersonName.elementize())
 				if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
-					errs.pushCode(errCode?errCode+"-9":"CL009", elementize(tva.e_OrganizationName)+" can only be present when "+elementize(tva.e_PersonName)+" is absent in "+elementize(tva.e_CreditsItem));
+					errs.pushCode(errCode?errCode+"-9":"CL009", tva.e_OrganizationName.elementize()+" can only be present when "+tva.e_PersonName.elementize()+" is absent in "+tva.e_CreditsItem.elementize())
 			}			
 			if (foundPersonName>1)
-				errs.pushCode(errCode?errCode+"-10":"CL010", "only a single "+elementize(tva.e_PersonName)+" is permitted in "+elementize(tva.e_CreditsItem))
+				errs.pushCode(errCode?errCode+"-10":"CL010", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 			if (foundCharacter>1)
-				errs.pushCode(errCode?errCode+"-11":"CL011", "only a single "+elementize(tva.e_Character)+" is permitted in "+elementize(tva.e_CreditsItem))
+				errs.pushCode(errCode?errCode+"-11":"CL011", "only a single "+tva.e_Character.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 			if (foundOrganizationName>1)
-				errs.pushCode(errCode?errCode+"-12":"CL012", "only a single "+elementize(tva.e_OrganizationName)+" is permitted in "+elementize(tva.e_CreditsItem))
+				errs.pushCode(errCode?errCode+"-12":"CL012", "only a single "+tva.e_OrganizationName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 		}
 	}
 }
@@ -1087,14 +1090,14 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 		var errLocation="Promotional Still Image ("+tva.a_href.attribute(tva.e_HowRelated)+"="+tva.cs_PromotionalStillImage+")";
 		var MediaUri=RelatedMaterial.get(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]), CG_SCHEMA);  
 		if (!MediaUri) 
-			errs.pushCode("IRM001", elementize(tva.e_MediaUri)+" not specified for "+errLocation);
+			errs.pushCode("IRM001", tva.e_MediaUri.elementize()+" not specified for "+errLocation);
 		if (MediaUri && !MediaUri.attr(tva.a_contentType))
 			errs.pushCode("IRM002", tva.a_contentType.attribute(tva.e_MediaUri)+" not specified for "+errLocation );
 
 		if (MediaUri && MediaUri.attr(tva.a_contentType)) {
 			var contentType=MediaUri.attr(tva.a_contentType).value();
 			if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
-				errs.pushCode("IRM003", tva.a_contentType.attribute(tva.e_MediaUri)+"="+quote(contentType)+" is not valid for a "+errLocation)
+				errs.pushCode("IRM003", tva.a_contentType.attribute(tva.e_MediaUri)+"="+contentType.quote()+" is not valid for a "+errLocation)
 		}		
 		return true;
 	}
@@ -1125,7 +1128,7 @@ function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, min
 		var evaluated=CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs);
 	}
 	if (countRelatedMaterial > maxRMelements)
-		errs.pushCode("RM001", "a maximum of "+maxRMelements+" "+elementize(tva.e_RelatedMaterial)+" element"+(maxRMelements>1?"s are":" is")+" permitted")
+		errs.pushCode("RM001", "a maximum of "+maxRMelements+" "+tva.e_RelatedMaterial.elementize()+" element"+(maxRMelements>1?"s are":" is")+" permitted")
 }
 
 
@@ -1157,10 +1160,10 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 	while (RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA)) {
 		var HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 		if (!HowRelated) 
-			NoChildElement(errs, elementize(tva.e_HowRelated), elementize(tva.e_RelatedMaterial), "VP001")
+			NoChildElement(errs, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize(), "VP001")
 		else {	
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "VP002")
-			if (HowRelated.attr(tva.a_href)) {
+			if (HowRelated.attr(tva.a_href))
 				switch (HowRelated.attr(tva.a_href).value()) {
 					case dvbi.PAGINATION_FIRST_URI:
 						countPaginationFirst++;
@@ -1175,7 +1178,6 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 						countPaginationLast++;
 						break;
 				}	
-			}
 		}
 	}
 
@@ -1188,7 +1190,7 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 	if (!linkCountErrs) {
 		var numPaginations=countPaginationFirst+countPaginationPrev+countPaginationNext+countPaginationLast;
 		if (numPaginations!=0 && numPaginations!=2 && numPaginations!=4)
-			errs.pushCode("VP020", "only 0, 2 or 4 paginations links may be signalled in "+elementize(tva.e_RelatedMaterial)+" elements for "+Location);
+			errs.pushCode("VP020", "only 0, 2 or 4 paginations links may be signalled in "+tva.e_RelatedMaterial.elementize()+" elements for "+Location)
 		else if (numPaginations==2) {
 			if (countPaginationPrev==1 && countPaginationLast==1) 
 				errs.pushCode("VP021", quote("previous")+" and "+quote("last")+" links cannot be specified alone");
@@ -1221,7 +1223,7 @@ function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 				ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes")
 			}
 			if (countRelatedMaterial > 1)
-				errs.pushCode("RMME001", "a maximum of 1 "+elementize(tva.e_RelatedMaterial)+" element is permitted in "+elementize(BasicDescription.name())+" for this request type");	
+				errs.pushCode("RMME001", "a maximum of 1 "+tva.e_RelatedMaterial.elementize()+" element is permitted in "+BasicDescription.name().elementize()+" for this request type")	
 			break;
 		case tva.e_GroupInformation:
 			// TODO: 
@@ -1242,7 +1244,7 @@ function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
  * @param {string} errno           The error number to show in the log
  */
 function NoChildElement(errs, missingElement, parentElement, schemaLocation=null, errno=null) {
-	errs.pushCode(errno?errno:"NC001", missingElement+" element not specified for "+parentElement+ (schemaLocation)?" in "+schemaLocation:"");
+	errs.pushCode(errno?errno:"NC001", missingElement+" element not specified for "+parentElement+ (schemaLocation)?(") in "+schemaLocation):"")
 }
 
 
@@ -1256,7 +1258,7 @@ function NoChildElement(errs, missingElement, parentElement, schemaLocation=null
  * @param {string} errno   The error number to show in the log
  */
 function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
-	errs.pushCode(errno?errno:"HV001", "invalid "+tva.a_href.attribute()+"="+quote(value)+" specified for "+src+(loc)?" in "+loc:"");
+	errs.pushCode(errno?errno:"HV001", "invalid "+tva.a_href.attribute()+"="+quote(value)+" specified for "+src+(loc)?(" in "+loc):"")
 }
 
 
@@ -1268,7 +1270,7 @@ function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
  * @param {String} loc The location of the element
  */
 function NoAuxiliaryURI(errs, src, loc, errno=null) {
-	NoChildElement(errs, elementize(tva.e_AuxiliaryURI), src+" "+elementize(tva.e_MediaLocator), loc, errno?errno:"AU001")
+	NoChildElement(errs, tva.e_AuxiliaryURI.elementize(), src+" "+tva.e_MediaLocator.elementize(), loc, errno?errno:"AU001")
 }
 
 
@@ -1294,14 +1296,14 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
     }
 
     if (!HowRelated) {
-		NoChildElement(errs, elementize(tva.e_HowRelated), RelatedMaterial.name(), Location, "TA001");
+		NoChildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "TA001")
 		return;
     }
 	
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.h_href], [], errs, "TA002")
 	if (HowRelated.attr(tva.a_href)) {
 		if (HowRelated.attr(tva.a_href).value()!=dvbi.TEMPLATE_AIT_URI) 
-			errs.pushCode("TA003", tva.a_href.attribute(tva.e_HowRelated)+"="+quote(HowRelated.attr(tva.a_href).value())+" does not designate a Template AIT");
+			errs.pushCode("TA003", tva.a_href.attribute(tva.e_HowRelated)+"="+HowRelated.attr(tva.a_href).value().quote()+" does not designate a Template AIT")
 		else {		
 			if (MediaLocator.length!=0) 
 				MediaLocator.forEach(ml => {
@@ -1310,11 +1312,11 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 						if (child.name()==tva.e_AuxiliaryURI) {
 							hasAuxiliaryURI=true;
 							if (!child.attr(tva.a_contentType)) 
-								NoChildElement(errs, tva.a_contentType.attribute(), "Template AIT "+elementize(tva.e_AuxiliaryURI), Location, "TA010");
+								NoChildElement(errs, tva.a_contentType.attribute(), "Template AIT "+tva.e_AuxiliaryURI.elementize(), Location, "TA010")
 							else {
-								var contentType=child.attr(tva.a_contentType).value();
+								let contentType=child.attr(tva.a_contentType).value()
 								if (contentType!=dvbi.XML_AIT_CONTENT_TYPE) 
-									errs.pushCode("TA011", "invalid "+tva.a_contentType.attribute()+"="+quote(contentType)+" specified for "+elementize(RelatedMaterial.name())+elementize(tva.e_MediaLocator)+" in "+Location);
+									errs.pushCode("TA011", "invalid "+tva.a_contentType.attribute()+"="+quote(contentType)+" specified for "+RelatedMaterial.name().elementize()+tva.e_MediaLocator.elementize()+" in "+Location)
 							}
 						}
 					});	
@@ -1322,7 +1324,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 						NoAuxiliaryURI(errs, "template AIT", Location, "TA012");
 				});
 			else 
-				NoChildElement(errs, elementize(tva.e_MediaLocator), RelatedMaterial.name(), Location, "TA013");
+				NoChildElement(errs, tva.e_MediaLocator.elementize(), RelatedMaterial.name(), Location, "TA013")
 		}
 	}
 }
@@ -1359,14 +1361,14 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     }
 
     if (!HowRelated) {
-		NochildElement(errs, elementize(tva.e_HowRelated), RelatedMaterial.name(), Location, "PS001");
+		NochildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "PS001")
 		return;
     }
 	
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "PS002")
 	if (HowRelated.attr(tva.a_href)) {
 		if (HowRelated.attr(tva.a_href).value()!=dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
-			errs.pushCode("PS010", tva.a_href.attribute(tva.e_HowRelated)+"="+quote(HowRelated.attr(tva.a_href).value())+" does not designate a Promotional Still Image");
+			errs.pushCode("PS010", tva.a_href.attribute(tva.e_HowRelated)+"="+HowRelated.attr(tva.a_href).value().quote()+" does not designate a Promotional Still Image")
 		else {
 			if (Format) {
 				var subElems=Format.childNodes(), hasStillPictureFormat=false;
@@ -1386,7 +1388,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					}
 				});
 				if (!hasStillPictureFormat) 
-					NoChildElement(errs, elementize(tva.e_StillPictureFormat), tva.e_Format, Location, "PS023");
+					NoChildElement(errs, tva.e_StillPictureFormat.elementize(), tva.e_Format, Location, "PS023")
 			}
 
 			if (MediaLocator.length!=0) 
@@ -1396,13 +1398,13 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						if (child.name()==tva.e_MediaUri) {
 							hasMediaURI=true;
 							if (!child.attr(tva.a_contentType)) 
-								NoChildElement(errs, tva.a_contentType.attribute(), "logo "+elementize(tva.e_MediaUri), Location, "PS031");
+								NoChildElement(errs, tva.a_contentType.attribute(), "logo "+tva.e_MediaUri.elementize(), Location, "PS031")
 							else {
 								var contentType=child.attr(tva.a_contentType).value();
 								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
-									errs.pushCode("PS032", "invalid "+tva.a_contentType.attribute(tva.e_MediaLocator)+"="+quote(contentType)+" specified for "+elementize(RelatedMaterial.name())+" in "+Location);
+									errs.pushCode("PS032", "invalid "+tva.a_contentType.attribute(tva.e_MediaLocator)+"="+quote(contentType)+" specified for "+RelatedMaterial.name().elementize()+" in "+Location)
 								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) 
-									errs.pushCode("PS033", "conflicting media types in "+elementize(tva.e_Format)+" and "+elementize(tva.e_MediaUri)+" for "+Location);
+									errs.pushCode("PS033", "conflicting media types in "+tva.e_Format.elementize()+" and "+tva.e_MediaUri.elementize()+" for "+Location)
 							}
 						}
 					});
@@ -1410,7 +1412,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						NoMediaLocator(errs, "logo", Location);
 				});
 			else 
-				NoChildElement(errs, tva.e_MediaLocator, elementize(RelatedMaterial.name()), Location, "PS039");
+				NoChildElement(errs, tva.e_MediaLocator, RelatedMaterial.name().elementize(), Location, "PS039")
 		}
 	}
 }
@@ -1437,7 +1439,7 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 	while (RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA)) {
 		var HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 		if (!HowRelated) 
-			NoChildElement(errs, elementize(tva.e_HowRelated), elementize(tva.e_RelatedMaterial))
+			NoChildElement(errs, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize())
 		else {		
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "MB010")
 			if (HowRelated.attr(tva.a_href)) {
@@ -1445,7 +1447,7 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 				switch (hrHref) {
 					case dvbi.TEMPLATE_AIT_URI:
 						countTemplateAIT++;
-						ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, elementize(BasicDescription.name()))
+						ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name().elementize())
 						break;
 					case dvbi.PAGINATION_FIRST_URI:
 					case dvbi.PAGINATION_PREV_URI:
@@ -1456,20 +1458,20 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 						break;
 					case dvbi.PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
 						countImage++;
-						ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, elementize(BasicDescription.name()));
+						ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name().elementize())
 						break;
 					default:
-						InvalidHrefValue(errs, hrHref, elementize(tva.e_HowRelated), elementize(tva.e_RelatedMaterial)+" in Box Set List", "MB011");
+						InvalidHrefValue(errs, hrHref, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize()+" in Box Set List", "MB011")
 				}	
 			}
 		}
 	}
 	if (countTemplateAIT==0)
-		errs.pushCode("MB021", "a "+elementize(tva.e_RelatedMaterial)+" element signalling the Template XML AIT must be specified for a Box Set List");
+		errs.pushCode("MB021", "a "+tva.e_RelatedMaterial.elementize()+" element signalling the Template XML AIT must be specified for a Box Set List")
 	if (countTemplateAIT>1)
-		errs.pushCode("MB022", "only one "+elementize(tva.e_RelatedMaterial)+" element signalling the Template XML AIT can be specified for a Box Set List");
+		errs.pushCode("MB022", "only one "+tva.e_RelatedMaterial.elementize()+" element signalling the Template XML AIT can be specified for a Box Set List")
 	if (countImage>1)
-		errs.pushCode("MB023", "only one "+elementize(tva.e_RelatedMaterial)+" element signalling the promotional still image can be specified for a Box Set List");
+		errs.pushCode("MB023", "only one "+tva.e_RelatedMaterial.elementize()+" element signalling the promotional still image can be specified for a Box Set List")
 	
 	if (hasPagination)
 		ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "Box Set List");
@@ -1506,28 +1508,28 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 		var titleStr=unEntity(Title.text());
 		
 		if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
-			errs.pushCode(errCode?errCode+"-1":"VT011", elementize(tva.e_Title)+" length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
+			errs.pushCode(errCode?errCode+"-1":"VT011", tva.e_Title.elementize()+" length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 		if (titleType==dvbi.TITLE_MAIN_TYPE) {
 			if (isIn(mainSet, titleLang))
-				errs.pushCode(errCode?errCode+"-2":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+quote(dvbi.TITLE_MAIN_TYPE))
+				errs.pushCode(errCode?errCode+"-2":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote())
 			else mainSet.push(titleLang);
 		}
 		else if (titleType==dvbi.TITLE_SECONDARY_TYPE) {
 			if (allowSecondary) {
 				if (isIn(secondarySet, titleLang))
-					errs.pushCode(errCode?errCode+"-3":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+quote(dvbi.TITLE_SECONDARY_TYPE))
+					errs.pushCode(errCode?errCode+"-3":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote())
 				else secondarySet.push(titleLang);
 			}
 			else 
-				errs.pushCode(errCode?errCode+"-4":"VT014", tva.a_type.attribute(tva.e_Title)+"="+quote(dvbi.TITLE_SECONDARY_TYPE)+" is not permitted for this "+elementize(BasicDescription.name()));
+				errs.pushCode(errCode?errCode+"-4":"VT014", tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" is not permitted for this "+BasicDescription.name().elementize())
 		}
 		else
-			errs.pushCode(errCode?errCode+"-5":"VT015", tva.a_type.attribute()+" must be "+quote(dvbi.TITLE_MAIN_TYPE)+" or "+quote(dvbi.TITLE_SECONDARY_TYPE)+" for "+elementize(tva.e_Title));
+			errs.pushCode(errCode?errCode+"-5":"VT015", tva.a_type.attribute()+" must be "+dvbi.TITLE_MAIN_TYPE.quote()+" or "+dvbi.TITLE_SECONDARY_TYPE.quote()+" for "+tva.e_Titl.elementize())
 		
 		secondarySet.forEach(lang => {
 			if (!isIn(mainSet, lang)) {
 				var tLoc= lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"="+quote(lang) : "";
-				errs.pushCode(errCode?errCode+"-6":"VT016", tva.a_type.attribute()+"="+quote(dvbi.TITLE_SECONDARY_TYPE)+" specified without "+tva.a_type.attribute()+"="+quote(dvbi.TITLE_MAIN_TYPE)+tLloc);
+				errs.pushCode(errCode?errCode+"-6":"VT016", tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" specified without "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote()+tLloc)
 			}
 		});
 	}
@@ -1556,7 +1558,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	
 	var BasicDescription=parentElement.get(xPath(SCHEMA_PREFIX, tva.e_BasicDescription), CG_SCHEMA);
 	if (!BasicDescription) {
-		NoChildElement(errs, elementize(tva.e_BasicDescription), parentElement.name());
+		NoChildElement(errs, tva.e_BasicDescription.elementize(), parentElement.name())
 		return;
 	}
 
@@ -1686,7 +1688,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		switch (child.name()) {
 			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
 				if (requestType==CG_REQUEST_MORE_EPISODES)
-					errs.pushCode("PI021", elementize(tva.e_OtherIdentifier)+" is not permitted in this request type")
+					errs.pushCode("PI021", tva.e_OtherIdentifier.elementize()+" is not permitted in this request type")
 				break;
 			case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
 				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI031");
@@ -1695,10 +1697,10 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				if (child.attr(tva.a_crid)) {
 					var foundCRID=child.attr(tva.a_crid).value();
 					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
-						errs.pushCode("PI032", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+quote(foundCRID)+" is not a defined Group CRID for "+elementize(tva.e_EpisodeOf))
+						errs.pushCode("PI032", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_EpisodeOf.elementize())
 					else
 						if (!isCRIDURI(foundCRID))
-							errs.pushCode("PI033", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+quote(foundCRID)+" is not a valid CRID")
+							errs.pushCode("PI033", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a valid CRID")
 				}
 				break;
 			case tva.e_MemberOf:			// <ProgramInformation><MemberOf>
@@ -1716,17 +1718,17 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 						
 				// <ProgramInformation><MemberOf>@xsi:type
 				if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
-					errs.pushCode("PI043", "@xsi:"+tva.a_type+" must be "+quote(tva.t_MemberOfType)+" for "+ProgramInformation.name()+"."+tva.e_MemberOf);
+					errs.pushCode("PI043", attribute("xsi:"+tva.a_type)+" must be "+(tva.t_MemberOfTypequote)+" for "+ProgramInformation.name()+"."+tva.e_MemberOf)
 			
 				// <ProgramInformation><MemberOf>@crid
 				var foundCRID=null;
 				if (child.attr(tva.a_crid)) {
 					foundCRID=child.attr(tva.a_crid).value();
 					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
-						errs.pushCode("PI044", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+quote(foundCRID)+" is not a defined Group CRID for "+elementize(tva.e_MemberOf))
+						errs.pushCode("PI044", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_MemberOf.elementize())
 					else
 						if (!isCRIDURI(foundCRID))
-							errs.pushCode("PI045", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+quote(foundCRID)+" is not a valid CRID")
+							errs.pushCode("PI045", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a valid CRID")
 				}
 				
 				// <ProgramInformation><MemberOf>@index
@@ -1768,7 +1770,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		
 	var ProgramInformationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_ProgramInformationTable), CG_SCHEMA);
 	if (!ProgramInformationTable) {
-		errs.pushCode("PI101", elementize(tva.e_ProgramInformationTable)+" not specified in "+elementize(ProgramDescription.name()));
+		errs.pushCode("PI101", tva.e_ProgramInformationTable.elementize()+" not specified in "+ProgramDescription.name().elementize())
 		return null;
 	}
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformationTable, [], [tva.a_lang], errs, "PI102");
@@ -1783,7 +1785,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PI110", "number of items ("+cnt+") in "+elementize(tva.e_ProgramInformationTable)+" does match "+tva.a_numOfItems.attribute(tva.e_GroupInformation)+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
+			errs.pushCode("PI110", "number of items ("+cnt+") in "+tva.e_ProgramInformationTable.elementize()+" does match "+tva.a_numOfItems.attribute(tva.e_GroupInformation)+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")")
 	}
 	return currentProgramCRID;
 }
@@ -1854,10 +1856,10 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 		if (MemberOf) {
 			if (MemberOf.attr(tva.a_type)) {
 				if (MemberOf.attr(tva.a_type).value()!=tva.t_MemberOfType)
-					errs.pushCode("GIB020", GroupInformation.name()+"."+tva.e_MemberOf+"@xsi:"+tva.a_type+" is invalid ("+quote(MemberOf.attr(tva.a_type).value())+")");
+					errs.pushCode("GIB020", GroupInformation.name()+"."+tva.e_MemberOf+"@xsi:"+tva.a_type+" is invalid ("+MemberOf.attr(tva.a_type).value().quote()+")")
 			}
 			else
-				errs.pushCode("GIB021", GroupInformation.name()+"."+tva.e_MemberOf+" requires @xsi:"+tva.a_type+"="+quote(tva.t_MemberOfType)+" attribute");
+				errs.pushCode("GIB021", GroupInformation.name()+"."+tva.e_MemberOf+" requires @xsi:"+tva.a_type+"="+tva.t_MemberOfType.quote()+" attribute")
 			
 			if (MemberOf.attr(tva.a_index)) {
 				var index=valUnsignedInt(MemberOf.attr(tva.a_index).value());
@@ -1882,7 +1884,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 				errs.pushCode("GIB026", GroupInformation.name()+"."+tva.e_MemberOf+" requires "+tva.a_crid.attribute()+" attribute");
 		}
 		else
-			errs.pushCode("GIB027", GroupInformation.name()+" requires a "+elementize(tva.e_MemberOf)+" element referring to the "+CATEGORY_GROUP_NAME+" ("+categoryCRID+")");
+			errs.pushCode("GIB027", GroupInformation.name()+" requires a "+tva.e_MemberOf.elementize()+" element referring to the "+CATEGORY_GROUP_NAME+" ("+categoryCRID+")")
 	}
 	
 	checkTAGUri(GroupInformation, errs, "GIB030");	
@@ -1917,7 +1919,7 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
 		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
 			if (groupId!=dvbi.CRID_NOW && groupId!=dvbi.CRID_LATER && groupId!=dvbi.CRID_EARLIER )
-				errs.pushCode("GIS011", tva.a_groupId.attribute(GroupInformation.name())+" value "+quote(groupId)+" is valid for this request type")
+				errs.pushCode("GIS011", tva.a_groupId.attribute(GroupInformation.name())+" value "+groupId.quote()+" is valid for this request type")
 		}
 	}
 
@@ -1959,9 +1961,8 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 	
 	if (GroupInformation.attr(tva.a_groupId)) {
 		var groupId=GroupInformation.attr(tva.a_groupId).value();
-		if (!isCRIDURI(groupId)) {
-			errs.pushCode("GIM003", tva.a_groupId.attribute(GroupInformation.name())+" value "+quote(groupId)+" is not a valid CRID")
-		}
+		if (!isCRIDURI(groupId)) 
+			errs.pushCode("GIM003", tva.a_groupId.attribute(GroupInformation.name())+" value "+groupId.quote()+" is not a valid CRID")
 		else 
 			groupsFound.push(groupId);
 	}
@@ -1973,12 +1974,12 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupType, [tva.a_type, tva.a_value], [], errs, "GIM010")
 		
 		if (GroupType.attr(tva.a_type) && GroupType.attr(tva.a_type).value()!=tva.t_ProgramGroupTypeType) 
-			errs.pushCode("GIM012", tva.e_GroupType+"@xsi:"+tva.a_type+" must be "+quote(tva.t_ProgramGroupTypeType));
+			errs.pushCode("GIM012", tva.e_GroupType+"@xsi:"+tva.a_type+" must be "+tva.t_ProgramGroupTypeType.quote())
 		if (GroupType.attr(tva.a_value) && GroupType.attr(tva.a_value).value()!="otherCollection") 
-			errs.pushCode("GIM013", tva.a_value.attribute(tva.e_GroupType)+" must be "+quote("otherCollection"));
+			errs.pushCode("GIM013", tva.a_value.attribute(tva.e_GroupType)+" must be "+"otherCollection".quote())
 	}
 	else
-		errs.pushCode("GIM014", elementize(tva.e_GroupType)+" is required in "+elementize(GroupInformation.name())); 
+		errs.pushCode("GIM014", tva.e_GroupType.elementize()+" is required in "+GroupInformation.name().elementize())
 
 	// <GroupInformation><BasicDescription>
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
@@ -2056,7 +2057,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 	var GroupInformationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformationTable), CG_SCHEMA);
 	
 	if (!GroupInformationTable) {
-		errs.pushCode("GI100", elementize(tva.e_GroupInformationTable)+" not specified in "+elementize(ProgramDescription.name()));
+		errs.pushCode("GI100", tva.e_GroupInformationTable.elementize()+" not specified in "+ProgramDescription.name().elementize())
 		return;
 	}
 	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "GI101");
@@ -2069,18 +2070,17 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 			var countMemberOf=0;
 			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
 			var e=0, elem;
-			while (elem=GroupInformation.child(e++)) {
+			while (elem=GroupInformation.child(e++)) 
 				if (elem.name()==tva.e_MemberOf)
 					countMemberOf++
-			}
 			if (countMemberOf==0) {
 				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
 				if (categoryGroup)
-					errs.pushCode("GI111", "only a single "+CATEGORY_GROUP_NAME+" can be present in "+elementize(tva.e_GroupInformationTable))
+					errs.pushCode("GI111", "only a single "+CATEGORY_GROUP_NAME+" can be present in "+tva.e_GroupInformationTable.elementize())
 				else categoryGroup=GroupInformation;
 			}
 		if (!categoryGroup)
-			errs.pushCode("GI112", "a "+CATEGORY_GROUP_NAME+" must be specified in "+elementize(tva.e_GroupInformationTable)+" for this request type")
+			errs.pushCode("GI112", "a "+CATEGORY_GROUP_NAME+" must be specified in "+tva.e_GroupInformationTable.elementize()+" for this request type")
 	}
 	
 	var indexes=[], giCount=0;
@@ -2122,9 +2122,9 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 
 	function ValidValues(errs, numOfItems, numAllowed, grp) {
 		if (numOfItems<=0)
-			errs.pushCode("VNN101", tva.a_numOfItems.attribute(tva.e_GroupInformation)+" must be > 0 for "+quote(grp));			
+			errs.pushCode("VNN101", tva.a_numOfItems.attribute(tva.e_GroupInformation)+" must be > 0 for "+grp.quote());			
 		if (numOfItems>numAllowed)
-			errs.pushCode("VNN102", tva.a_numOfItems.attribute(tva.e_GroupInformation)+" must be <= "+numAllowed+" for "+quote(grp));
+			errs.pushCode("VNN102", tva.a_numOfItems.attribute(tva.e_GroupInformation)+" must be <= "+numAllowed+" for "+grp.quote());
 	}
 	
 	if (!GroupInformation) {
@@ -2151,12 +2151,12 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 					break;
 			}
 			if (isIn(groupCRIDsFound, grp))
-				errs.pushCode("VNN001", "only a single "+quote(grp)+" structural CRID is premitted in this request");
+				errs.pushCode("VNN001", "only a single "+grp.quote()+" structural CRID is premitted in this request")
 			else 
 				groupCRIDsFound.push(grp);
 		}
 		else 
-			errs.pushCode("VNN002", elementize(tva.e_GroupInformation)+" for "+quote(grp)+" is not permitted for this request type");
+			errs.pushCode("VNN002", tva.e_GroupInformation.elementize()+" for "+grp/quote()+" is not permitted for this request type")
 	}
 }
 
@@ -2181,7 +2181,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 	
 	var GroupInformationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformationTable), CG_SCHEMA);
 	if (!GroupInformationTable) {
-		errs.pushCode("NN001", elementize(tva.e_GroupInformationTable)+" not specified in "+elementize(ProgramDescription.name()));
+		errs.pushCode("NN001", tva.e_GroupInformationTable.elementize()+" not specified in "+ProgramDescription.name().elementize())
 		return;
 	}
 	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "NN002");
@@ -2196,7 +2196,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
 				break;
 			default:
-				errs.pushCode("NN003", elementize(tva.e_GroupInformation)+" not processed for this request type")
+				errs.pushCode("NN003", tva.e_GroupInformation.elementize()+" not processed for this request type")
 		}
 	}
 }
@@ -2259,7 +2259,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 
 				var combo=audioLang+"!--!"+AudioLanguage.attr(tva.a_purpose).value();
 				if (isIn(foundAttributes, combo))
-					errs.pushCode("AV016", "audio "+tva.a_purpose.attribute()+" "+quote(AudioLanguage.attr(tva.a_purpose).value())+" already specified for language "+quote(audioLang));
+					errs.pushCode("AV016", "audio "+tva.a_purpose.attribute()+" "+AudioLanguage.attr(tva.a_purpose).value().quote()+" already specified for language "+audioLang.quote())
 				else
 					foundAttributes.push(combo);
 			}
@@ -2267,7 +2267,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	}
 	audioCounts.forEach(audioLang => {
 		if (audioCounts[audioLang]>2)
-			errs.pushCode("AV020", "more than 2 "+elementize(tva.e_AudioAttributes)+" elements for language "+quote(audioLang));
+			errs.pushCode("AV020", "more than 2 "+tva.e_AudioAttributes.elementize()+" elements for language "+audioLang.quote())
 	});
 	
 	// <VideoAttributes>
@@ -2278,29 +2278,29 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 		var HorizontalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_HorizontalSize), CG_SCHEMA);
 		if (HorizontalSize) 
 			if (valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
-				errs.pushCode("AV031", elementize(tva.e_HorizontalSize)+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+				errs.pushCode("AV031", tva.e_HorizontalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
 		
 		var VerticalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_VerticalSize), CG_SCHEMA);
 		if (VerticalSize) 
 			if (valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
-				errs.pushCode("AV032", elementize(tva.e_VerticalSize)+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")");
+				errs.pushCode("AV032", tva.e_VerticalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
 		
 		var AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX,tva.e_AspectRatio), CG_SCHEMA);
 		if (AspectRatio) 
 			if (!isRatioType(AspectRatio.text()))
-				errs.pushCode("AV033", elementize(tva.e_AspectRatio)+" is not a valid aspect ratio");
+				errs.pushCode("AV033", tva.e_AspectRatio.elementize()+" is not a valid aspect ratio")
 	}
 
 	// <CaptioningAttributes>
-	var CaptioningAttributes=AVAttributes.get(xPath(SCHEMA_PREFIX, tva.e_CaptioningAttributes), CG_SCHEMA);
+	let CaptioningAttributes=AVAttributes.get(xPath(SCHEMA_PREFIX, tva.e_CaptioningAttributes), CG_SCHEMA)
 	if (CaptioningAttributes) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, CaptioningAttributes, [], [tva.e_Coding], errs, "AV040");
 		
-		var Coding=CaptioningAttributes.get(xPath(SCHEMA_PREFIX, tva.e_Coding), CG_SCHEMA);
+		let Coding=CaptioningAttributes.get(xPath(SCHEMA_PREFIX, tva.e_Coding), CG_SCHEMA)
 		if (Coding) {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Coding, [tva.a_href], [], errs, "AV041")
 			if (Coding.attr(tva.a_href)) {
-				var codingHref=Coding.attr(tva.a_href).value();
+				let codingHref=Coding.attr(tva.a_href).value()
 				if (codingHref!=dvbi.DVB_BITMAP_SUBTITLES && codingHref!=DVB_CHARACTER_SUBTITLES 
 				  && codingHref!=dvbi.EBU_TT_D)
 					errs.pushCode("AV042", tva.a_href.attribute(tva.e_CaptioningAttributes+"."+tva.e_Coding)+" is not valid - should be DVB (bitmap or character) or EBU TT-D")
@@ -2381,7 +2381,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, node, [tva.a_href], [tva.a_type], errs, errcode?errcode+"-1":"ChG001")
 		var GenreType=(node.attr(tva.a_type)?node.attr(tva.a_type).value():"other");
 		if (GenreType!="other")
-			errs.pushCode(errcode?errcode+"-2":"ChG002", tva.a_type.attribute(node.parent().name()+"."+node.name())+" must contain "+quote("other"));
+			errs.pushCode(errcode?errcode+"-2":"ChG002", tva.a_type.attribute(node.parent().name()+"."+node.name())+" must contain "+"other".quote())
 
 		return (node.attr(tva.a_href)?node.attr(tva.a_href).value():null);
 	}
@@ -2440,7 +2440,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	// <CaptionLanguage>
 	var captionCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, tva.e_CaptionLanguage);
 	if (captionCount > 1)
-		errs.pushCode("ID020", "only a single "+elementize(tva.e_CaptionLanguage)+" element is permitted in "+elementize(InstanceDescription.name()));
+		errs.pushCode("ID020", "only a single "+tva.e_CaptionLanguage.elementize()+" element is permitted in "+InstanceDescription.name().elementize())
 	var CaptionLanguage=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_CaptionLanguage), CG_SCHEMA);
 	if (CaptionLanguage) {
 		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), InstanceDescription.name()+"."+tva.e_CaptionLanguage, "ID021");
@@ -2450,7 +2450,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	// <SignLanguage>
 	var signCount=countElements(CG_SCHEMA, SCHEMA_PREFIX, InstanceDescription, tva.e_SignLanguage);
 	if (signCount > 1)
-		errs.pushCode("ID030", "only a single "+elementize(tva.e_SignLanguage)+" element is premitted in "+elementize(InstanceDescription.name()));
+		errs.pushCode("ID030", "only a single "+tva.e_SignLanguage.elementize()+" element is premitted in "+InstanceDescription.name().elementize())
 	var SignLanguage=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_SignLanguage), CG_SCHEMA);
 	if (SignLanguage) {
 		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name()+"."+tva.e_SignLanguage, "ID-310");
@@ -2478,7 +2478,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 					errs.pushCode("ID050", tva.a_type.attribute(tva.e_OtherIdentifier)+"="+quote(oiType)+" is not valid for "+VerifyType+"."+InstanceDescription.name());				
 				if (oiType=dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE)
 					if (!isCRIDURI(OtherIdentifier.text()))
-						errs.pushCode("ID051", tva.e_OtherIdentifier+" must be a CRID for "+tva.a_type.attribute()+"="+quote(oiType));
+						errs.pushCode("ID051", tva.e_OtherIdentifier+" must be a CRID for "+tva.a_type.attribute()+"="+oiType.quote());
 		}
 		else 
 			errs.pushCode("ID052", tva.a_type.attribute(tva.e_OtherIdentifier)+" is required in "+VerifyType+"."+InstanceDescription.name())
@@ -2496,10 +2496,10 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	if (VerifyType==tva.e_ScheduleEvent) {
 		// Genre and RelatedMaterial for restart capability should only be specified for the "current" (ie. 'now') program
 		if (!isCurrentProgram && (restartGenre || restartRelatedMaterial))
-			errs.pushCode("ID060", "restart "+elementize(tva.e_Genre)+" and "+elementize(tva.e_RelatedMaterial)+" are only permitted for the current ("+quote("now")+") program");
+			errs.pushCode("ID060", "restart "+tva.e_Genre.elementize()+" and "+tva.e_RelatedMaterial.elementize()+" are only permitted for the current ("+"now".quote()+") program")
 		
 		if ((restartGenre && !restartRelatedMaterial) || (restartRelatedMaterial && !restartGenre))
-			errs.pushCode("ID061", "both "+elementize(tva.e_Genre)+" and "+elementize(tva.e_RelatedMaterial)+" are required together for "+VerifyType);	
+			errs.pushCode("ID061", "both "+tva.e_Genre.elementize()+" and "+tva.e_RelatedMaterial.elementize()+" are required together for "+VerifyType)
 	}
 }
 
@@ -2521,7 +2521,7 @@ function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs, errco
 			errs.pushCode(errcode?errcode+"-1":"TA001", tva.a_contentType.attribute(node.name())+"="+quote(node.attr(tva.a_contentType).value())+" is not valid for a template AIT")		
 	}
 	else
-		errs.pushCode(errcode?errcode+"-2":"TA002", tva.a_contentType.attribute()+" attribute is required when signalling a template AIT in "+elementize(node.name()));
+		errs.pushCode(errcode?errcode+"-2":"TA002", tva.a_contentType.attribute()+" attribute is required when signalling a template AIT in "+node.name().elementize())
 }
 
 
@@ -2571,7 +2571,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 				errs.pushCode("OD010", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+" is not a CRID URI");
 			else {
 				if (!isIn(programCRIDs, programCRID))
-					errs.pushCode("OD011", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+"="+quote(programCRID)+" does not refer to a program in the "+elementize(tva.e_ProgramInformationTable));
+					errs.pushCode("OD011", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+"="+programCRID.quote()+" does not refer to a program in the "+tva.e_ProgramInformationTable.elementize())
 			}
 			plCRIDs.push(programCRID)
 		}
@@ -2579,28 +2579,28 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 			errs.pushCode("OD012", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+" is a required attribute");		
 	}
 	if (--prog>1)
-		errs.pushCode("OD013", "only a single "+elementize(tva.e_Program)+" is permitted in "+elementize(OnDemandProgram.name()))
+		errs.pushCode("OD013", "only a single "+tva.e_Program.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 
 	// <ProgramURL>
 	var pUrl=0, ProgramURL;
 	while (ProgramURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_ProgramURL, ++pUrl), CG_SCHEMA)) 
 		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, ProgramURL, errs, "OD020");
 	if (--pUrl>1)
-		errs.pushCode("OD021", "only a single "+elementize(tva.e_ProgramURL)+" is permitted in "+elementize(OnDemandProgram.name()))
+		errs.pushCode("OD021", "only a single "+tva.e_ProgramURL.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 
 	// <AuxiliaryURL>
 	var aux=0, AuxiliaryURL; 
 	while (AuxiliaryURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_AuxiliaryURL, ++aux), CG_SCHEMA)) 
 		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, AuxiliaryURL, errs, "OD030");
 	if (--aux>1)
-		errs.pushCode("OD031", "only a single "+elementize(tva.e_AuxiliaryURL)+" is permitted in "+elementize(OnDemandProgram.name()))
+		errs.pushCode("OD031", "only a single "+tva.e_AuxiliaryURL.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 	
 	// <InstanceDescription>
 	var id=0, InstanceDescription;
 	while (InstanceDescription=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_InstanceDescription, ++id), CG_SCHEMA))
 		ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, false, odpLang, programCRIDs, requestType, errs);
 	if (--id>1)
-		errs.pushCode("OD041", "only a single "+elementize(tva.e_InstanceDescription)+" is permitted in "+elementize(OnDemandProgram.name()))
+		errs.pushCode("OD041", "only a single "+tva.e_InstanceDescription.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 	
 	// <PublishedDuration>
 	var pd=0, PublishedDuration; 
@@ -2608,7 +2608,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 		if (!isISODuration(PublishedDuration.text()))
 			errs.pushCode("OD050", OnDemandProgram.name()+"."+tva.e_PublishedDuration+" is not a valid ISO Duration (xs:duration)");
 	if (--pd>1)
-		errs.pushCode("OD051", "only a single "+elementize(tva.e_PublishedDuration)+" is permitted in "+elementize(OnDemandProgram.name()))
+		errs.pushCode("OD051", "only a single "+tva.e_PublishedDuration.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 	
 	// <StartOfAvailability> and <EndOfAvailability>
 	var soa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_StartOfAvailability), CG_SCHEMA),
@@ -2616,34 +2616,34 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	
 	if (soa) 
 		if (!isUTCDateTime(soa.text())) {
-			errs.pushCode("OD060", elementize(tva.e_StartOfAvailability)+" must be expressed in Zulu time");
+			errs.pushCode("OD060", tva.e_StartOfAvailability.elementize()+" must be expressed in Zulu time")
 			soa=null;
 		}
 	if (eoa) 
 		if (!isUTCDateTime(eoa.text())) {
-			errs.pushCode("OD061", elementize(tva.e_EndOfAvailability)+" must be expressed in Zulu time");
+			errs.pushCode("OD061", tva.e_EndOfAvailability.elementize()+" must be expressed in Zulu time")
 			eoa=null;
 		}
 	if (soa && eoa) {
 		var fr=new Date(soa.text()), to=new Date(eoa.text());	
 		if (to.getTime() < fr.getTime()) 
-			errs.pushCode("OD062", elementize(tva.e_StartOfAvailability)+" must be earlier than "+elementize(tva.e_EndOfAvailability));
+			errs.pushCode("OD062", tva.e_StartOfAvailability.elementize()+" must be earlier than "+tva.e_EndOfAvailability.elementize())
 	}
 	
 	// <DeliveryMode>
 	var dm=0, DeliveryMode;
 	while (DeliveryMode=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_DeliveryMode, ++dm), CG_SCHEMA))
 		if (DeliveryMode.text()!="streaming")
-			errs.pushCode("OD070", OnDemandProgram.name()+"."+tva.e_DeliveryMode+" must be "+quote("streaming"));
+			errs.pushCode("OD070", OnDemandProgram.name()+"."+tva.e_DeliveryMode+" must be "+"streaming".quote())
 	if (--dm>1)
-		errs.pushCode("OD071", "only a single "+elementize(tva.e_DeliveryMode)+" is permitted in "+elementize(OnDemandProgram.name()))
+		errs.pushCode("OD071", "only a single "+tva.e_DeliveryMode.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 	
 	// <Free>
 	var fr=0, Free;
 	while (Free=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_Free, ++fr), CG_SCHEMA))
 		TrueValue(Free, tva.a_value, "OD080", errs)
 	if (--fr>1)
-		errs.pushCode("OD081", "only a single "+elementize(tva.e_Free)+" is permitted in "+elementize(OnDemandProgram.name()))
+		errs.pushCode("OD081", "only a single "+tva.e_Free.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 }	
 
 
@@ -2752,7 +2752,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 				if (!isCRIDURI(ProgramCRID.value()))
 					errs.pushCode("SE011", tva.a_crid.attribute(tva.e_Program)+" is not a valid CRID ("+ProgramCRID.value()+")");
 				if (!isIn(programCRIDs, ProgramCRID.value()))
-					errs.pushCode("SE012", tva.a_crid.attribute(tva.e_Program)+"="+quote(ProgramCRID.value())+" does not refer to a program in the "+elementize(tva.e_ProgramInformationTable))
+					errs.pushCode("SE012", tva.a_crid.attribute(tva.e_Program)+"="+ProgramCRID.value().quote()+" does not refer to a program in the "+tva.e_ProgramInformationTable.elementize())
 				plCRIDs.push(ProgramCRID.value())
 				isCurrentProgram=(ProgramCRID.value()==currentProgramCRID) 
 			}
@@ -2777,9 +2777,9 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 				var PublishedStartTime=new Date(pstElem.text());
 				
 				if (scheduleStart && PublishedStartTime < scheduleStart) 
-					errs.pushCode("SE041", elementize(tva.e_PublishedStartTime)+" ("+PublishedStartTime+") is earlier than "+tva.a_start.attribute(tva.e_Schedule));
+					errs.pushCode("SE041", tva.e_PublishedStartTime.elementize()+" ("+PublishedStartTime+") is earlier than "+tva.a_start.attribute(tva.e_Schedule))
 				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
-					errs.pushCode("SE042", elementize(tva.e_PublishedStartTime)+" ("+PublishedStartTime+") is after "+tva.a_end.attribute(tva.e_Schedule));	
+					errs.pushCode("SE042", tva.e_PublishedStartTime.elementize()+" ("+PublishedStartTime+") is after "+tva.a_end.attribute(tva.e_Schedule))	
 
 				var pdElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration), CG_SCHEMA);
 				if (pdElem && scheduleEnd) {
@@ -2789,13 +2789,13 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 				}
 			}
 			else 
-				errs.pushCode("SE049", elementize(tva.e_PublishedStartTime)+" is not expressed in UTC format ("+pstElem.text()+")");
+				errs.pushCode("SE049", tva.e_PublishedStartTime.elementize()+" is not expressed in UTC format ("+pstElem.text()+")");
 		}
 		
 		// <ActualStartTime> 
 		var astElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_ActualStartTime), CG_SCHEMA);
 		if (astElem && !isUTCDateTime(astElem.text())) 
-				errs.pushCode("SE051", elementize(tva.e_ActualStartTime)+" is not expressed in UTC format ("+astElem.text()+")");
+				errs.pushCode("SE051", tva.e_ActualStartTime.elementize()+" is not expressed in UTC format ("+astElem.text()+")");
 
 		// <FirstShowing>
 		var FirstShowing=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_FirstShowing), CG_SCHEMA);
@@ -2854,10 +2854,9 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 			endSchedule=null;
 		}
 
-	if (startSchedule && endSchedule) {
+	if (startSchedule && endSchedule) 
 		if (to.getTime() <= fr.getTime()) 
 			errs.pushCode("VS012", tva.a_start.attribute(Schedule.name())+" must be earlier than "+tva.a_end.attribute());
-	}
 	
 	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, plCRIDs, currentProgramCRID, fr, to, requestType, errs);
 	
@@ -2887,7 +2886,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 
 	var ProgramLocationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_ProgramLocationTable), CG_SCHEMA);
 	if (!ProgramLocationTable) {
-		errs.pushCode("PL001", elementize(tva.e_ProgramLocationTable)+" is not specified");
+		errs.pushCode("PL001", tva.e_ProgramLocationTable.elementize()+" is not specified")
 		return;
 	}
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], [tva.e_Schedule, tva.e_OnDemandProgram], errs, "PL010");
@@ -2907,7 +2906,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 				var thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs);
 				if (thisServiceIdRef.length)
 					if (isIn(foundServiceIds, thisServiceIdRef))
-						errs.pushCode("PL020", "A "+elementize(tva.e_Schedule)+" element with "+tva.a_serviceIDRef.attribute()+"="+quote(thisServiceIdRef)+" is already specified")
+						errs.pushCode("PL020", "A "+tva.e_Schedule.elementize()+" element with "+tva.a_serviceIDRef.attribute()+"="+thisServiceIdRef.quote()+" is already specified")
 					else 
 						foundServiceIds.push(thisServiceIdRef);
 				cnt++;
@@ -2916,12 +2915,12 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	}
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
-			errs.pushCode("PL021", "number of items ("+cnt+") in the "+elementize(tva.e_ProgramLocationTable)+" does match "+tva.a_numOfItems.attribute(tva.e_GroupInformation)+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")");
+			errs.pushCode("PL021", "number of items ("+cnt+") in the "+tva.e_ProgramLocationTable.elementize()+" does match "+tva.a_numOfItems.attribute(tva.e_GroupInformation)+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")")
 	}
 
 	programCRIDs.forEach(programCRID => {
 		if (!isIn(plCRIDs, programCRID))
-			errs.pushCode("PL022", "CRID "+quote(programCRID)+" specified in "+elementize(tva.e_ProgramInformationTable)+" is not specified in "+elementize(tva.e_ProgramLocationTable));
+			errs.pushCode("PL022", "CRID "+quote(programCRID)+" specified in "+tva.e_ProgramInformationTable.elementize()+" is not specified in "+tva.e_ProgramLocationTable.elementize())
 		
 	})
 }
@@ -2964,7 +2963,7 @@ console.log(CGtext)
 */
 
 	if (CG.root().name()!==tva.e_TVAMain) {
-		errs.pushCode("CG002", "Root element is not "+elementize(tva.e_TVAMain))
+		errs.pushCode("CG002", "Root element is not "+tva.e_TVAMain.elementize())
 		return
 	}
 	let CG_SCHEMA={}, 
@@ -2976,7 +2975,7 @@ console.log(CGtext)
 	
 	let ProgramDescription=CG.get(xPath(SCHEMA_PREFIX, tva.e_ProgramDescription), CG_SCHEMA);
 	if (!ProgramDescription) {
-		errs.pushCode("CG004", "No "+elementize(tva.e_ProgramDescription)+" element specified.");
+		errs.pushCode("CG004", "No "+tva.e_ProgramDescription.elementize()+" element specified.")
 		return;
 	}
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [], [], errs, "CG005")
@@ -3142,16 +3141,14 @@ function processFile(req,res) {
 		return true;
 	}
 	
-    if (isEmpty(req.query)) {
+    if (isEmpty(req.query)) 
         drawForm(false, res);    
-    } else if (!checkFile(req)) {
+    else if (!checkFile(req)) {
         drawForm(false, res, req.files.CGfile.name, req.body.requestType, "File not specified");
         res.status(400);
     }
     else {
-        var CGxml=null;
-        var errs=new ErrorList();
-		var fname="***";
+        let CGxml=null, errs=new ErrorList(), fname="***"
 		if (req && req.files && req.files.CGfile) fname=req.files.CGfile.name;
         try {
             CGxml=req.files.CGfile.data;
@@ -3159,9 +3156,8 @@ function processFile(req,res) {
         catch (err) {
             errs.pushCode("PF001", "retrieval of FILE ("+fname+") failed");
         }
-		if (CGxml) {
+		if (CGxml) 
 			validateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), req.body.requestType, errs);
-		}
 		
         drawForm(false, res, fname, req.body.requestType, null, errs);
     }
