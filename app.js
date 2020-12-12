@@ -5,6 +5,11 @@ const express=require("express")
 const fs=require("fs"), path=require("path")
 const {parse}=require("querystring")
 
+// command line arguments - https://github.com/75lb/command-line-args
+const commandLineArgs=require('command-line-args')
+
+const fetch=require("node-fetch")
+ 
 const ErrorList=require("./dvb-common/ErrorList.js")
 const dvbi=require("./dvb-common/DVB-I_definitions.js")
 const tva=require("./dvb-common/TVA_definitions.js")
@@ -34,8 +39,6 @@ var sprintf=require("sprintf-js").sprintf,
     vsprintf=require("sprintf-js").vsprintf
 	
 const https=require("https")
-const HTTP_SERVICE_PORT=3020
-const HTTPS_SERVICE_PORT=HTTP_SERVICE_PORT+1
 const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt")
 
 
@@ -76,7 +79,7 @@ const TVA_ContentCSFilename=path.join(DVB_COMMON_DIR, "tva","ContentCS.xml"),
 	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt"
 
 const ISO3166_URL=COMMON_REPO_RAW + "iso3166-countries.json",
-	  ISO3166_Filename=path.join("dvb-common","iso3166-countries.json")
+	  ISO3166_Filename=path.join(DVB_COMMON_DIR,"iso3166-countries.json")
       
 /* // TODO: LINT
 const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
@@ -160,7 +163,7 @@ String.prototype.elementize = function() {
  *
  * @param {string} attr the attribute name
  * @param {string} elem the element holding the attribute
- * @returns {string} a string containing str formatted as an attribute
+ * @returns {string} a string containing attr formatted as an attribute
  */
 function attribute(attr, elem="") {
 	return attr.attribute(elem)
@@ -251,9 +254,8 @@ if (typeof(String.prototype.trim)==="undefined") {
  * @param {String} data   the list of values, 1 per line
  */
 function addRoles(values, data) {
-	var lines=data.split('\n');
-	for (var line=0; line<lines.length; line++) 
-		values.push(lines[line].trim());	
+	let lines=data.split('\n')
+	lines.forEach(line => values.push(line.trim()))
 }
 
 
@@ -265,7 +267,7 @@ function addRoles(values, data) {
  */
 function loadRolesFromFile(values, rolesFilename) {
 	console.log("reading Roles from", rolesFilename);
-    fs.readFile(rolesFilename, {encoding: "utf-8"}, function(err,data){
+    fs.readFile(rolesFilename, {encoding: "utf-8"}, function(err,data) {
         if (!err) 
 			addRoles(values, data);
         else 
@@ -281,7 +283,22 @@ function loadRolesFromFile(values, rolesFilename) {
  * @param {String} rolesURL URL to the load
  */
 function loadRolesFromURL(values, rolesURL) { 
-	console.log("retrieving Roles from", rolesURL);
+	console.log("retrieving Roles from", rolesURL, "using fetch()");
+
+	function handleErrors(response) {
+		if (!response.ok) {
+			throw Error(response.statusText)
+		}
+		return response
+	}
+	
+	fetch(rolesURL)
+		.then(handleErrors)
+		.then(response => response.text())
+		.then(strCS => addRoles(values, strCS))
+		.catch(error => console.log("error ("+error+") retrieving "+rolesURL))
+
+/*	
 	var xhttp=new XmlHttpRequest();
 	xhttp.onreadystatechange=function() {
 		if (this.readyState==4) {
@@ -292,6 +309,7 @@ function loadRolesFromURL(values, rolesURL) {
 	};
 	xhttp.open("GET", csURL, true);
 	xhttp.send();
+*/
 } 
 
 
@@ -358,9 +376,9 @@ function isEmpty(obj) {
  * @returns {boolean} true if the argment is compliant to a tva:RatioType
  */
 function isRatioType(str) {
-	const ratioRegex=/^\d+:\d+$/;
-	var s=str.match(ratioRegex);
-	return s?s[0]===str:false;
+	const ratioRegex=/^\d+:\d+$/
+	let s=str.match(ratioRegex)
+	return s?s[0]===str:false
 }
 
 
@@ -371,9 +389,9 @@ function isRatioType(str) {
  * @returns {integer}  the decimal representation of the string, or 0 is non-digits are included
  */
 function valUnsignedInt(str) {
-	var intRegex=/[\d]+/g;
-	var s=str.match(intRegex);
-	return s[0]===str?parseInt(str, 10):0;
+	const intRegex=/[\d]+/;
+	let s=str.match(intRegex)
+	return s[0]===str?parseInt(str, 10):0
 }
 
 
@@ -384,9 +402,9 @@ function valUnsignedInt(str) {
  * @returns {boolean}  true if the argment is formatted according to UTC ("Zulu") time
  */
 function isUTCDateTime(str) {
-	const UTCregex=/^[\d]{4}-((0[1-9])|(1[0-2]))-((0[1-9])|1\d|2\d|(3[0-1]))T(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z$/;
-	var s=str.match(UTCregex);
-	return s?s[0]===str:false;
+	const UTCregex=/^[\d]{4}-((0[1-9])|(1[0-2]))-((0[1-9])|1\d|2\d|(3[0-1]))T(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z$/
+	let s=str.match(UTCregex)
+	return s?s[0]===str:false
 }
 
 
@@ -398,7 +416,7 @@ function isUTCDateTime(str) {
  */
 function isISODuration(duration) {
 	const isoRegex = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
-	var s=duration.match(isoRegex);
+	let s=duration.match(isoRegex);
 	return s?s[0]===duration:false;
 }
  
@@ -449,9 +467,9 @@ function parseISOduration(duration) {
  * @returns {boolean}  true is the argment is formatted as a DVB locator
  */
 function isDVBLocator(locator) {
-	const locatorRegex = /^dvb:\/\/[\dA-Fa-f]+\.[\dA-Fa-f]*\.[\dA-Fa-f]+;[\dA-Fa-f]+$/;
-	var s=locator.match(locatorRegex);
-	return s?s[0]===locator:false;
+	const locatorRegex = /^dvb:\/\/[\dA-Fa-f]+\.[\dA-Fa-f]*\.[\dA-Fa-f]+;[\dA-Fa-f]+$/
+	let s=locator.match(locatorRegex)
+	return s?s[0]===locator:false
 }
 
 
@@ -538,8 +556,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 		if (tableHeader) res.write("</table>");
 
 		tableHeader=false;
-		errors.messages.forEach(function(value)
-		{
+		errors.messages.forEach(function(value) {
 			if (!tableHeader) {
 				res.write("<table><tr><th>code</th><th>errors</th></tr>");
 				tableHeader=true;                    
@@ -556,8 +573,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 		if (tableHeader) res.write("</table>");
 		
 		tableHeader=false;
-		errors.messagesWarn.forEach(function(value)
-		{
+		errors.messagesWarn.forEach(function(value)	{
 			if (!tableHeader) {
 				res.write("<table><tr><th>code</th><th>warnings</th></tr>");
 				tableHeader=true;                    
@@ -656,7 +672,7 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 		while (child=parentElement.child(c++)) {
 			var childName=child.name();
 			if (child.type()=='element')
-				if (!isIn(mandatoryChildElements, childName) &&!isIn(optionalChildElements, childName)) {		
+				if (!isIn(mandatoryChildElements, childName) && !isIn(optionalChildElements, childName)) {		
 					errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+childName/elementize()+" is not permitted in "+thisElem)
 					rv=false;
 				}
@@ -1289,10 +1305,14 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
     var HowRelated=null, Format=null, MediaLocator=[];
     var c=0, elem;
     while (elem=RelatedMaterial.child(c++)) {
-        if (elem.name()==tva.e_HowRelated)
-            HowRelated=elem;
-        else if (elem.name()==tva.e_MediaLocator)
-            MediaLocator.push(elem);
+		switch (elem.name()) {
+			case tva.e_HowRelated:
+				HowRelated=elem
+				break
+			case tva.e_MediaLocator:
+				MediaLocator.push(elem)
+				break
+		}
     }
 
     if (!HowRelated) {
@@ -1434,16 +1454,16 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 		errs.pushCode("MB000", "ValidateRelatedMaterial_BoxSetList() called with BasicDescription==null")
 		return
 	}
-	var countImage=0, countTemplateAIT=0, hasPagination=false;
-	var rm=0, RelatedMaterial;
+	let countImage=0, countTemplateAIT=0, hasPagination=false
+	let rm=0, RelatedMaterial
 	while (RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA)) {
-		var HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
+		let HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA)
 		if (!HowRelated) 
 			NoChildElement(errs, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize())
 		else {		
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "MB010")
 			if (HowRelated.attr(tva.a_href)) {
-				var hrHref=HowRelated.attr(tva.a_href).value();
+				let hrHref=HowRelated.attr(tva.a_href).value()
 				switch (hrHref) {
 					case dvbi.TEMPLATE_AIT_URI:
 						countTemplateAIT++;
@@ -1496,40 +1516,39 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 		return
 	}
 	
-	var mainSet=[], secondarySet=[];
-	var t=0, Title;
+	let mainSet=[], secondarySet=[]
+	let t=0, Title
 	while (Title=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Title, ++t), CG_SCHEMA)) {
 
-		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Title, [tva.a_type], [tva.a_lang], errs, "VT001");
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Title, [tva.a_type], [tva.a_lang], errs, errCode?errCode+"-1":"VT001");
 		
-		var titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : "unspecified"; 
-		var titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT002");
-
-		var titleStr=unEntity(Title.text());
+		let titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : "unspecified"
+		let titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT002")
+		let titleStr=unEntity(Title.text())
 		
 		if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
-			errs.pushCode(errCode?errCode+"-1":"VT011", tva.e_Title.elementize()+" length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
+			errs.pushCode(errCode?errCode+"-11":"VT011", tva.e_Title.elementize()+" length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 		if (titleType==dvbi.TITLE_MAIN_TYPE) {
 			if (isIn(mainSet, titleLang))
-				errs.pushCode(errCode?errCode+"-2":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote())
+				errs.pushCode(errCode?errCode+"-12":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote())
 			else mainSet.push(titleLang);
 		}
 		else if (titleType==dvbi.TITLE_SECONDARY_TYPE) {
 			if (allowSecondary) {
 				if (isIn(secondarySet, titleLang))
-					errs.pushCode(errCode?errCode+"-3":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote())
+					errs.pushCode(errCode?errCode+"-13":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote())
 				else secondarySet.push(titleLang);
 			}
 			else 
-				errs.pushCode(errCode?errCode+"-4":"VT014", tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" is not permitted for this "+BasicDescription.name().elementize())
+				errs.pushCode(errCode?errCode+"-14":"VT014", tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" is not permitted for this "+BasicDescription.name().elementize())
 		}
 		else
-			errs.pushCode(errCode?errCode+"-5":"VT015", tva.a_type.attribute()+" must be "+dvbi.TITLE_MAIN_TYPE.quote()+" or "+dvbi.TITLE_SECONDARY_TYPE.quote()+" for "+tva.e_Titl.elementize())
+			errs.pushCode(errCode?errCode+"-15":"VT015", tva.a_type.attribute()+" must be "+dvbi.TITLE_MAIN_TYPE.quote()+" or "+dvbi.TITLE_SECONDARY_TYPE.quote()+" for "+tva.e_Titl.elementize())
 		
 		secondarySet.forEach(lang => {
 			if (!isIn(mainSet, lang)) {
-				var tLoc= lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"="+lang.quote() : "";
-				errs.pushCode(errCode?errCode+"-6":"VT016", tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" specified without "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote()+tLloc)
+				let tLoc= lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"="+lang.quote() : ""
+				errs.pushCode(errCode?errCode+"-16":"VT016", tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" specified without "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote()+tLloc)
 			}
 		});
 	}
@@ -1554,9 +1573,8 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 		return;
 	}
 
-	var isParentGroup=parentElement==categoryGroup;
-	
-	var BasicDescription=parentElement.get(xPath(SCHEMA_PREFIX, tva.e_BasicDescription), CG_SCHEMA);
+	let isParentGroup=parentElement==categoryGroup
+	let BasicDescription=parentElement.get(xPath(SCHEMA_PREFIX, tva.e_BasicDescription), CG_SCHEMA)
 	if (!BasicDescription) {
 		NoChildElement(errs, tva.e_BasicDescription.elementize(), parentElement.name())
 		return;
@@ -1668,8 +1686,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI002")
 
-	var piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
-	var isCurrentProgram=false, programCRID=null;
+	let piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010")
+	let isCurrentProgram=false, programCRID=null
 	
 	if (ProgramInformation.attr(tva.a_programId)) {
 		programCRID=ProgramInformation.attr(tva.a_programId).value();
@@ -1709,8 +1727,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 					case CG_REQUEST_SCHEDULE_WINDOW:
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI041");
 						if (child.attr(tva.a_crid) && child.attr(tva.a_crid).value()==dvbi.CRID_NOW)
-							isCurrentProgram=true;
-							
+							isCurrentProgram=true;	
 						break;
 					default:
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI042");
@@ -1733,8 +1750,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 				
 				// <ProgramInformation><MemberOf>@index
 				if (child.attr(tva.a_index)) {
-					var index=valUnsignedInt(child.attr(tva.a_index).value());
-					var indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")";
+					let index=valUnsignedInt(child.attr(tva.a_index).value())
+					let indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")"
 					if (isIn(indexes, indexInCRID))
 						errs.pushCode("PI046", tva.a_index.attribute(tva.e_MemberOf)+"="+index+" is in use by another "+ProgramInformation.name()+" element")
 					else 
@@ -1774,11 +1791,11 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		return null;
 	}
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformationTable, [], [tva.a_lang], errs, "PI102");
-	var pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, parentLang, false, "PI103");
+	let pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, parentLang, false, "PI103")
 
-	var pi=0, ProgramInformation, cnt=0, indexes=[], currentProgramCRID=null;
+	let pi=0, ProgramInformation, cnt=0, indexes=[], currentProgramCRID=null
 	while (ProgramInformation=ProgramInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_ProgramInformation, ++pi), CG_SCHEMA)) {
-		var t=ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
+		let t=ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs)
 		if (t) currentProgramCRID=t;
 		cnt++; 
 	}
@@ -1960,7 +1977,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIM002")
 	
 	if (GroupInformation.attr(tva.a_groupId)) {
-		var groupId=GroupInformation.attr(tva.a_groupId).value();
+		let groupId=GroupInformation.attr(tva.a_groupId).value()
 		if (!isCRIDURI(groupId)) 
 			errs.pushCode("GIM003", tva.a_groupId.attribute(GroupInformation.name())+" value "+groupId.quote()+" is not a valid CRID")
 		else 
@@ -1969,9 +1986,9 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 
 	TrueValue(GroupInformation, tva.a_ordered, "GIM004", errs, false)
 	
-	var GroupType=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_GroupType), CG_SCHEMA);
+	let GroupType=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_GroupType), CG_SCHEMA)
 	if (GroupType) {
-		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupType, [tva.a_type, tva.a_value], [], errs, "GIM010")
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupType, [tva.a_type, tva.a_value], [], errs, "GIM011")
 		
 		if (GroupType.attr(tva.a_type) && GroupType.attr(tva.a_type).value()!=tva.t_ProgramGroupTypeType) 
 			errs.pushCode("GIM012", tva.e_GroupType+"@xsi:"+tva.a_type+" must be "+tva.t_ProgramGroupTypeType.quote())
@@ -2006,7 +2023,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 		return;
 	}
 
-	var giLang=GetLanguage(knownLanguages, errs, GroupInformation, parentLanguage, false, "GI001");
+	let giLang=GetLanguage(knownLanguages, errs, GroupInformation, parentLanguage, false, "GI001")
 	
 	switch (requestType) {
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
@@ -2023,12 +2040,12 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 			break;				
 	}
 
-	var GroupType=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_GroupType), CG_SCHEMA);
+	let GroupType=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_GroupType), CG_SCHEMA)
 	if (GroupType) {
 		if (!(GroupType.attr(tva.a_type) && GroupType.attr(tva.a_type).value()==tva.t_ProgramGroupTypeType)) 
-			errs.pushCode("GI051", tva.e_GroupType+"@xsi:"+tva.a_type+"="+tva.t_ProgramGroupTypeType.quote()+" is required");
+			errs.pushCode("GI011", tva.e_GroupType+"@xsi:"+tva.a_type+"="+tva.t_ProgramGroupTypeType.quote()+" is required")
 		if (!(GroupType.attr(tva.a_value) && GroupType.attr(tva.a_value).value()=="otherCollection")) 
-			errs.pushCode("GI052", tva.a_value.attribute(tva.e_GroupType)+"="+"otherCollection".quote()+" is required");
+			errs.pushCode("GI022", tva.a_value.attribute(tva.e_GroupType)+"="+"otherCollection".quote()+" is required")
 	}
 	else
 		errs.pushCode("GI014", elementize(tva.e_GroupType)+" is required in "+elementize(GroupInformation.name()));
@@ -2050,17 +2067,17 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, requestType, groupIds, errs, o) { 
 	
 	if (!ProgramDescription) {
-		errs.pushCode("GI000", "CheckGroupInformation() called with ProgramDescription==null")
+		errs.pushCode("GI100", "CheckGroupInformation() called with ProgramDescription==null")
 		return
 	}
 	var gi, GroupInformation;
 	var GroupInformationTable=ProgramDescription.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformationTable), CG_SCHEMA);
 	
 	if (!GroupInformationTable) {
-		errs.pushCode("GI100", tva.e_GroupInformationTable.elementize()+" not specified in "+ProgramDescription.name().elementize())
+		errs.pushCode("GI101", tva.e_GroupInformationTable.elementize()+" not specified in "+ProgramDescription.name().elementize())
 		return;
 	}
-	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "GI101");
+	var gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "GI102")
 
 	// find which GroupInformation element is the "category group"
 	var categoryGroup=null;
@@ -2100,7 +2117,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 	}
 
 	if (requestType==CG_REQUEST_MORE_EPISODES && giCount>1)
-		errs.pushCode("GI104", "only one "+tva.e_GroupInformation+" element is premitted for this request type");
+		errs.pushCode("GI114", "only one "+tva.e_GroupInformation+" element is premitted for this request type");
 }
 
 
@@ -2136,9 +2153,9 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, null, null, null );
 	
 	if (GroupInformation.attr(tva.a_groupId)) {
-		var grp=GroupInformation.attr(tva.a_groupId).value();
+		let grp=GroupInformation.attr(tva.a_groupId).value()
 		if ((grp==dvbi.CRID_EARLIER && numEarlier>0) || (grp==dvbi.CRID_NOW && numNow>0) || (grp==dvbi.CRID_LATER && numLater>0)) {
-			var numOfItems=GroupInformation.attr(tva.a_numOfItems)? valUnsignedInt(GroupInformation.attr(tva.a_numOfItems).value()): -1;
+			let numOfItems=GroupInformation.attr(tva.a_numOfItems)?valUnsignedInt(GroupInformation.attr(tva.a_numOfItems).value()):-1
 			switch (grp) {
 				case dvbi.CRID_EARLIER:
 					ValidValues(errs, numOfItems, numEarlier, grp);
@@ -2935,7 +2952,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
  */
 function validateContentGuide(CGtext, requestType, errs) {
 	let CG=null
-console.log(CGtext)
+
 	if (CGtext) try {
 		CG=libxml.parseXmlString(CGtext);
 	} catch (err) {
@@ -2980,7 +2997,7 @@ console.log(CGtext)
 	}
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [], [], errs, "CG005")
 	
-	let programCRIDs=[], groupIds=[], o={childCount:0};
+	let programCRIDs=[], groupIds=[], o={childCount:0}
 	
 	switch (requestType) {
 		case CG_REQUEST_SCHEDULE_TIME:
@@ -3059,13 +3076,16 @@ function loadDataFiles(useURLs) {
 	loadCS(allowedGenres, useURLs, TVA_ContentCSFilename, TVA_ContentCSURL);
 	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
 	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
-
-	// console.log("loading countries...");
-	// knownCountries.loadCountriesFromFile(ISO3166_Filename, true);
-  
+/*
+	console.log("loading countries...")
+	if (useURLs) 
+		knownCountries.loadCountriesFromURL(ISO3166_URL, true)
+	else knownCountries.loadCountriesFromFile(ISO3166_Filename, true)
+*/  
     console.log("loading languages...");
-	knownLanguages.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
-	//knownLanguages.loadLanguagesFromURL(IANA_Subtag_Registry_URL, true);
+	if (useURLs) 
+		knownLanguages.loadLanguagesFromURL(IANA_Subtag_Registry_URL, true)
+	else knownLanguages.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true)
 	
 	console.log("loading CreditItem roles...");
 	allowedCreditItemRoles=[];
@@ -3165,8 +3185,17 @@ function processFile(req,res) {
 }
 
 
+// command line options
+const DEFAULT_HTTP_SERVICE_PORT=3020;
+const optionDefinitions=[
+  { name: 'urls', alias: 'u', type: Boolean, defaultValue: false},
+  { name: 'port', alias: 'p', type: Number, defaultValue:DEFAULT_HTTP_SERVICE_PORT },
+  { name: 'sport', alias: 's', type: Number, defaultValue:DEFAULT_HTTP_SERVICE_PORT+1 }
+]
+const options=commandLineArgs(optionDefinitions)
+
 // read in the validation data
-loadDataFiles(false);
+loadDataFiles(options.urls)
 
 //middleware
 morgan.token("protocol", function getProtocol(req) {
@@ -3224,7 +3253,7 @@ app.get("*", function(req,res) {
 
 
 // start the HTTP server
-var http_server=app.listen(HTTP_SERVICE_PORT, function() {
+var http_server=app.listen(options.port, function() {
     console.log("HTTP listening on port number", http_server.address().port);
 });
 
@@ -3239,7 +3268,7 @@ var https_options={
 
 if (https_options.key && https_options.cert) {
     var https_server=https.createServer(https_options, app);
-    https_server.listen(HTTPS_SERVICE_PORT, function(){
+    https_server.listen(options.sport, function() {
         console.log("HTTPS listening on port number", https_server.address().port);
     });
 }
