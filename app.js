@@ -297,20 +297,7 @@ function loadRolesFromURL(values, rolesURL) {
 		.then(response => response.text())
 		.then(strCS => addRoles(values, strCS))
 		.catch(error => console.log("error ("+error+") retrieving "+rolesURL))
-
-/*	
-	var xhttp=new XmlHttpRequest();
-	xhttp.onreadystatechange=function() {
-		if (this.readyState==4) {
-			if (this.status==200) 
-				addRoles(values, xhttp.responseText);
-			else console.log("error ("+this.status+") retrieving "+csURL);	
-		}
-	};
-	xhttp.open("GET", csURL, true);
-	xhttp.send();
-*/
-} 
+} 	
 
 
 /**
@@ -1242,7 +1229,6 @@ function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 				errs.pushCode("RMME001", "a maximum of 1 "+tva.e_RelatedMaterial.elementize()+" element is permitted in "+BasicDescription.name().elementize()+" for this request type")	
 			break;
 		case tva.e_GroupInformation:
-			// TODO: 
 			ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "More Episodes")
 			break;
 	}
@@ -2472,7 +2458,9 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	if (SignLanguage) {
 		CheckLanguage(knownLanguages, errs, SignLanguage.text(), InstanceDescription.name()+"."+tva.e_SignLanguage, "ID-310");
 		FalseValue(SignLanguage, tva.a_closed, "ID032", errs)
-		//TODO: need to consider language validation against ISO 639-3 [18].
+		// check value is "sgn" according to ISO 639-2 or a sign language listed in ISO 639-3
+		if (SignLanguage.text()!="sgn" && !knownLanguages.isKnownSignLanguage(SignLanguage.text())) 
+			errs.pushCode("ID033", "invalid "+tva.e_SignLanguage.elementize()+" "+SignLanguage.text().quote()+" in "+InstanceDescription.name().elementize())
 	}
 	
 	// <AVAttributes>
@@ -3120,22 +3108,23 @@ function processQuery(req, res) {
 	}
 	
     if (isEmpty(req.query)) 
-        drawForm(true, res);    
+        drawForm(true, res)    
     else if (!checkQuery(req)) {
         drawForm(true, res, req.query.CGurl, req.body.requestType, "URL not specified");
         res.status(400);
     }
     else {
-        var CGxml=null;
         var errs=new ErrorList();
-        try {
-            CGxml=syncRequest("GET", req.query.CGurl);
-        }
-        catch (err) {
-            errs.pushCode("PQ001", "retrieval of URL ("+req.query.CGurl+") failed");
-        }
-		if (CGxml) 
-			validateContentGuide(CGxml.getBody().toString().replace(/(\r\n|\n|\r|\t)/gm,""), req.body.requestType, errs);
+		
+		var xhttp=new XmlHttpRequest()
+		xhttp.onreadystatechange=function() {
+			if (this.readyState==this.DONE && this.status==200) 
+				validateContentGuide(xhttp.responseText.replace(/(\r\n|\n|\r|\t)/gm,""), errs)
+			else             
+				errs.pushCode("PQ001", "retrieval of URL ("+req.query.CGurl+") failed")
+		}
+		xhttp.open("GET", req.query.CGurl, false);
+		xhttp.send();
 
         drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs);
     }
@@ -3267,6 +3256,9 @@ var https_options={
 };
 
 if (https_options.key && https_options.cert) {
+	if (options.sport==options.port)
+		options.sport=options.port+1
+		
     var https_server=https.createServer(https_options, app);
     https_server.listen(options.sport, function() {
         console.log("HTTPS listening on port number", https_server.address().port);
