@@ -19,8 +19,8 @@ const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js")
 const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js")
 const {loadCS}=require("./dvb-common/CS_handler.js")
 
-// libxmljs - https://github.com/libxmljs/libxmljs
-const libxml=require("libxmljs")
+// libxmljs2 - github.com/marudor/libxmljs2
+const libxml=require("libxmljs2")
 
 //LINT: validation against schema
 //const xmllint=require("xmllint")
