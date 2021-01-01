@@ -184,6 +184,23 @@ String.prototype.quote = function() {
 }
 
 
+/**
+ * checks of the specified argument matches an HTTP(s) URL where the protocol is required to be provided
+ *
+ * @param {string} arg  The value whose format is to be checked
+ * @returns {boolean} true if the argument is an HTTP URL
+ */
+function isHTTPURL(arg) {
+	let pattern = new RegExp('^(https?:\\/\\/)'+ // protocol
+		'((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
+		'((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
+		'(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
+		'(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
+		'(\\#[-a-z\\d_]*)?$','i') // fragment locator
+	return !!pattern.test(arg)
+}
+
+
 /** 
  * verify the language using a validation class
  *
@@ -1089,18 +1106,19 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 	if (hrHref==tva.cs_PromotionalStillImage) {
 		// Promotional Still Image
 		
-		let errLocation="Promotional Still Image ("+tva.a_href.attribute(tva.e_HowRelated)+"="+tva.cs_PromotionalStillImage+")"
 		let MediaUri=RelatedMaterial.get(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]), CG_SCHEMA) 
-		if (!MediaUri) 
-			errs.pushCode("IRM001", tva.e_MediaUri.elementize()+" not specified for "+errLocation);
-		if (MediaUri && !MediaUri.attr(tva.a_contentType))
-			errs.pushCode("IRM002", tva.a_contentType.attribute(tva.e_MediaUri)+" not specified for "+errLocation );
-
-		if (MediaUri && MediaUri.attr(tva.a_contentType)) {
-			let contentType=MediaUri.attr(tva.a_contentType).value()
-			if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
-				errs.pushCode("IRM003", tva.a_contentType.attribute(tva.e_MediaUri)+"="+contentType.quote()+" is not valid for a "+errLocation)
-		}		
+		if (MediaUri) {
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MediaUri, [tva.a_contentType], [], errs, "IRM002")
+			if (MediaUri.attr(tva.a_contentType)) {
+				let contentType=MediaUri.attr(tva.a_contentType).value()
+				if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
+					errs.pushCode("IRM003", tva.a_contentType.attribute(tva.e_MediaUri)+"="+contentType.quote()+" is not valid for a "+errLocation)
+			}
+			 
+			if (!isHTTPURL(MediaUri.text()))
+				errs.pushCode("IRM004", tva.e_MediaUri.elementize()+"="+MediaUri.text().quote()+" is not a valid Image URL", "invalid URL")
+		}
+		else errs.pushCode("IRM001", tva.e_MediaUri.elementize()+" not specified for Promotional Still Image ("+tva.a_href.attribute(tva.e_HowRelated)+"="+tva.cs_PromotionalStillImage+")")
 		return true;
 	}
 	return false;
@@ -1180,6 +1198,13 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 						countPaginationLast++;
 						break;
 				}	
+			let MediaURI=RelatedMaterial.get(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]), CG_SCHEMA)
+			if (MediaURI) {
+				if (!isHTTPURL(MediaURI.text()))
+					errs.pushCode("VP011", tva.e_MediaUri.elementize()+"="+MediaUri.text().quote()+" is not a valid Pagination URL", "invalid URL")
+			}
+			else
+				errs.pushCode("VP010", tva.e_MediaLocator.elementize()+tva.e_MediaUri.elementize()+" not specified for pagination link")
 		}
 	}
 
@@ -1411,6 +1436,8 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) 
 									errs.pushCode("PS033", "conflicting media types in "+tva.e_Format.elementize()+" and "+tva.e_MediaUri.elementize()+" for "+Location)
 							}
+							if (!isHTTPURL(child.text()))
+								errs.pushCode("PS034", tva.e_MediaUri.elementize()+"="+child.text().quote()+" is not a valid Image URL", "invalid URL")
 						}
 					});
 					if (!hasMediaURI) 
@@ -2533,7 +2560,11 @@ function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs, errco
 	if (!node) return;
 	
 	if (node.attr(tva.a_contentType)) {
-		if (node.attr(tva.a_contentType).value() != dvbi.XML_AIT_CONTENT_TYPE) 
+		if (node.attr(tva.a_contentType).value()==dvbi.XML_AIT_CONTENT_TYPE) {
+			if (!isHTTPURL(node.text()))
+				errs.pushCode(errcode?errcode+"-3":"TA003", node.name().elementize()+"="+node.text().quote()+" is not a valid AIT URL", "invalid URL")
+		}
+		else
 			errs.pushCode(errcode?errcode+"-1":"TA001", tva.a_contentType.attribute(node.name())+"="+node.attr(tva.a_contentType).value().quote()+" is not valid for a template AIT")		
 	}
 	else
