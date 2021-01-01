@@ -3,7 +3,6 @@
 const express=require("express")
 
 const fs=require("fs"), path=require("path")
-const {parse}=require("querystring")
 
 // command line arguments - https://github.com/75lb/command-line-args
 const commandLineArgs=require('command-line-args')
@@ -91,11 +90,8 @@ const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-re
 const IANAlanguages=require("./"+DVB_COMMON_DIR+"/IANAlanguages.js")
 
 var allowedGenres=[], allowedCreditItemRoles=[]
-
-//const ISOcountries=require("./dvb-common/ISOcountries.js")
-//var knownCountries=new ISOcountries(false, true)
-
 var knownLanguages=new IANAlanguages()
+
 /* // LINT
 var TVAschema, MPEG7schema, XMLschema;
 */
@@ -525,7 +521,6 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 		res.write(">"+choice.label+"</input>")
 	});
 	
-	//choice.label.replace(/ /g, '&nbsp;')
 	res.write(FORM_END);
 	
     res.write(RESULT_WITH_INSTRUCTION);
@@ -3112,7 +3107,7 @@ function doValidateContentGuide(CGtext, requestType, errs) {
  */
 function validateContentGuide(CGtext, requestType)  {
 	var errs=new ErrorList()
-	validateContentGuide(CGtext, requestType, errs)
+	doValidateContentGuide(CGtext, requestType, errs)
 
 	return new Promise((resolve, reject) => {
 		resolve(errs)
@@ -3198,19 +3193,6 @@ function processQuery(req, res) {
 			.then(errs=>drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs))
 			.then(res=>res.end())
 			.catch(error => console.log("error ("+error+") handling "+csURL))
-/*
-		var xhttp=new XmlHttpRequest()
-		xhttp.onreadystatechange=function() {
-			if (this.readyState==this.DONE && this.status==200) 
-				validateContentGuide(xhttp.responseText.replace(/(\r\n|\n|\r|\t)/gm,""), errs)
-			else             
-				errs.pushCode("PQ001", "retrieval of URL ("+req.query.CGurl+") failed")
-		}
-		xhttp.open("GET", req.query.CGurl, false);
-		xhttp.send();
-
-		drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs);
-*/
     }
 }
 
