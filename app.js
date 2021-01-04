@@ -7,6 +7,9 @@ const fs=require("fs"), path=require("path")
 // command line arguments - https://github.com/75lb/command-line-args
 const commandLineArgs=require('command-line-args')
 
+// favourite icon - https://www.npmjs.com/package/serve-favicon
+const favicon=require("serve-favicon")
+
 const fetch=require("node-fetch")
  
 const ErrorList=require("./dvb-common/ErrorList.js")
@@ -3308,6 +3311,8 @@ app.use(fileUpload());
 
 // initialize Express
 app.use(express.urlencoded({ extended: true }));
+
+app.use(favicon('favicon.ico'))
 
 // handle HTTP POST requests to /check
 app.post("/check", function(req,res) {
