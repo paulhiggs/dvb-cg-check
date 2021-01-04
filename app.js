@@ -193,7 +193,7 @@ function isHTTPURL(arg) {
 		'(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
 		'(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
 		'(\\#[-a-z\\d_]*)?$','i') // fragment locator
-	return !!pattern.test(arg)
+	return pattern.test(arg)
 }
 
 
@@ -667,14 +667,14 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	// check that no additional child elements existance if the "Other Child Elements are OK" flag is not set
 	if (!isIn(optionalChildElements, OTHER_ELEMENTS_OK)) {
 		let c=0, child
-		while (child=parentElement.child(c++)) {
-			let childName=child.name()
-			if (child.type()=='element')
+		while (child=parentElement.child(c++)) 
+			if (child.type()=='element') {
+				let childName=child.name()
 				if (!isIn(mandatoryChildElements, childName) && !isIn(optionalChildElements, childName)) {		
 					errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+childName/elementize()+" is not permitted in "+thisElem)
 					rv=false;
 				}
-		}
+			}
 	}
 	return rv;
 }
@@ -929,34 +929,35 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		countParentalGuidance++;
 		
 		let pgc=0, pgChild, countExplanatoryText=0
-		while (pgChild=ParentalGuidance.child(pgc++)) {
-			switch (pgChild.name()) {
-				case tva.e_MinimumAge:
-				case tva.e_ParentalRating:
-					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-						errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+elementize("mpeg7:"+tva.e_MinimumAge))
-					
-					if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-						errs.pushCode(errCode?errCode+"-2":"PG012", etva.e_MinimumAge.lementize()+" must be in the first "+tva.e_ParentalGuidance.lementize()+" element");
-					
-					if (pgChild.name()==tva.e_ParentalRating) {
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
-					}
-					break;		
-				case tva.e_ExplanatoryText:
-					countExplanatoryText++;
-					if (pgChild.attr(tva.a_length)) {
-						if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
-							errs.pushCode(errCode?errCode+"-3":"PG003", tva.a_length.attribute()+"="+pgChild.attr(tva.a_length).value().quote()+" is not allowed for "+tva.e_ExplanatoryText.elementize())
-					}
-					else 
-						errs.pushCode(errCode?errCode+"-4":"PG004", tva.a_length.attribute()+"="+tva.v_lengthLong.quote()+" is required for "+tva.e_ExplanatoryText.elementize())
-					
-					if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
-						errs.pushCode(errCode?errCode+"-5":"PG005", "length of "+tva.e_ExplanatoryText.elementize()+" cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters")
-					break;
+		while (pgChild=ParentalGuidance.child(pgc++)) 
+			if (pgChild.type()=='element') {
+				switch (pgChild.name()) {
+					case tva.e_MinimumAge:
+					case tva.e_ParentalRating:
+						if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
+							errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+elementize("mpeg7:"+tva.e_MinimumAge))
+						
+						if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
+							errs.pushCode(errCode?errCode+"-2":"PG012", etva.e_MinimumAge.lementize()+" must be in the first "+tva.e_ParentalGuidance.lementize()+" element");
+						
+						if (pgChild.name()==tva.e_ParentalRating) {
+							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
+						}
+						break;		
+					case tva.e_ExplanatoryText:
+						countExplanatoryText++;
+						if (pgChild.attr(tva.a_length)) {
+							if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
+								errs.pushCode(errCode?errCode+"-3":"PG003", tva.a_length.attribute()+"="+pgChild.attr(tva.a_length).value().quote()+" is not allowed for "+tva.e_ExplanatoryText.elementize())
+						}
+						else 
+							errs.pushCode(errCode?errCode+"-4":"PG004", tva.a_length.attribute()+"="+tva.v_lengthLong.quote()+" is required for "+tva.e_ExplanatoryText.elementize())
+						
+						if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
+							errs.pushCode(errCode?errCode+"-5":"PG005", "length of "+tva.e_ExplanatoryText.elementize()+" cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters")
+						break;
+				}
 			}
-		}
 		if (countExplanatoryText > 1)
 			errs.pushCode(errCode?errCode+"-7":"PG006", "only a single "+tva.e_ExplanatoryText.elementize()+" element is premitted in "+tva.e_ParentalGuidance.elementize())
 	}
@@ -987,20 +988,20 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	}
 	let se=0, subElem
 	let familyNameCount=0, givenNameCount=0, otherElemCount=0
-	while (subElem=elem.child(se++)) {
-		switch (subElem.name()) {
-			case tva.e_GivenName:
-				givenNameCount++;
-				checkNamePart(subElem, errs, errCode?errCode+"-2":"VN002");
-			    break;
-			case tva.e_FamilyName:
-				familyNameCount++;
-				checkNamePart(subElem, errs, errCode?errCode+"-3":"VN003");
-			    break;
-			default:
-				otherElemCount++;			
-		}
-	}
+	while (subElem=elem.child(se++)) 
+		if (subElem.type=="element") 
+			switch (subElem.name()) {
+				case tva.e_GivenName:
+					givenNameCount++;
+					checkNamePart(subElem, errs, errCode?errCode+"-2":"VN002");
+					break;
+				case tva.e_FamilyName:
+					familyNameCount++;
+					checkNamePart(subElem, errs, errCode?errCode+"-3":"VN003");
+					break;
+				default:
+					otherElemCount++;			
+			}
 	if (givenNameCount==0)
 		errs.pushCode("VN004", tva.e_GivenName.elementize()+" is mandatory in "+elem.name().elementize())
 	if (familyNameCount>1)
@@ -1025,7 +1026,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 	}
 	let CreditsList=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_CreditsList), CG_SCHEMA)
 	if (CreditsList) {
-		let ci=0, CreditsItem	
+		let ci=0, CreditsItem
 		while (CreditsItem=CreditsList.get(xPath(SCHEMA_PREFIX,tva.e_CreditsItem, ++ci), CG_SCHEMA)) {
 			if (CreditsItem.attr(tva.a_role)) {
 				let CreditsItemRole=CreditsItem.attr(tva.a_role).value()
@@ -1036,38 +1037,39 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 				errs.pushCode(errCode?errCode+"-2":"CL002", tva.a_role.attribute(tva.e_CreditsItem)+" not specified")
 			let foundPersonName=0, foundCharacter=0, foundOrganizationName=0
 			let s=0, elem
-			while (elem=CreditsItem.child(s++)) {
-				switch (elem.name()) {
-					case tva.e_PersonName:
-						foundPersonName++;
-						// required to have a GivenName optionally have a FamilyName
-						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-						break;
-					case tva.e_Character:
-						foundCharacter++;
-						// required to have a GivenName optionally have a FamilyName
-						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-						break;
-					case tva.e_OrganizationName:
-						foundOrganizationName++;
-						if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
-							errs.pushCode(errCode?errCode+"-3":"CL003", "length of "+tva.e_OrganizationName.elementize()+" in "+tva.e_CreditsItem.elementize()+" exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
-						break;
-					default:
-						if (elem.name()!="text")
-							errs.pushCode(errCode?errCode+"-4":"CL004", "extra element "+elem.name().elementize()+" found in "+tva.e_CreditsItem.elementize())
-				}
-				if (foundPersonName>1)
-					errs.pushCode(errCode?errCode+"-5":"CL005", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
-				if (foundCharacter>1)
-					errs.pushCode(errCode?errCode+"-6":"CL006", "only a single "+tva.e_Character.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
-				if (foundOrganizationName>1)
-					errs.pushCode(errCode?errCode+"-7":"CL007", "only a single "+tva.e_OrganizationName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
-				if (foundCharacter>0 && foundPersonName==0)
-					errs.pushCode(errCode?errCode+"-8":"CL008", tva.e_Character.elementize()+" in "+tva.e_CreditsItem.elementize()+" requires "+tva.e_PersonName.elementize())
-				if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
-					errs.pushCode(errCode?errCode+"-9":"CL009", tva.e_OrganizationName.elementize()+" can only be present when "+tva.e_PersonName.elementize()+" is absent in "+tva.e_CreditsItem.elementize())
-			}			
+			while (elem=CreditsItem.child(s++)) 
+				if (elem.type()=="element") {
+					switch (elem.name()) {
+						case tva.e_PersonName:
+							foundPersonName++;
+							// required to have a GivenName optionally have a FamilyName
+							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+							break;
+						case tva.e_Character:
+							foundCharacter++;
+							// required to have a GivenName optionally have a FamilyName
+							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+							break;
+						case tva.e_OrganizationName:
+							foundOrganizationName++;
+							if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
+								errs.pushCode(errCode?errCode+"-3":"CL003", "length of "+tva.e_OrganizationName.elementize()+" in "+tva.e_CreditsItem.elementize()+" exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
+							break;
+						default:
+							if (elem.name()!="text")
+								errs.pushCode(errCode?errCode+"-4":"CL004", "extra element "+elem.name().elementize()+" found in "+tva.e_CreditsItem.elementize())
+					}
+					if (foundPersonName>1)
+						errs.pushCode(errCode?errCode+"-5":"CL005", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
+					if (foundCharacter>1)
+						errs.pushCode(errCode?errCode+"-6":"CL006", "only a single "+tva.e_Character.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
+					if (foundOrganizationName>1)
+						errs.pushCode(errCode?errCode+"-7":"CL007", "only a single "+tva.e_OrganizationName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
+					if (foundCharacter>0 && foundPersonName==0)
+						errs.pushCode(errCode?errCode+"-8":"CL008", tva.e_Character.elementize()+" in "+tva.e_CreditsItem.elementize()+" requires "+tva.e_PersonName.elementize())
+					if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
+						errs.pushCode(errCode?errCode+"-9":"CL009", tva.e_OrganizationName.elementize()+" can only be present when "+tva.e_PersonName.elementize()+" is absent in "+tva.e_CreditsItem.elementize())
+				}			
 			if (foundPersonName>1)
 				errs.pushCode(errCode?errCode+"-10":"CL010", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 			if (foundCharacter>1)
@@ -1096,9 +1098,8 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 	}
 	let HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA)
 	if (!HowRelated || !HowRelated.attr(tva.a_href)) return false;
-	let hrHref=HowRelated.attr(tva.a_href).value()
-
-	if (hrHref==tva.cs_PromotionalStillImage) {
+	
+	if (HowRelated.attr(tva.a_href).value()==tva.cs_PromotionalStillImage) {
 		// Promotional Still Image
 		
 		let MediaUri=RelatedMaterial.get(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]), CG_SCHEMA) 
@@ -1371,18 +1372,19 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 	}
     let HowRelated=null, Format=null, MediaLocator=[]
     let c=0, elem
-    while (elem=RelatedMaterial.child(c++)) 
-		switch (elem.name()) {
-			case tva.e_HowRelated:
-				HowRelated=elem;
-				break;
-			case tva.e_Format:
-				Format=elem;
-				break;
-			case tva.e_MediaLocator:
-				MediaLocator.push(elem);
-				break;
-		}
+	while (elem=RelatedMaterial.child(c++)) 
+		if (elem.type=='element')
+			switch (elem.name()) {
+				case tva.e_HowRelated:
+					HowRelated=elem;
+					break;
+				case tva.e_Format:
+					Format=elem;
+					break;
+				case tva.e_MediaLocator:
+					MediaLocator.push(elem);
+					break;
+			}
 
 
     if (!HowRelated) {
@@ -1713,64 +1715,65 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
 
 	let c=0, child
-	while (child=ProgramInformation.child(c++)) {
-		switch (child.name()) {
-			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
-				if (requestType==CG_REQUEST_MORE_EPISODES)
-					errs.pushCode("PI021", tva.e_OtherIdentifier.elementize()+" is not permitted in this request type")
-				break;
-			case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI031");
+	while (child=ProgramInformation.child(c++)) 
+		if (child.type()=="element") {
+			switch (child.name()) {
+				case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
+					if (requestType==CG_REQUEST_MORE_EPISODES)
+						errs.pushCode("PI021", tva.e_OtherIdentifier.elementize()+" is not permitted in this request type")
+					break;
+				case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
+					checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI031");
+					
+					// <ProgramInformation><EpisodeOf>@crid
+					if (child.attr(tva.a_crid)) {
+						let foundCRID=child.attr(tva.a_crid).value()
+						if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
+							errs.pushCode("PI032", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_EpisodeOf.elementize())
+						else
+							if (!isCRIDURI(foundCRID))
+								errs.pushCode("PI033", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a valid CRID")
+					}
+					break;
+				case tva.e_MemberOf:			// <ProgramInformation><MemberOf>
+					switch (requestType) {
+						case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
+						case CG_REQUEST_SCHEDULE_WINDOW:
+							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI041");
+							if (child.attr(tva.a_crid) && child.attr(tva.a_crid).value()==dvbi.CRID_NOW)
+									isCurrentProgram=true
+							break;
+						default:
+							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI042");
+					}
+							
+					// <ProgramInformation><MemberOf>@xsi:type
+					if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
+						errs.pushCode("PI043", attribute("xsi:"+tva.a_type)+" must be "+(tva.t_MemberOfTypequote)+" for "+ProgramInformation.name()+"."+tva.e_MemberOf)
 				
-				// <ProgramInformation><EpisodeOf>@crid
-				if (child.attr(tva.a_crid)) {
-					let foundCRID=child.attr(tva.a_crid).value()
-					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
-						errs.pushCode("PI032", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_EpisodeOf.elementize())
-					else
-						if (!isCRIDURI(foundCRID))
-							errs.pushCode("PI033", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a valid CRID")
-				}
-				break;
-			case tva.e_MemberOf:			// <ProgramInformation><MemberOf>
-				switch (requestType) {
-					case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
-					case CG_REQUEST_SCHEDULE_WINDOW:
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI041");
-						if (child.attr(tva.a_crid) && child.attr(tva.a_crid).value()==dvbi.CRID_NOW)
-							isCurrentProgram=true;	
-						break;
-					default:
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI042");
-				}
-						
-				// <ProgramInformation><MemberOf>@xsi:type
-				if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
-					errs.pushCode("PI043", attribute("xsi:"+tva.a_type)+" must be "+(tva.t_MemberOfTypequote)+" for "+ProgramInformation.name()+"."+tva.e_MemberOf)
-			
-				// <ProgramInformation><MemberOf>@crid
-				let foundCRID=null
-				if (child.attr(tva.a_crid)) {
-					foundCRID=child.attr(tva.a_crid).value();
-					if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
-						errs.pushCode("PI044", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_MemberOf.elementize())
-					else
-						if (!isCRIDURI(foundCRID))
-							errs.pushCode("PI045", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a valid CRID")
-				}
-				
-				// <ProgramInformation><MemberOf>@index
-				if (child.attr(tva.a_index)) {
-					let index=valUnsignedInt(child.attr(tva.a_index).value())
-					let indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")"
-					if (isIn(indexes, indexInCRID))
-						errs.pushCode("PI046", tva.a_index.attribute(tva.e_MemberOf)+"="+index+" is in use by another "+ProgramInformation.name()+" element")
-					else 
-						indexes.push(indexInCRID);
-				}
-				break;			
-		}	
-	}
+					// <ProgramInformation><MemberOf>@crid
+					let foundCRID=null
+					if (child.attr(tva.a_crid)) {
+						foundCRID=child.attr(tva.a_crid).value();
+						if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
+							errs.pushCode("PI044", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_MemberOf.elementize())
+						else
+							if (!isCRIDURI(foundCRID))
+								errs.pushCode("PI045", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a valid CRID")
+					}
+					
+					// <ProgramInformation><MemberOf>@index
+					if (child.attr(tva.a_index)) {
+						let index=valUnsignedInt(child.attr(tva.a_index).value())
+						let indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")"
+						if (isIn(indexes, indexInCRID))
+							errs.pushCode("PI046", tva.a_index.attribute(tva.e_MemberOf)+"="+index+" is in use by another "+ProgramInformation.name()+" element")
+						else 
+							indexes.push(indexInCRID);
+					}
+					break;			
+			}	
+		}
 	
 	return isCurrentProgram?programCRID:null;
 }
@@ -2099,7 +2102,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
 			let e=0, elem
 			while (elem=GroupInformation.child(e++)) 
-				if (elem.name()==tva.e_MemberOf)
+				if (elem.type=='element' && elem.name()==tva.e_MemberOf)
 					countMemberOf++
 			if (countMemberOf==0) {
 				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
@@ -2946,23 +2949,24 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	
 	let c=0, child, cnt=0, foundServiceIds=[], plCRIDs=[]
 
-	while (child=ProgramLocationTable.child(c++)) {		
-		switch (child.name()) {
-			case tva.e_OnDemandProgram:
-				ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
-				cnt++;
-				break;
-			case tva.e_Schedule:
-				let thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs)
-				if (thisServiceIdRef.length)
-					if (isIn(foundServiceIds, thisServiceIdRef))
-						errs.pushCode("PL020", "A "+tva.e_Schedule.elementize()+" element with "+tva.a_serviceIDRef.attribute()+"="+thisServiceIdRef.quote()+" is already specified")
-					else 
-						foundServiceIds.push(thisServiceIdRef);
-				cnt++;
-				break;
+	while (child=ProgramLocationTable.child(c++)) 
+		if (child.type()=="element") {		
+			switch (child.name()) {
+				case tva.e_OnDemandProgram:
+					ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
+					cnt++;
+					break;
+				case tva.e_Schedule:
+					let thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs)
+					if (thisServiceIdRef.length)
+						if (isIn(foundServiceIds, thisServiceIdRef))
+							errs.pushCode("PL020", "A "+tva.e_Schedule.elementize()+" element with "+tva.a_serviceIDRef.attribute()+"="+thisServiceIdRef.quote()+" is already specified")
+						else 
+							foundServiceIds.push(thisServiceIdRef);
+					cnt++;
+					break;
+			}
 		}
-	}
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
 			errs.pushCode("PL021", "number of items ("+cnt+") in the "+tva.e_ProgramLocationTable.elementize()+" does match "+tva.a_numOfItems.attribute(tva.e_GroupInformation)+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")")
