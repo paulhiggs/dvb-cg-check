@@ -181,6 +181,23 @@ String.prototype.quote = function() {
 
 
 /**
+ * counts the number of named elements in the specificed node 
+ * *
+ * @param {Object} node the libxmljs node to check
+ * @param {String} childElementName the name of the child element to count
+ * @returns {integer} the number of named child elments 
+ */
+function CountChildElements(node, childElementName) {
+	let r=0, childElems=node?node.childNodes():null
+	if (childElems) childElems.forEach(elem => {
+		if (elem.type=='element' && elem.name()==childElementName)
+			r++
+	})
+	return r
+}
+
+
+/**
  * checks of the specified argument matches an HTTP(s) URL where the protocol is required to be provided
  *
  * @param {string} arg  The value whose format is to be checked
@@ -667,7 +684,8 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	// check that no additional child elements existance if the "Other Child Elements are OK" flag is not set
 	if (!isIn(optionalChildElements, OTHER_ELEMENTS_OK)) {
 		let c=0, child
-		while (child=parentElement.child(c++)) 
+		let children=parentElement.childNodes()
+		if (children) children.forEach(child => {
 			if (child.type()=='element') {
 				let childName=child.name()
 				if (!isIn(mandatoryChildElements, childName) && !isIn(optionalChildElements, childName)) {		
@@ -675,6 +693,8 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 					rv=false;
 				}
 			}
+		})
+
 	}
 	return rv;
 }
@@ -928,8 +948,8 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 	while (ParentalGuidance=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_ParentalGuidance, ++pg), CG_SCHEMA)) {
 		countParentalGuidance++;
 		
-		let pgc=0, pgChild, countExplanatoryText=0
-		while (pgChild=ParentalGuidance.child(pgc++)) 
+		let countExplanatoryText=0, children=ParentalGuidance.childNodes()
+		if (children) children.forEach( pgChild => {
 			if (pgChild.type()=='element') {
 				switch (pgChild.name()) {
 					case tva.e_MinimumAge:
@@ -958,6 +978,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						break;
 				}
 			}
+		}) 
 		if (countExplanatoryText > 1)
 			errs.pushCode(errCode?errCode+"-7":"PG006", "only a single "+tva.e_ExplanatoryText.elementize()+" element is premitted in "+tva.e_ParentalGuidance.elementize())
 	}
@@ -986,9 +1007,8 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 		errs.pushCode("VN000", "ValidateName() called with elem==null")
 		return
 	}
-	let se=0, subElem
-	let familyNameCount=0, givenNameCount=0, otherElemCount=0
-	while (subElem=elem.child(se++)) 
+	let familyNameCount=0, givenNameCount=0, otherElemCount=0, children=elem.childNodes()
+	if (children) children.forEach(subElem => {
 		if (subElem.type=="element") 
 			switch (subElem.name()) {
 				case tva.e_GivenName:
@@ -1002,6 +1022,8 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 				default:
 					otherElemCount++;			
 			}
+	})
+		
 	if (givenNameCount==0)
 		errs.pushCode("VN004", tva.e_GivenName.elementize()+" is mandatory in "+elem.name().elementize())
 	if (familyNameCount>1)
@@ -1036,8 +1058,9 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 			else 
 				errs.pushCode(errCode?errCode+"-2":"CL002", tva.a_role.attribute(tva.e_CreditsItem)+" not specified")
 			let foundPersonName=0, foundCharacter=0, foundOrganizationName=0
-			let s=0, elem
-			while (elem=CreditsItem.child(s++)) 
+
+			let children=CreditsItem.childNodes()
+			if (children) children.forEach(elem => {
 				if (elem.type()=="element") {
 					switch (elem.name()) {
 						case tva.e_PersonName:
@@ -1069,7 +1092,9 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 						errs.pushCode(errCode?errCode+"-8":"CL008", tva.e_Character.elementize()+" in "+tva.e_CreditsItem.elementize()+" requires "+tva.e_PersonName.elementize())
 					if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
 						errs.pushCode(errCode?errCode+"-9":"CL009", tva.e_OrganizationName.elementize()+" can only be present when "+tva.e_PersonName.elementize()+" is absent in "+tva.e_CreditsItem.elementize())
-				}			
+				}	
+			})
+		
 			if (foundPersonName>1)
 				errs.pushCode(errCode?errCode+"-10":"CL010", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
 			if (foundCharacter>1)
@@ -1098,7 +1123,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 	}
 	let HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA)
 	if (!HowRelated || !HowRelated.attr(tva.a_href)) return false;
-	
+
 	if (HowRelated.attr(tva.a_href).value()==tva.cs_PromotionalStillImage) {
 		// Promotional Still Image
 		
@@ -1309,17 +1334,19 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 		return
 	}
     let HowRelated=null, Format=null, MediaLocator=[]
-    let c=0, elem
-    while (elem=RelatedMaterial.child(c++)) {
-		switch (elem.name()) {
-			case tva.e_HowRelated:
-				HowRelated=elem
-				break
-			case tva.e_MediaLocator:
-				MediaLocator.push(elem)
-				break
-		}
-    }
+
+	let children=RelatedMaterial.childNodes()
+	if (children) children.forEach(elem => {
+		if (elem.type()=='element')
+			switch (elem.name()) {
+				case tva.e_HowRelated:
+					HowRelated=elem
+					break
+				case tva.e_MediaLocator:
+					MediaLocator.push(elem)
+					break
+			}
+	})
 
     if (!HowRelated) {
 		NoChildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "TA001")
@@ -1335,7 +1362,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 				MediaLocator.forEach(ml => {
 					let subElems=ml.childNodes(), hasAuxiliaryURI=false
 					if (subElems) subElems.forEach(child => {
-						if (child.name()==tva.e_AuxiliaryURI) {
+						if (child.type()=='element' && child.name()==tva.e_AuxiliaryURI) {
 							hasAuxiliaryURI=true;
 							if (!child.attr(tva.a_contentType)) 
 								NoChildElement(errs, tva.a_contentType.attribute(), "Template AIT "+tva.e_AuxiliaryURI.elementize(), Location, "TA010")
@@ -1371,8 +1398,8 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 		return
 	}
     let HowRelated=null, Format=null, MediaLocator=[]
-    let c=0, elem
-	while (elem=RelatedMaterial.child(c++)) 
+	let children=RelatedMaterial.childNodes()
+	if (children) children.forEach(elem => {
 		if (elem.type=='element')
 			switch (elem.name()) {
 				case tva.e_HowRelated:
@@ -1386,6 +1413,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					break;
 			}
 
+	})
 
     if (!HowRelated) {
 		NochildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "PS001")
@@ -1400,7 +1428,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 			if (Format) {
 				let subElems=Format.childNodes(), hasStillPictureFormat=false
 				if (subElems) subElems.forEach(child => {
-					if (child.name()==tva.e_StillPictureFormat) {
+					if (child.type()=='element' && child.name()==tva.e_StillPictureFormat) {
 						hasStillPictureFormat=true;
 						
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_horizontalSize, tva.a_verticalSize, tva.a_href], [], errs, "PS021");
@@ -1422,7 +1450,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 				MediaLocator.forEach(ml => {
 					let subElems=ml.childNodes(), hasMediaURI=false
 					if (subElems) subElems.forEach(child => {
-						if (child.name()==tva.e_MediaUri) {
+						if (child.type()=='element' && child.name()==tva.e_MediaUri) {
 							hasMediaURI=true;
 							if (!child.attr(tva.a_contentType)) 
 								NoChildElement(errs, tva.a_contentType.attribute(), "logo "+tva.e_MediaUri.elementize(), Location, "PS031")
@@ -1541,13 +1569,13 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 		switch (titleType) {
 			case dvbi.TITLE_MAIN_TYPE:
 				if (isIn(mainSet, titleLang))
-					errs.pushCode(errCode?errCode+"-12":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote())
+					errs.pushCode(errCode?errCode+"-12":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_MAIN_TYPE.quote())
 				else mainSet.push(titleLang)
 				break
 			case dvbi.TITLE_SECONDARY_TYPE:
 				if (allowSecondary) {
 					if (isIn(secondarySet, titleLang))
-						errs.pushCode(errCode?errCode+"-13":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote())
+						errs.pushCode(errCode?errCode+"-13":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_SECONDARY_TYPE.quote())
 					else secondarySet.push(titleLang)
 				}
 				else 
@@ -1714,8 +1742,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	// <ProgramInformation><BasicDescription>
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
 
-	let c=0, child
-	while (child=ProgramInformation.child(c++)) 
+	let children=ProgramInformation.childNodes()
+	if (children) children.forEach(child => {
 		if (child.type()=="element") {
 			switch (child.name()) {
 				case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
@@ -1774,7 +1802,8 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 					break;			
 			}	
 		}
-	
+	})
+
 	return isCurrentProgram?programCRID:null;
 }
 
@@ -2098,13 +2127,8 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES || requestType==CG_REQUEST_BS_CONTENTS) {
 		gi=0;
 		while (GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformation, ++gi), CG_SCHEMA)) {
-			let countMemberOf=0
 			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
-			let e=0, elem
-			while (elem=GroupInformation.child(e++)) 
-				if (elem.type=='element' && elem.name()==tva.e_MemberOf)
-					countMemberOf++
-			if (countMemberOf==0) {
+			if (CountChildElements(GroupInformation, tva.e_MemberOf)==0) {
 				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
 				if (categoryGroup)
 					errs.pushCode("GI111", "only a single "+CATEGORY_GROUP_NAME+" can be present in "+tva.e_GroupInformationTable.elementize())
@@ -2947,9 +2971,10 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	
 	let pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, parentLang, false, "PL012")	
 	
-	let c=0, child, cnt=0, foundServiceIds=[], plCRIDs=[]
+	let cnt=0, foundServiceIds=[], plCRIDs=[]
 
-	while (child=ProgramLocationTable.child(c++)) 
+	let children=ProgramLocationTable.childNodes()
+	if (children) children.forEach(child => {
 		if (child.type()=="element") {		
 			switch (child.name()) {
 				case tva.e_OnDemandProgram:
@@ -2966,7 +2991,9 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 					cnt++;
 					break;
 			}
-		}
+		}		
+	})
+
 	if (o && o.childCount!=0) {
 		if (o.childCount!=cnt)
 			errs.pushCode("PL021", "number of items ("+cnt+") in the "+tva.e_ProgramLocationTable.elementize()+" does match "+tva.a_numOfItems.attribute(tva.e_GroupInformation)+" specified in "+CATEGORY_GROUP_NAME+" ("+o.childCount+")")
