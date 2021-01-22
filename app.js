@@ -2,6 +2,8 @@
 // express framework - https://expressjs.com/en/4x/api.html
 const express=require("express")
 
+const phlib=require('./phlib/phlib')
+
 const fs=require("fs"), path=require("path")
 
 // command line arguments - https://github.com/75lb/command-line-args
@@ -129,60 +131,6 @@ function unEntity(str) {
 }
 
 
-/** 
- * convert characters in the string to HTML entities
- *
- * @param {string} str that should be displayed in HTML
- * @return {string} a string with ENTITY representations of < and >
- */
-function HTMLize(str) {
-	return str.replace(/</g,"&lt;").replace(/>/g,"&gt;");              
-}
-
-
-/**
- * make the string appear like an XML element
- *
- * @param {string} str the element name
- * @returns {string} a string containing str formatted as an element
- */
-function elementize(str) {
-	return str.elementize()
-}
-String.prototype.elementize = function() {
-	return "<"+this+">"
-}
- 
- 
-/**
- * make the string appear like an XML attribute
- *
- * @param {string} attr the attribute name
- * @param {string} elem the element holding the attribute
- * @returns {string} a string containing attr formatted as an attribute
- */
-function attribute(attr, elem="") {
-	return attr.attribute(elem)
-}
-String.prototype.attribute = function(elem="") {
-	return elem+"@"+this
-} 
- 
- 
-/**
- * quote a string
- *
- * @param {string} str the item to "quote"
- * @returns {string} a string containing a quoted vesrion of the argument
- */
-function quote(str) {
-	return str.quote()
-}
-String.prototype.quote = function() {
-	return "\""+this+"\"";
-}
-
-
 /**
  * counts the number of named elements in the specificed node 
  * *
@@ -228,11 +176,11 @@ function isHTTPURL(arg) {
  */
 function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
 	if (!validator) {
-		errs.pushCode(errno?errno+"-1":"LA001", "cannot validate language "+quote(lang)+""+(loc?" for "+elementize(loc):""));
+		errs.pushCode(errno?errno+"-1":"LA001", "cannot validate language "+lang.quote()+""+(loc?" for "+loc.elementize():""))
 		return false;
 	}
 	if (!validator.isKnown(lang))  {
-		errs.pushCode(errno?errno+"-2":"LA002", "language "+lang.quote()+" specified"+(loc?" for "+elementize(loc):"")+" is invalid");	
+		errs.pushCode(errno?errno+"-2":"LA002", "language "+lang.quote()+" specified"+(loc?" for "+loc.elementize():"")+" is invalid")
 		return false;
 	}
 	return true;
@@ -555,7 +503,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 					res.write(SUMMARY_FORM_HEADER);
 					tableHeader=true;
 				}
-				res.write("<tr><td>"+HTMLize(i)+"</td><td>"+errors.counts[i]+"</td></tr>");
+				res.write("<tr><td>"+phlib.HTMLize(i)+"</td><td>"+errors.counts[i]+"</td></tr>");
 				resultsShown=true;
 			}
 		}
@@ -565,7 +513,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 					res.write(SUMMARY_FORM_HEADER);
 					tableHeader=true;
 				}
-				res.write("<tr><td><i>"+HTMLize(i)+"</i></td><td>"+errors.countsWarn[i]+"</td></tr>");
+				res.write("<tr><td><i>"+phlib.HTMLize(i)+"</i></td><td>"+errors.countsWarn[i]+"</td></tr>");
 				resultsShown=true;
 			}
 		}
@@ -579,10 +527,10 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 			}
 			if (value.includes(errors.delim)) {
 				let x=value.split(errors.delim)
-				res.write("<tr><td>"+x[0]+"</td><td>"+HTMLize(x[1])+"</td></tr>");	
+				res.write("<tr><td>"+x[0]+"</td><td>"+phlib.HTMLize(x[1])+"</td></tr>");	
 			}
 			else 
-				res.write("<tr><td></td><td>"+HTMLize(value)+"</td></tr>")
+				res.write("<tr><td></td><td>"+phlib.HTMLize(value)+"</td></tr>")
 			resultsShown=true;
 		});
 		if (tableHeader) res.write("</table>");
@@ -595,10 +543,10 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 			}
 			if (value.includes(errors.delim)) {
 				let x=value.split(errors.delim)
-				res.write("<tr><td>"+x[0]+"</td><td>"+HTMLize(x[1])+"</td></tr>");	
+				res.write("<tr><td>"+x[0]+"</td><td>"+phlib.HTMLize(x[1])+"</td></tr>");	
 			}
 			else 
-				res.write("<tr><td></td><td>"+HTMLize(value)+"</td></tr>")
+				res.write("<tr><td></td><td>"+phlib.HTMLize(value)+"</td></tr>")
 
 			resultsShown=true;
 		});
@@ -675,7 +623,7 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 		errs.pushCode(errCode?errCode+"-0":"TE000", "checkTopElements() called with a 'null' element to check");
 		return false;
 	}
-	let rv=true, thisElem=elementize(parentElement.parent().name()+"."+parentElement.name())
+	let rv=true, thisElem=phlib.elementize(parentElement.parent().name()+"."+parentElement.name())
 	// check that each of the specifid childElements exists
 	mandatoryChildElements.forEach(elem => {
 		if (!parentElement.get(xPath(SCHEMA_PREFIX, elem), CG_SCHEMA)) {
@@ -692,7 +640,7 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 			if (child.type()=='element') {
 				let childName=child.name()
 				if (!isIn(mandatoryChildElements, childName) && !isIn(optionalChildElements, childName)) {		
-					errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+childName/elementize()+" is not permitted in "+thisElem)
+					errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+childName.elementize()+" is not permitted in "+thisElem)
 					rv=false;
 				}
 			}
@@ -728,7 +676,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
 	
 	parentElement.attrs().forEach(attr => {
 		if (!isIn(requiredAttributes, attr.name()) && !isIn(optionalAttributes, attr.name()))
-			errs.pushCode(errCode?errCode+"-2":"AT002", attr.name().attribute()+" is not permitted in "+elementize((parentElement.parent()?parentElement.parent().name()+".":"")+parentElement.name()));
+			errs.pushCode(errCode?errCode+"-2":"AT002", attr.name().attribute()+" is not permitted in "+phlib.elementize((parentElement.parent()?parentElement.parent().name()+".":"")+parentElement.name()));
 	});
 }
 
@@ -958,10 +906,10 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 					case tva.e_MinimumAge:
 					case tva.e_ParentalRating:
 						if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-							errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+elementize("mpeg7:"+tva.e_MinimumAge))
+							errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+phlib.elementize("mpeg7:"+tva.e_MinimumAge))
 						
 						if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-							errs.pushCode(errCode?errCode+"-2":"PG012", etva.e_MinimumAge.lementize()+" must be in the first "+tva.e_ParentalGuidance.lementize()+" element");
+							errs.pushCode(errCode?errCode+"-2":"PG012", etva.e_MinimumAge.elementize()+" must be in the first "+tva.e_ParentalGuidance.elementize()+" element");
 						
 						if (pgChild.name()==tva.e_ParentalRating) {
 							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
@@ -1780,7 +1728,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 							
 					// <ProgramInformation><MemberOf>@xsi:type
 					if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
-						errs.pushCode("PI043", attribute("xsi:"+tva.a_type)+" must be "+(tva.t_MemberOfTypequote)+" for "+ProgramInformation.name()+"."+tva.e_MemberOf)
+						errs.pushCode("PI043", attribute("xsi:"+tva.a_type)+" must be "+tva.t_MemberOfType.quote()+" for "+ProgramInformation.name()+"."+tva.e_MemberOf)
 				
 					// <ProgramInformation><MemberOf>@crid
 					let foundCRID=null
@@ -2094,7 +2042,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
 			errs.pushCode("GI022", tva.a_value.attribute(tva.e_GroupType)+"="+"otherCollection".quote()+" is required")
 	}
 	else
-		errs.pushCode("GI014", elementize(tva.e_GroupType)+" is required in "+elementize(GroupInformation.name()));
+		errs.pushCode("GI014", tva.e_GroupType.elementize()+" is required in "+GroupInformation.name().elementize());
 }
 
 
@@ -2472,20 +2420,20 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 				Genre3=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, 3), CG_SCHEMA)
 				
 			if (Genre3)
-				errs.pushCode("ID010", "exactly 2 "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" elements are required for "+VerifyType);
+				errs.pushCode("ID010", "exactly 2 "+phlib.elementize(InstanceDescription.name()+"."+tva.e_Genre)+" elements are required for "+VerifyType);
 
 			let g1href=checkGenre(Genre1, CG_SCHEMA, SCHEMA_PREFIX, errs, "ID011")
 			if (g1href && !isAvailability(g1href))
-				errs.pushCode("ID012", "first "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
+				errs.pushCode("ID012", "first "+phlib.elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
 
 			let g2href=checkGenre(Genre2, CG_SCHEMA, SCHEMA_PREFIX, errs, "ID013")	
 			if (g2href && !isAvailability(g2href))
-				errs.pushCode("ID014", "second "+elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
+				errs.pushCode("ID014", "second "+phlib.elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a media or fepg availability indicator");
 			
 			if (Genre1 && Genre2) {
 				if ((isMediaAvailability(g1href) && isMediaAvailability(g2href))
 				 || (isEPGAvailability(g1href) && isEPGAvailability(g2href)))
-					errs.pushCode("ID015", elementize(InstanceDescription.name()+"."+tva.e_Genre)+" elements must indicate different availabilities")
+					errs.pushCode("ID015", phlib.elementize(InstanceDescription.name()+"."+tva.e_Genre)+" elements must indicate different availabilities")
 			}
 			break
 		case tva.e_ScheduleEvent:
@@ -2496,7 +2444,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 					if (isRestartAvailability(Genre.attr(tva.a_href).value())) 
 						restartGenre=Genre;
 					else 
-						errs.pushCode("ID017", elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a restart link indicator")
+						errs.pushCode("ID017", phlib.elementize(InstanceDescription.name()+"."+tva.e_Genre)+" must contain a restart link indicator")
 				}
 			}	
 			break	
@@ -3004,7 +2952,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 
 	programCRIDs.forEach(programCRID => {
 		if (!isIn(plCRIDs, programCRID))
-			errs.pushCode("PL022", "CRID "+quote(programCRID)+" specified in "+tva.e_ProgramInformationTable.elementize()+" is not specified in "+tva.e_ProgramLocationTable.elementize())
+			errs.pushCode("PL022", "CRID "+programCRID.quote()+" specified in "+tva.e_ProgramInformationTable.elementize()+" is not specified in "+tva.e_ProgramLocationTable.elementize())
 		
 	})
 }
