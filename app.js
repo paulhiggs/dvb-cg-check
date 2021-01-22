@@ -917,12 +917,11 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 						break;		
 					case tva.e_ExplanatoryText:
 						countExplanatoryText++;
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_length], [], errs, errCode?errCode+"-4":"PG004") 
 						if (pgChild.attr(tva.a_length)) {
 							if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
 								errs.pushCode(errCode?errCode+"-3":"PG003", tva.a_length.attribute()+"="+pgChild.attr(tva.a_length).value().quote()+" is not allowed for "+tva.e_ExplanatoryText.elementize())
 						}
-						else 
-							errs.pushCode(errCode?errCode+"-4":"PG004", tva.a_length.attribute()+"="+tva.v_lengthLong.quote()+" is required for "+tva.e_ExplanatoryText.elementize())
 						
 						if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
 							errs.pushCode(errCode?errCode+"-5":"PG005", "length of "+tva.e_ExplanatoryText.elementize()+" cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters")
@@ -1001,13 +1000,13 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 	if (CreditsList) {
 		let ci=0, CreditsItem
 		while (CreditsItem=CreditsList.get(xPath(SCHEMA_PREFIX,tva.e_CreditsItem, ++ci), CG_SCHEMA)) {
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, [tva.a_role], [], errs, errCode?errCode+"-2":"CL002") 
 			if (CreditsItem.attr(tva.a_role)) {
 				let CreditsItemRole=CreditsItem.attr(tva.a_role).value()
 				if (!isIn(allowedCreditItemRoles, CreditsItemRole))
 					errs.pushCode(errCode?errCode+"-1":"CL001", CreditsItemRole.quote()+" is not valid for "+tva.a_role.attribute(tva.e_CreditsItem))
 			}
-			else 
-				errs.pushCode(errCode?errCode+"-2":"CL002", tva.a_role.attribute(tva.e_CreditsItem)+" not specified")
+			
 			let foundPersonName=0, foundCharacter=0, foundOrganizationName=0
 
 			let children=CreditsItem.childNodes()
@@ -1315,9 +1314,8 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 					if (subElems) subElems.forEach(child => {
 						if (child.type()=='element' && child.name()==tva.e_AuxiliaryURI) {
 							hasAuxiliaryURI=true;
-							if (!child.attr(tva.a_contentType)) 
-								NoChildElement(errs, tva.a_contentType.attribute(), "Template AIT "+tva.e_AuxiliaryURI.elementize(), Location, "TA010")
-							else {
+							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentType], [], errs, "TA010")
+							if (child.attr(tva.a_contentType)) {
 								let contentType=child.attr(tva.a_contentType).value()
 								if (contentType!=dvbi.XML_AIT_CONTENT_TYPE) 
 									errs.pushCode("TA011", "invalid "+tva.a_contentType.attribute()+"="+contentType.quote()+" specified for "+RelatedMaterial.name().elementize()+tva.e_MediaLocator.elementize()+" in "+Location)
@@ -1403,9 +1401,8 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					if (subElems) subElems.forEach(child => {
 						if (child.type()=='element' && child.name()==tva.e_MediaUri) {
 							hasMediaURI=true;
-							if (!child.attr(tva.a_contentType)) 
-								NoChildElement(errs, tva.a_contentType.attribute(), "logo "+tva.e_MediaUri.elementize(), Location, "PS031")
-							else {
+							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentTyoe], [], errs, "PS031")
+							if (child.attr(tva.a_contentType)) {
 								let contentType=child.attr(tva.a_contentType).value()
 								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
 									errs.pushCode("PS032", "invalid "+tva.a_contentType.attribute(tva.e_MediaLocator)+"="+contentType.quote()+" specified for "+RelatedMaterial.name().elementize()+" in "+Location)
@@ -1865,12 +1862,9 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	if (!isCategoryGroup) {
 		let MemberOf=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_MemberOf), CG_SCHEMA)
 		if (MemberOf) {
-			if (MemberOf.attr(tva.a_type)) {
-				if (MemberOf.attr(tva.a_type).value()!=tva.t_MemberOfType)
-					errs.pushCode("GIB020", GroupInformation.name()+"."+tva.e_MemberOf+"@xsi:"+tva.a_type+" is invalid ("+MemberOf.attr(tva.a_type).value().quote()+")")
-			}
-			else
-				errs.pushCode("GIB021", GroupInformation.name()+"."+tva.e_MemberOf+" requires @xsi:"+tva.a_type+"="+tva.t_MemberOfType.quote()+" attribute")
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Memberof, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "GIB020")
+			if (MemberOf.attr(tva.a_type) && MemberOf.attr(tva.a_type).value()!=tva.t_MemberOfType)
+				errs.pushCode("GIB021", GroupInformation.name()+"."+tva.e_MemberOf+"@xsi:"+tva.a_type+" is invalid ("+MemberOf.attr(tva.a_type).value().quote()+")")
 			
 			if (MemberOf.attr(tva.a_index)) {
 				let index=valUnsignedInt(MemberOf.attr(tva.a_index).value())
@@ -1884,15 +1878,9 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 				else 
 					errs.pushCode("GIB023", tva.a_index.attribute(GroupInformation.name()+"."+tva.e_MemberOf)+" must be an integer >= 1 (parsed "+index+")")
 			}
-			else
-				errs.pushCode("GIB024", GroupInformation.name()+"."+tva.e_MemberOf+" requires "+tva.a_index.attribute()+" attribute");
-			
-			if (MemberOf.attr(tva.a_crid)) {
-				if (MemberOf.attr(tva.a_crid).value()!=categoryCRID)
-					errs.pushCode("GIB025", tva.a_crid.attribute(GroupInformation.name()+"."+tva.e_MemberOf)+" ("+MemberOf.attr(tva.a_crid).value()+") does not match the "+CATEGORY_GROUP_NAME+" crid ("+categoryCRID+")");
-			}
-			else
-				errs.pushCode("GIB026", GroupInformation.name()+"."+tva.e_MemberOf+" requires "+tva.a_crid.attribute()+" attribute");
+
+			if (MemberOf.attr(tva.a_crid) && MemberOf.attr(tva.a_crid).value()!=categoryCRID)
+				errs.pushCode("GIB025", tva.a_crid.attribute(GroupInformation.name()+"."+tva.e_MemberOf)+" ("+MemberOf.attr(tva.a_crid).value()+") does not match the "+CATEGORY_GROUP_NAME+" crid ("+categoryCRID+")");
 		}
 		else
 			errs.pushCode("GIB027", GroupInformation.name()+" requires a "+tva.e_MemberOf.elementize()+" element referring to the "+CATEGORY_GROUP_NAME+" ("+categoryCRID+")")
@@ -1934,8 +1922,7 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 		}
 	}
 
-	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
-		
+	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {		
 		TrueValue(GroupInformation, tva.a_ordered, "GIS013", errs)
 		if (!GroupInformation.attr(tva.a_numOfItems)) 
 			errs.pushCode("GIS015", tva.a_numOfItems.attribute(GroupInformation.name())+" is required for this request type")
@@ -2243,10 +2230,8 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 		let MixType=AudioAttributes.get(xPath(SCHEMA_PREFIX, tva.e_MixType), CG_SCHEMA)
 		if (MixType) {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MixType, [tva.a_href], [], errs, "AV011"); 
-			if (MixType.attr(tva.a_href)) {
-				if (!isValidAudioMixType(MixType.attr(tva.a_href).value()))
-					errs.pushCode("AV012", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
-			}
+			if (MixType.attr(tva.a_href) && !isValidAudioMixType(MixType.attr(tva.a_href).value()))
+				errs.pushCode("AV012", tva.e_AudioAttributes+"."+tva.e_MixType+" is not valid");
 		}
 				
 		let AudioLanguage=AudioAttributes.get(xPath(SCHEMA_PREFIX, tva.e_AudioLanguage), CG_SCHEMA)
@@ -2283,19 +2268,16 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "AV030");
 		
 		let HorizontalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_HorizontalSize), CG_SCHEMA)
-		if (HorizontalSize) 
-			if (valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
-				errs.pushCode("AV031", tva.e_HorizontalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
+		if (HorizontalSize && valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
+			errs.pushCode("AV031", tva.e_HorizontalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
 		
 		let VerticalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_VerticalSize), CG_SCHEMA)
-		if (VerticalSize) 
-			if (valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
-				errs.pushCode("AV032", tva.e_VerticalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
+		if (VerticalSize && valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
+			errs.pushCode("AV032", tva.e_VerticalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
 		
 		let AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX,tva.e_AspectRatio), CG_SCHEMA)
-		if (AspectRatio) 
-			if (!isRatioType(AspectRatio.text()))
-				errs.pushCode("AV033", tva.e_AspectRatio.elementize()+" is not a valid aspect ratio")
+		if (AspectRatio && !isRatioType(AspectRatio.text()))
+			errs.pushCode("AV033", tva.e_AspectRatio.elementize()+" is not a valid aspect ratio")
 	}
 
 	// <CaptioningAttributes>
@@ -2481,6 +2463,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	// <OtherIdentifier>
 	let oi=0, OtherIdentifier
 	while (OtherIdentifier=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_OtherIdentifier, ++oi), CG_SCHEMA)) {
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, OtherIdentifier, [tva.a_type], [], errs, "VID052")
 		if (OtherIdentifier.attr(tva.a_type)) {			
 			let oiType=OtherIdentifier.attr(tva.a_type).value()
 	
@@ -2495,8 +2478,6 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 					if (!isCRIDURI(OtherIdentifier.text()))
 						errs.pushCode("ID051", tva.e_OtherIdentifier+" must be a CRID for "+tva.a_type.attribute()+"="+oiType.quote());
 		}
-		else 
-			errs.pushCode("ID052", tva.a_type.attribute(tva.e_OtherIdentifier)+" is required in "+VerifyType+"."+InstanceDescription.name())
 	}
 	
 	// <RelatedMaterial>
@@ -2589,6 +2570,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	// <Program>
 	let prog=0, Program
 	while (Program=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_Program, ++prog), CG_SCHEMA)) {
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Program, [tva.a_crid], [], errs, "OD012")
 		if (Program.attr(tva.a_crid)) {
 			let programCRID=Program.attr(tva.a_crid).value()
 			if (!isCRIDURI(programCRID))
@@ -2598,9 +2580,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 					errs.pushCode("OD011", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+"="+programCRID.quote()+" does not refer to a program in the "+tva.e_ProgramInformationTable.elementize())
 			}
 			plCRIDs.push(programCRID)
-		}
-		else
-			errs.pushCode("OD012", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+" is a required attribute");		
+		}	
 	}
 	if (--prog>1)
 		errs.pushCode("OD013", "only a single "+tva.e_Program.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
