@@ -874,7 +874,7 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 			errs.pushCode(errCode?errCode+"-2":"GE002", "invalid "+tva.a_href.attribute()+" value "+genreValue.quote()+" for "+tva.e_Genre.elementize());
 	}
 	if (count>maxGenres)
-		errs.pushCode(errCode?errCode+"-3":"GE003","More than "+maxGenres+" "+etva.e_Genre.elementize()+" element"+(maxGenres>1?"s":"")+" specified");
+		errs.pushCode(errCode?errCode+"-3":"GE003","More than "+maxGenres+" "+tva.e_Genre.elementize()+" element"+(maxGenres>1?"s":"")+" specified");
 }
 
 /**
@@ -909,7 +909,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 							errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+phlib.elementize("mpeg7:"+tva.e_MinimumAge))
 						
 						if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-							errs.pushCode(errCode?errCode+"-2":"PG012", etva.e_MinimumAge.elementize()+" must be in the first "+tva.e_ParentalGuidance.elementize()+" element");
+							errs.pushCode(errCode?errCode+"-2":"PG012", tva.e_MinimumAge.elementize()+" must be in the first "+tva.e_ParentalGuidance.elementize()+" element");
 						
 						if (pgChild.name()==tva.e_ParentalRating) {
 							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
@@ -1533,7 +1533,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 					errs.pushCode(errCode?errCode+"-14":"VT014", tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" is not permitted for this "+BasicDescription.name().elementize())
 				break
 			default:	
-				errs.pushCode(errCode?errCode+"-15":"VT015", tva.a_type.attribute()+" must be "+dvbi.TITLE_MAIN_TYPE.quote()+" or "+dvbi.TITLE_SECONDARY_TYPE.quote()+" for "+tva.e_Titl.elementize())
+				errs.pushCode(errCode?errCode+"-15":"VT015", tva.a_type.attribute()+" must be "+dvbi.TITLE_MAIN_TYPE.quote()+" or "+dvbi.TITLE_SECONDARY_TYPE.quote()+" for "+tva.e_Title.elementize())
 		}	
 		
 		
