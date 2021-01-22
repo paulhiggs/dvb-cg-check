@@ -141,7 +141,7 @@ function unEntity(str) {
 function CountChildElements(node, childElementName) {
 	let r=0, childElems=node?node.childNodes():null
 	if (childElems) childElems.forEach(elem => {
-		if (elem.type=='element' && elem.name()==childElementName)
+		if (elem.type()=='element' && elem.name()==childElementName)
 			r++
 	})
 	return r
@@ -960,7 +960,7 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	}
 	let familyNameCount=0, givenNameCount=0, otherElemCount=0, children=elem.childNodes()
 	if (children) children.forEach(subElem => {
-		if (subElem.type=="element") 
+		if (subElem.type()=="element") 
 			switch (subElem.name()) {
 				case tva.e_GivenName:
 					givenNameCount++;
@@ -1351,7 +1351,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
     let HowRelated=null, Format=null, MediaLocator=[]
 	let children=RelatedMaterial.childNodes()
 	if (children) children.forEach(elem => {
-		if (elem.type=='element')
+		if (elem.type()=='element')
 			switch (elem.name()) {
 				case tva.e_HowRelated:
 					HowRelated=elem;
