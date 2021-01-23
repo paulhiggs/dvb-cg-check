@@ -2474,7 +2474,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 				}
 				else 
 					errs.pushCode("ID050", tva.a_type.attribute(tva.e_OtherIdentifier)+"="+oiType.quote()+" is not valid for "+VerifyType+"."+InstanceDescription.name());				
-				if (oiType=dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE)
+				if (oiType==dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE)
 					if (!isCRIDURI(OtherIdentifier.text()))
 						errs.pushCode("ID051", tva.e_OtherIdentifier+" must be a CRID for "+tva.a_type.attribute()+"="+oiType.quote());
 		}
@@ -2848,7 +2848,6 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	if (startSchedule)
 		if (isUTCDateTime(startSchedule.value())) 
 			fr=new Date(startSchedule.value());
-
 		else {
 			errs.pushCode("VS010", tva.a_start.attribute(Schedule.name())+" is not expressed in UTC format ("+startSchedule.value()+")");
 			startSchedule=null;
@@ -2974,7 +2973,7 @@ function doValidateContentGuide(CGtext, requestType, errs) {
 	};
 */
 
-	if (CG.root().name()!==tva.e_TVAMain) {
+	if (CG.root().name()!=tva.e_TVAMain) {
 		errs.pushCode("CG002", "Root element is not "+tva.e_TVAMain.elementize())
 		return
 	}
@@ -2984,7 +2983,6 @@ function doValidateContentGuide(CGtext, requestType, errs) {
 	CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
 	let tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
-	
 	let ProgramDescription=CG.get(xPath(SCHEMA_PREFIX, tva.e_ProgramDescription), CG_SCHEMA);
 	if (!ProgramDescription) {
 		errs.pushCode("CG004", "No "+tva.e_ProgramDescription.elementize()+" element specified.")
