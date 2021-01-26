@@ -88,14 +88,16 @@ const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
 	  XMLschemaFileName=path.join("schema","xml.xsd")
 */
 
-// curl from https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
-const IANA_Subtag_Registry_Filename=path.join("./dvb-common","language-subtag-registry"),
-      IANA_Subtag_Registry_URL="https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry"
+
 
 const IANAlanguages=require("./"+DVB_COMMON_DIR+"/IANAlanguages.js")
 
 var allowedGenres=[], allowedCreditItemRoles=[]
 var knownLanguages=new IANAlanguages()
+
+const IANA_Subtag_Registry_Filename=path.join("./dvb-common",knownLanguages.LanguagesFilename),
+      IANA_Subtag_Registry_URL=knownLanguages.LanguagesURL
+
 
 /* // LINT
 var TVAschema, MPEG7schema, XMLschema;
@@ -103,7 +105,7 @@ var TVAschema, MPEG7schema, XMLschema;
 
 
 /**
- * determines if a value is in a set of values - simular to 
+ * determines if a value is in a set of values 
  *
  * @param {String or Array} values The set of values to check existance in
  * @param {String} value The value to check for existance
@@ -115,6 +117,24 @@ function isIn(values, value){
    
     if (typeof(values)=="object") 	
 		return values.includes(value)
+    
+    return false;
+}
+
+
+/**
+ * determines if a value is in a set of values using a case insensitive comparison
+ *
+ * @param {String or Array} values The set of values to check existance in
+ * @param {String} value The value to check for existance
+ * @return {boolean} if value is in the set of values
+ */function isIni(values, value){
+	let vlc=value.toLowerCase()
+    if (typeof(values)=="string")
+        return values.toLowerCase()==vlc
+   
+	if (typeof(values)=="object")
+		return (values.find(element => element.toLowerCase()==vlc) != undefined)
     
     return false;
 }
@@ -1682,7 +1702,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 		programCRID=ProgramInformation.attr(tva.a_programId).value();
 		if (!isCRIDURI(programCRID)) 
 			errs.pushCode("PI011", tva.a_programId.attribute(ProgramInformation.name())+" is not a valid CRID ("+programCRID+")");
-		if (isIn(programCRIDs, programCRID))
+		if (isIni(programCRIDs, programCRID))
 			errs.pushCode("PI012", tva.a_programId.attribute(ProgramInformation.name())+"="+programCRID.quote()+" is already used");
 		else programCRIDs.push(programCRID);
 	}
@@ -1704,7 +1724,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 					// <ProgramInformation><EpisodeOf>@crid
 					if (child.attr(tva.a_crid)) {
 						let foundCRID=child.attr(tva.a_crid).value()
-						if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
+						if (groupCRIDs && !isIni(groupCRIDs, foundCRID)) 
 							errs.pushCode("PI032", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_EpisodeOf.elementize())
 						else
 							if (!isCRIDURI(foundCRID))
@@ -1731,7 +1751,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 					let foundCRID=null
 					if (child.attr(tva.a_crid)) {
 						foundCRID=child.attr(tva.a_crid).value();
-						if (groupCRIDs && !isIn(groupCRIDs, foundCRID)) 
+						if (groupCRIDs && !isIni(groupCRIDs, foundCRID)) 
 							errs.pushCode("PI044", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_MemberOf.elementize())
 						else
 							if (!isCRIDURI(foundCRID))
@@ -1742,7 +1762,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 					if (child.attr(tva.a_index)) {
 						let index=valUnsignedInt(child.attr(tva.a_index).value())
 						let indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")"
-						if (isIn(indexes, indexInCRID))
+						if (isIni(indexes, indexInCRID))
 							errs.pushCode("PI046", tva.a_index.attribute(tva.e_MemberOf)+"="+index+" is in use by another "+ProgramInformation.name()+" element")
 						else 
 							indexes.push(indexInCRID);
@@ -2144,7 +2164,7 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 					ValidValues(errs, numOfItems, numLater, grp);
 					break;
 			}
-			if (isIn(groupCRIDsFound, grp))
+			if (isIni(groupCRIDsFound, grp))
 				errs.pushCode("VNN001", "only a single "+grp.quote()+" structural CRID is premitted in this request")
 			else 
 				groupCRIDsFound.push(grp);
@@ -2576,7 +2596,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 			if (!isCRIDURI(programCRID))
 				errs.pushCode("OD010", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+" is not a CRID URI");
 			else {
-				if (!isIn(programCRIDs, programCRID))
+				if (!isIni(programCRIDs, programCRID))
 					errs.pushCode("OD011", tva.a_crid.attribute(OnDemandProgram.name()+"."+tva.e_Program)+"="+programCRID.quote()+" does not refer to a program in the "+tva.e_ProgramInformationTable.elementize())
 			}
 			plCRIDs.push(programCRID)
@@ -2759,7 +2779,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 			if (ProgramCRID) {
 				if (!isCRIDURI(ProgramCRID.value()))
 					errs.pushCode("SE011", tva.a_crid.attribute(tva.e_Program)+" is not a valid CRID ("+ProgramCRID.value()+")");
-				if (!isIn(programCRIDs, ProgramCRID.value()))
+				if (!isIni(programCRIDs, ProgramCRID.value()))
 					errs.pushCode("SE012", tva.a_crid.attribute(tva.e_Program)+"="+ProgramCRID.value().quote()+" does not refer to a program in the "+tva.e_ProgramInformationTable.elementize())
 				plCRIDs.push(ProgramCRID.value())
 				isCurrentProgram=(ProgramCRID.value()==currentProgramCRID) 
@@ -2914,7 +2934,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 				case tva.e_Schedule:
 					let thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs)
 					if (thisServiceIdRef.length)
-						if (isIn(foundServiceIds, thisServiceIdRef))
+						if (isIni(foundServiceIds, thisServiceIdRef))
 							errs.pushCode("PL020", "A "+tva.e_Schedule.elementize()+" element with "+tva.a_serviceIDRef.attribute()+"="+thisServiceIdRef.quote()+" is already specified")
 						else 
 							foundServiceIds.push(thisServiceIdRef);
@@ -2930,7 +2950,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	}
 
 	programCRIDs.forEach(programCRID => {
-		if (!isIn(plCRIDs, programCRID))
+		if (!isIni(plCRIDs, programCRID))
 			errs.pushCode("PL022", "CRID "+programCRID.quote()+" specified in "+tva.e_ProgramInformationTable.elementize()+" is not specified in "+tva.e_ProgramLocationTable.elementize())
 		
 	})
