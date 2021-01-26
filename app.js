@@ -23,6 +23,8 @@ const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js")
 const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js")
 const {loadCS}=require("./dvb-common/CS_handler.js")
 
+const patterns=require("./dvb-common/pattern_checks.js")
+
 // libxmljs2 - github.com/marudor/libxmljs2
 const libxml=require("libxmljs2")
 
@@ -89,13 +91,12 @@ const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
 */
 
 
-
 const IANAlanguages=require("./"+DVB_COMMON_DIR+"/IANAlanguages.js")
 
 var allowedGenres=[], allowedCreditItemRoles=[]
 var knownLanguages=new IANAlanguages()
 
-const IANA_Subtag_Registry_Filename=path.join("./dvb-common",knownLanguages.LanguagesFilename),
+const IANA_Subtag_Registry_Filename=path.join("./dvb-common", knownLanguages.LanguagesFileName),
       IANA_Subtag_Registry_URL=knownLanguages.LanguagesURL
 
 
@@ -128,7 +129,8 @@ function isIn(values, value){
  * @param {String or Array} values The set of values to check existance in
  * @param {String} value The value to check for existance
  * @return {boolean} if value is in the set of values
- */function isIni(values, value){
+ */
+function isIni(values, value){
 	let vlc=value.toLowerCase()
     if (typeof(values)=="string")
         return values.toLowerCase()==vlc
@@ -165,23 +167,6 @@ function CountChildElements(node, childElementName) {
 			r++
 	})
 	return r
-}
-
-
-/**
- * checks of the specified argument matches an HTTP(s) URL where the protocol is required to be provided
- *
- * @param {string} arg  The value whose format is to be checked
- * @returns {boolean} true if the argument is an HTTP URL
- */
-function isHTTPURL(arg) {
-	let pattern = new RegExp('^(https?:\\/\\/)'+ // protocol
-		'((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
-		'((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
-		'(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
-		'(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
-		'(\\#[-a-z\\d_]*)?$','i') // fragment locator
-	return pattern.test(arg)
 }
 
 
@@ -355,19 +340,6 @@ function isEmpty(obj) {
 
 
 /**
- * checks if the argument complies to the TV Anytime defintion of RatioType
- *
- * @param {string}     str string contining value to check
- * @returns {boolean} true if the argment is compliant to a tva:RatioType
- */
-function isRatioType(str) {
-	const ratioRegex=/^\d+:\d+$/
-	let s=str.match(ratioRegex)
-	return s?s[0]===str:false
-}
-
-
-/**
  * converts a decimal representation of a string to a number
  *
  * @param {string} str    string contining the decimal value
@@ -380,32 +352,6 @@ function valUnsignedInt(str) {
 }
 
 
-/**
- * checks if the argument complies to an XML representation of UTC time
- *
- * @param {string} str string contining the UTC time
- * @returns {boolean}  true if the argment is formatted according to UTC ("Zulu") time
- */
-function isUTCDateTime(str) {
-	const UTCregex=/^[\d]{4}-((0[1-9])|(1[0-2]))-((0[1-9])|1\d|2\d|(3[0-1]))T(([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?|(24:00:00(\.0+)?))Z$/
-	let s=str.match(UTCregex)
-	return s?s[0]===str:false
-}
-
-
-/**
- * checks if the argument complies to an XML representation of UTC time
- *
- * @param {string} duration string contining the UTC time
- * @returns {boolean}  true if the argment is formatted according to UTC ("Zulu") time
- */
-function isISODuration(duration) {
-	const isoRegex = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
-	let s=duration.match(isoRegex);
-	return s?s[0]===duration:false;
-}
- 
- 
 // credit to https://gist.github.com/adriengibrat/e0b6d16cdd8c584392d8#file-parseduration-es5-js
 function parseISOduration(duration) {
 	var durationRegex = /^(-)?P(?:(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?|(\d+)W)$/;
@@ -441,20 +387,6 @@ function parseISOduration(duration) {
 	};
 	
 	return parsed;	
-}
-
-
-/**
- * checks if the argument complies to a DVB locator according to clause 6.4.2 of ETSI TS 102 851 
- * i.e. dvb://<original_network_id>..<service_id> ;<event_id>
- *
- * @param {string} locator string contining the DVB locator
- * @returns {boolean}  true is the argment is formatted as a DVB locator
- */
-function isDVBLocator(locator) {
-	const locatorRegex = /^dvb:\/\/[\dA-Fa-f]+\.[\dA-Fa-f]*\.[\dA-Fa-f]+;[\dA-Fa-f]+$/
-	let s=locator.match(locatorRegex)
-	return s?s[0]===locator:false
 }
 
 
@@ -1106,7 +1038,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
 					errs.pushCode("IRM003", tva.a_contentType.attribute(tva.e_MediaUri)+"="+contentType.quote()+" is not valid for a "+errLocation)
 			}
 			 
-			if (!isHTTPURL(MediaUri.text()))
+			if (!patterns.isHTTPURL(MediaUri.text()))
 				errs.pushCode("IRM004", tva.e_MediaUri.elementize()+"="+MediaUri.text().quote()+" is not a valid Image URL", "invalid URL")
 		}
 		else errs.pushCode("IRM001", tva.e_MediaUri.elementize()+" not specified for Promotional Still Image ("+tva.a_href.attribute(tva.e_HowRelated)+"="+tva.cs_PromotionalStillImage+")")
@@ -1191,7 +1123,7 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 				}	
 			let MediaURI=RelatedMaterial.get(xPathM(SCHEMA_PREFIX, [tva.e_MediaLocator, tva.e_MediaUri]), CG_SCHEMA)
 			if (MediaURI) {
-				if (!isHTTPURL(MediaURI.text()))
+				if (!patterns.isHTTPURL(MediaURI.text()))
 					errs.pushCode("VP011", tva.e_MediaUri.elementize()+"="+MediaUri.text().quote()+" is not a valid Pagination URL", "invalid URL")
 			}
 			else
@@ -1429,7 +1361,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 								if (Format && ((isJPEGmime(contentType) && !isJPEG) || (isPNGmime(contentType) && !isPNG))) 
 									errs.pushCode("PS033", "conflicting media types in "+tva.e_Format.elementize()+" and "+tva.e_MediaUri.elementize()+" for "+Location)
 							}
-							if (!isHTTPURL(child.text()))
+							if (!patterns.isHTTPURL(child.text()))
 								errs.pushCode("PS034", tva.e_MediaUri.elementize()+"="+child.text().quote()+" is not a valid Image URL", "invalid URL")
 						}
 					});
@@ -2296,7 +2228,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 			errs.pushCode("AV032", tva.e_VerticalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
 		
 		let AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX,tva.e_AspectRatio), CG_SCHEMA)
-		if (AspectRatio && !isRatioType(AspectRatio.text()))
+		if (AspectRatio && !patterns.isRatioType(AspectRatio.text()))
 			errs.pushCode("AV033", tva.e_AspectRatio.elementize()+" is not a valid aspect ratio")
 	}
 
@@ -2535,7 +2467,7 @@ function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs, errco
 	
 	if (node.attr(tva.a_contentType)) {
 		if (node.attr(tva.a_contentType).value()==dvbi.XML_AIT_CONTENT_TYPE) {
-			if (!isHTTPURL(node.text()))
+			if (!patterns.isHTTPURL(node.text()))
 				errs.pushCode(errcode?errcode+"-3":"TA003", node.name().elementize()+"="+node.text().quote()+" is not a valid AIT URL", "invalid URL")
 		}
 		else
@@ -2630,7 +2562,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	// <PublishedDuration>
 	let pd=0, PublishedDuration 
 	while (PublishedDuration=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration, ++pd), CG_SCHEMA)) 
-		if (!isISODuration(PublishedDuration.text()))
+		if (!patterns.isISODuration(PublishedDuration.text()))
 			errs.pushCode("OD050", OnDemandProgram.name()+"."+tva.e_PublishedDuration+" is not a valid ISO Duration (xs:duration)");
 	if (--pd>1)
 		errs.pushCode("OD051", "only a single "+tva.e_PublishedDuration.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
@@ -2640,12 +2572,12 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	    eoa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_EndOfAvailability), CG_SCHEMA)
 	
 	if (soa) 
-		if (!isUTCDateTime(soa.text())) {
+		if (!patterns.isUTCDateTime(soa.text())) {
 			errs.pushCode("OD060", tva.e_StartOfAvailability.elementize()+" must be expressed in Zulu time")
 			soa=null;
 		}
 	if (eoa) 
-		if (!isUTCDateTime(eoa.text())) {
+		if (!patterns.isUTCDateTime(eoa.text())) {
 			errs.pushCode("OD061", tva.e_EndOfAvailability.elementize()+" must be expressed in Zulu time")
 			eoa=null;
 		}
@@ -2789,7 +2721,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		// <ProgramURL>
 		let ProgramURL=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_ProgramURL), CG_SCHEMA)
 		if (ProgramURL) 
-			if (!isDVBLocator(ProgramURL.text()))
+			if (!patterns.isDVBLocator(ProgramURL.text()))
 				errs.pushCode("SE021", tva.e_ScheduleEvent+"."+tva.e_ProgramURL+" ("+ProgramURL.text()+") is not a valid DVB locator");		
 		
 		// <InstanceDescription>
@@ -2801,7 +2733,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		let pstElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedStartTime), CG_SCHEMA)
 		if (pstElem) {
 
-			if (isUTCDateTime(pstElem.text())) {
+			if (patterns.isUTCDateTime(pstElem.text())) {
 				let PublishedStartTime=new Date(pstElem.text())
 				
 				if (scheduleStart && PublishedStartTime < scheduleStart) 
@@ -2822,7 +2754,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		
 		// <ActualStartTime> 
 		let astElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_ActualStartTime), CG_SCHEMA)
-		if (astElem && !isUTCDateTime(astElem.text())) 
+		if (astElem && !patterns.isUTCDateTime(astElem.text())) 
 			errs.pushCode("SE051", tva.e_ActualStartTime.elementize()+" is not expressed in UTC format ("+astElem.text()+")");
 
 		// <FirstShowing>
@@ -2866,7 +2798,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	let serviceIdRef=checkTAGUri(Schedule, errs, "VS004");
 	let startSchedule=Schedule.attr(tva.a_start), fr=null, endSchedule=Schedule.attr(tva.a_end), to=null;
 	if (startSchedule)
-		if (isUTCDateTime(startSchedule.value())) 
+		if (patterns.isUTCDateTime(startSchedule.value())) 
 			fr=new Date(startSchedule.value());
 		else {
 			errs.pushCode("VS010", tva.a_start.attribute(Schedule.name())+" is not expressed in UTC format ("+startSchedule.value()+")");
@@ -2874,7 +2806,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 		}
 
 	if (endSchedule)
-		if (isUTCDateTime(endSchedule.value())) 
+		if (patterns.isUTCDateTime(endSchedule.value())) 
 			to=new Date(endSchedule.value());
 		else {
 			errs.pushCode("VS011", tva.a_end.attribute(Schedule.name())+" is not expressed in UTC format ("+endSchedule.value()+")");
