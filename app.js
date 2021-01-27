@@ -83,13 +83,10 @@ const TVA_ContentCSFilename=path.join(DVB_COMMON_DIR, "tva","ContentCS.xml"),
 
 const ISO3166_URL=COMMON_REPO_RAW + "iso3166-countries.json",
 	  ISO3166_Filename=path.join(DVB_COMMON_DIR,"iso3166-countries.json")
-      
-/* // TODO: LINT
-const TVAschemaFileName=path.join("schema","tva_metadata_3-1.xsd"),
-	  MPEG7schemaFileName=path.join("schema","tva_mpeg7.xsd"),
-	  XMLschemaFileName=path.join("schema","xml.xsd")
-*/
+     
 
+const TVAschemaFileName=path.join(".","tva_metadata_3-1.xsd")
+var TVAschema
 
 const IANAlanguages=require("./"+DVB_COMMON_DIR+"/IANAlanguages.js")
 
@@ -98,12 +95,6 @@ var knownLanguages=new IANAlanguages()
 
 const IANA_Subtag_Registry_Filename=path.join("./dvb-common", knownLanguages.LanguagesFileName),
       IANA_Subtag_Registry_URL=knownLanguages.LanguagesURL
-
-
-/* // LINT
-var TVAschema, MPEG7schema, XMLschema;
-*/
-
 
 /**
  * determines if a value is in a set of values 
@@ -309,26 +300,6 @@ function readmyfile(filename) {
     return null;
 }
 
-	  
-/**
- * loads an XML schema from either a local file or an URL based location
- *
- * @param {boolean} useURL         if true use the URL loading method else use the local file
- * @param {String}  schemaFilename the filename of the schema
- * @param {String}  schemaURL      URL to the schema
- * @returns {string} the string contents of the XML schema
- */ /*
-function loadSchema(useURL, schemaFilename, schemaURL=null) {
-	console.log("loading schema", schemaFilename)
-
-	if (useURL) {
-		// TODO::
-	}
-	else {
-		return readmyfile(schemaFilename).toString() // .replace(/(\r\n|\n|\r|\t)/gm,"")
-	}
-}  */
-
 
 function isEmpty(obj) {
     for(let key in obj) {
@@ -402,7 +373,8 @@ function parseISOduration(duration) {
  */
 function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errors=null) {
 	
-	const FORM_TOP="<html><head><title>DVB-I Content Guide Validator</title></head><body>";
+	const TABLE_STYLE="<style>table {border-collapse: collapse;border: 1px solid black;} th, td {text-align: left; padding: 8px; }	tr:nth-child(even) {background-color: #f2f2f2;}	</style>"
+	const FORM_TOP="<html><head>"+TABLE_STYLE+"<title>DVB-I Content Guide Validator</title></head><body>";
 	const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
 	const ENTRY_FORM_URL="<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"%s\"/><input type=\"submit\" value=\"submit\"/>";
 
@@ -469,7 +441,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 				resultsShown=true;
 			}
 		}
-		if (tableHeader) res.write("</table>");
+		if (tableHeader) res.write("</table><br/>");
 
 		tableHeader=false;
 		errors.messages.forEach(function(value) {
@@ -2906,24 +2878,11 @@ function doValidateContentGuide(CGtext, requestType, errs) {
 	}
 	if (!CG) return;
 
-	// check the retrieved service list against the schema
-	// https://syssgx.github.io/xml.js/
-	// https://github.com/kripken/xml.js
-/*
-//TODO: look into why both of these validation approaches are failing
-// LINT
-	let lintErrs=null;
-	if (lintErrs=xmllint.validateXML({xml: CGtext,schema: [TVAschema, MPEG7schema, XMLschema]}).errors) {
-		// lint errors - xmllint "kills" node.js if there is an error
-		lintErrs.forEach(err => {
-			errs.pushCode("CG001", "xmllint: "+err);
+	if (!CG.validate(TVAschema)) 
+		CG.validationErrors.forEach(ve => {
+			let s=ve.toString().split('\r')
+			s.forEach(err => errs.pushCode("CG001", err)); 
 		})
-	}
-*/ /*
-	if (!SL.validate(SLschema)){
-		SL.validationErrors.forEach(err => console.log("validation error:", err));
-	};
-*/
 
 	if (CG.root().name()!=tva.e_TVAMain) {
 		errs.pushCode("CG002", "Root element is not "+tva.e_TVAMain.elementize())
@@ -3052,13 +3011,9 @@ function loadDataFiles(useURLs) {
 	allowedCreditItemRoles=[];
 	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
 	loadRoles(allowedCreditItemRoles, useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
-/*	
-	// LINT
+
 	console.log("loading Schemas...");
-	TVAschema=loadSchema(false, TVAschemaFileName);
-	MPEG7schema=loadSchema(false, MPEG7schemaFileName);
-	XMLschema=loadSchema(false, XMLschemaFileName);
-*/
+    TVAschema=libxml.parseXmlString(fs.readFileSync(TVAschemaFileName))
 }
 
 
