@@ -12,5 +12,13 @@
 		"node-fetch": "^2.6.1",
 		"serve-favicon": "^2.5.0",
 		"sprintf-js": "^1.1.2"
+	},
+	"engines": {
+		"node": ">= 15.0.0",
+		"npm": ">= 7.0.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/paulhiggs/dvb-cg-check"
 	}
 }
