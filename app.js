@@ -395,14 +395,13 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 									  
 	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
 	const SUMMARY_FORM_HEADER="<table><tr><th>item</th><th>count</th></tr>";
+	const DETAIL_FORM_HEADER="<table><tr><th>code</th><th>%s</th></tr>"
 	const FORM_BOTTOM="</body></html>";	
 	
     res.write(FORM_TOP);    
     res.write(PAGE_HEADING);
-   
-    if (URLmode) 
-		res.write(sprintf(ENTRY_FORM_URL, lastInput ? lastInput : ""));
-	else res.write(sprintf(ENTRY_FORM_FILE, lastInput ? lastInput : ""));
+    res.write(sprintf(URLmode?ENTRY_FORM_URL:ENTRY_FORM_FILE, lastInput ? lastInput : ""))
+
 	res.write(ENTRY_FORM_REQUEST_TYPE_HEADER);
 	
 	if (!lastType) lastType=ENTRY_FORM_REQUEST_TYPES[0].value;
@@ -446,7 +445,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 		tableHeader=false;
 		errors.messages.forEach(function(value) {
 			if (!tableHeader) {
-				res.write("<table><tr><th>code</th><th>errors</th></tr>");
+				res.write(sprintf(DETAIL_FORM_HEADER, "errors"))
 				tableHeader=true;                    
 			}
 			if (value.includes(errors.delim)) {
@@ -462,7 +461,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 		tableHeader=false;
 		errors.messagesWarn.forEach(function(value)	{
 			if (!tableHeader) {
-				res.write("<table><tr><th>code</th><th>warnings</th></tr>");
+				res.write(sprintf(DETAIL_FORM_HEADER, "warnings"));
 				tableHeader=true;                    
 			}
 			if (value.includes(errors.delim)) {
@@ -477,6 +476,8 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 		if (tableHeader) res.write("</table>");        
 	}
 	if (!error && !resultsShown) res.write("no errors or warnings");
+
+	res.write(FORM_BOTTOM)
 
 	return new Promise((resolve, reject) => {
 		resolve(res)
