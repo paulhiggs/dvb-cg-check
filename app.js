@@ -3146,7 +3146,7 @@ app.use(fileUpload());
 // initialize Express
 app.use(express.urlencoded({ extended: true }));
 
-app.use(favicon('favicon.ico'))
+app.use(favicon(path.join('phlib','ph-icon.ico')))
 
 // handle HTTP POST requests to /check
 app.post("/check", function(req,res) {
