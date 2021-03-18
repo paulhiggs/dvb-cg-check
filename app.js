@@ -2435,7 +2435,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
  * @param {string} errcode           error code to be used with any errors founf
  */
 function CheckTemplateAITApplication(node, errs, errcode=null) {
-console.log("-->CheckTemplateAITApplication")
+
 	if (!node)  {
 		errs.pushCode(errcode?errcode+"-":"TA000", "CheckTemplateAITApplication() called with node==null")	
 		return;
@@ -2466,7 +2466,7 @@ console.log("-->CheckTemplateAITApplication")
  * @param {Class}  errs                errors found in validaton
  */
 function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, plCRIDs, requestType, errs) {
-console.log("-->ValidateOnDemandProgram")
+
 	if (!OnDemandProgram) {
 		errs.pushCode("OD000", "ValidateOnDemandProgram() called with OnDemandProgram==null")
 		return
@@ -2812,7 +2812,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
  * @param {integer} o.childCount         the number of child elements to be present (to match GroupInformation@numOfItems)
  */
 function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, currentProgramCRID, requestType, errs, o=null) {
-console.log("-->CheckProgramLocation")
+
 	if (!ProgramDescription) {
 		errs.pushCode("PL000", "CheckProgramLocation() called with ProgramDescription==null")
 		return
