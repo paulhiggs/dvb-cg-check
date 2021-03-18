@@ -450,13 +450,13 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 			}
 			if (value.includes(errors.delim)) {
 				let x=value.split(errors.delim)
-				res.write("<tr><td>"+x[0]+"</td><td>"+phlib.HTMLize(x[1])+"</td></tr>");	
+				res.write("<tr><td>"+phlib.HTMLize(x[0])+"</td><td>"+phlib.HTMLize(x[1])+"</td></tr>");	
 			}
 			else 
 				res.write("<tr><td></td><td>"+phlib.HTMLize(value)+"</td></tr>")
 			resultsShown=true;
 		});
-		if (tableHeader) res.write("</table>");
+		if (tableHeader) res.write("</table><br/>");
 		
 		tableHeader=false;
 		errors.messagesWarn.forEach(function(value)	{
@@ -483,6 +483,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 		resolve(res)
 	})
 }
+
 
 /**
  * constructs an XPath based on the provided arguments
@@ -2429,25 +2430,26 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 /**
  * validate an <OnDemandProgram> elements in the <ProgramLocationTable>
  *
- * @param {string} CG_SCHEMA         Used when constructing Xpath queries
- * @param {string} SCHEMA_PREFIX     Used when constructing Xpath queries
  * @param {Object} node              the element node containing the an XML AIT reference
  * @param {Class}  errs              errors found in validaton
  * @param {string} errcode           error code to be used with any errors founf
  */
-function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs, errcode=null) {
-	if (!node) return;
-	
-	if (node.attr(tva.a_contentType)) {
-		if (node.attr(tva.a_contentType).value()==dvbi.XML_AIT_CONTENT_TYPE) {
-			if (!patterns.isHTTPURL(node.text()))
-				errs.pushCode(errcode?errcode+"-3":"TA003", node.name().elementize()+"="+node.text().quote()+" is not a valid AIT URL", "invalid URL")
-		}
-		else
-			errs.pushCode(errcode?errcode+"-1":"TA001", tva.a_contentType.attribute(node.name())+"="+node.attr(tva.a_contentType).value().quote()+" is not valid for a template AIT")		
+function CheckTemplateAITApplication(node, errs, errcode=null) {
+console.log("-->CheckTemplateAITApplication")
+	if (!node)  {
+		errs.pushCode(errcode?errcode+"-":"TA000", "CheckTemplateAITApplication() called with node==null")	
+		return;
+	}
+	if (!node.attr(tva.a_contentType)) {
+		errs.pushCode(errcode?errcode+"-1":"TA001", tva.a_contentType.attribute()+" attribute is required when signalling a template AIT in "+node.name().elementize())
+		return
+	}
+	if (node.attr(tva.a_contentType).value()==dvbi.XML_AIT_CONTENT_TYPE) {
+		if (!patterns.isHTTPURL(node.text()))
+			errs.pushCode(errcode?errcode+"-2":"TA002", node.name().elementize()+"="+node.text().quote()+" is not a valid AIT URL", "invalid URL")
 	}
 	else
-		errs.pushCode(errcode?errcode+"-2":"TA002", tva.a_contentType.attribute()+" attribute is required when signalling a template AIT in "+node.name().elementize())
+		errs.pushCode(errcode?errcode+"-3":"TA003", tva.a_contentType.attribute(node.name())+"="+node.attr(tva.a_contentType).value().quote()+" is not valid for a template AIT")
 }
 
 
@@ -2464,7 +2466,7 @@ function CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, node, errs, errco
  * @param {Class}  errs                errors found in validaton
  */
 function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, plCRIDs, requestType, errs) {
-
+console.log("-->ValidateOnDemandProgram")
 	if (!OnDemandProgram) {
 		errs.pushCode("OD000", "ValidateOnDemandProgram() called with OnDemandProgram==null")
 		return
@@ -2513,14 +2515,14 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	// <ProgramURL>
 	let pUrl=0, ProgramURL
 	while (ProgramURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_ProgramURL, ++pUrl), CG_SCHEMA)) 
-		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, ProgramURL, errs, "OD020");
+		CheckTemplateAITApplication(ProgramURL, errs, "OD020");
 	if (--pUrl>1)
 		errs.pushCode("OD021", "only a single "+tva.e_ProgramURL.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 
 	// <AuxiliaryURL>
 	let aux=0, AuxiliaryURL
 	while (AuxiliaryURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_AuxiliaryURL, ++aux), CG_SCHEMA)) 
-		CheckTemplateAITApplication(CG_SCHEMA, SCHEMA_PREFIX, AuxiliaryURL, errs, "OD030");
+		CheckTemplateAITApplication(AuxiliaryURL, errs, "OD030");
 	if (--aux>1)
 		errs.pushCode("OD031", "only a single "+tva.e_AuxiliaryURL.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 	
@@ -2810,7 +2812,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
  * @param {integer} o.childCount         the number of child elements to be present (to match GroupInformation@numOfItems)
  */
 function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, currentProgramCRID, requestType, errs, o=null) {
-
+console.log("-->CheckProgramLocation")
 	if (!ProgramDescription) {
 		errs.pushCode("PL000", "CheckProgramLocation() called with ProgramDescription==null")
 		return
@@ -2900,7 +2902,6 @@ function doValidateContentGuide(CGtext, requestType, errs) {
 		errs.pushCode("CG004", "No "+tva.e_ProgramDescription.elementize()+" element specified.")
 		return;
 	}
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [], [], errs, "CG005")
 	
 	let programCRIDs=[], groupIds=[], o={childCount:0}
 	
@@ -2933,10 +2934,10 @@ function doValidateContentGuide(CGtext, requestType, errs) {
 			break;
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
-			
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable], [], errs, "CG041"); 
 		
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
+			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs)
 			break;
 		case CG_REQUEST_MORE_EPISODES:
 			// more episodes response (6.7.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
@@ -3057,10 +3058,10 @@ function processQuery(req, res) {
 		fetch(req.query.CGurl)
 			.then(handleErrors)
 			.then(response => response.text())
-			.then(res=>validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm,"")))
+			.then(res=>validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm,""), req.body.requestType))
 			.then(errs=>drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs))
 			.then(res=>res.end())
-			.catch(error => console.log("error ("+error+") handling "+csURL))
+			.catch(error => console.log("error ("+error+") handling "+req.query.CGurl))
     }
 }
 
