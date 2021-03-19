@@ -28,9 +28,6 @@ const patterns=require("./dvb-common/pattern_checks.js")
 // libxmljs2 - github.com/marudor/libxmljs2
 const libxml=require("libxmljs2")
 
-//LINT: validation against schema
-//const xmllint=require("xmllint")
-
 // morgan - https://github.com/expressjs/morgan
 const morgan=require("morgan")
 
@@ -285,8 +282,12 @@ function loadRoles(values, useURL, roleFilename, roleURL) {
 } 
 
 
-//----------------------------------------------------------
-
+/**
+ * Synchronously reads a file (if it exists)
+ * 
+ * @param {String} filename 	The name of the file to read
+ * @returns {Buffer} the buffer containing the data from the file, or null if there is a problem reading
+ */
 function readmyfile(filename) {
     try {
         let stats=fs.statSync(filename)
@@ -296,7 +297,12 @@ function readmyfile(filename) {
     return null;
 }
 
-
+/**
+ * checks is an object has none of its own properties
+ * 
+ * @param {Object} obj 	The object to check 
+ * @returns {Booolean} true if the object does not contain ant local properties
+ */
 function isEmpty(obj) {
     for(let key in obj) {
         if(obj.hasOwnProperty(key))
@@ -483,6 +489,7 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 
 /**
  * constructs an XPath based on the provided arguments
+ * 
  * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
  * @param {string} elementName the name of the element to be searched for
  * @param {int} index the instance of the named element to be searched for (if specified)
@@ -495,6 +502,7 @@ function xPath(SCHEMA_PREFIX, elementName, index=null) {
 
 /**
  * constructs an XPath based on the provided arguments
+ * 
  * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
  * @param {array} elementNames the name of the element to be searched for
  * @returns {string} the XPath selector
