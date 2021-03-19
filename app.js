@@ -80,11 +80,7 @@ const TVA_ContentCSFilename=path.join(DVB_COMMON_DIR, "tva","ContentCS.xml"),
 
 	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt"),
 	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt"
-
-const ISO3166_URL=COMMON_REPO_RAW + "iso3166-countries.json",
-	  ISO3166_Filename=path.join(DVB_COMMON_DIR,"iso3166-countries.json")
-     
-
+  
 const TVAschemaFileName=path.join(".","tva_metadata_3-1.xsd")
 var TVAschema
 
@@ -2428,34 +2424,6 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 
 
 /**
- * checks of the specified argument matches an HTTP(s) URL where the protocol is required to be provided
- *
- * @param {string} arg  The value whose format is to be checked
- * @returns {boolean} true if the argument is an HTTP URL
- * 
- * see RFC 3986 - https://tools.ietf.org/html/rfc3986
- */
- isHTTPURLl=function (arg) {
-	return isURIl(arg, '(https?:\\/\\/)')
-}
-/**
- * checks of the specified argument matches URL according to RFC 3986 - https://tools.ietf.org/html/rfc3986
- *
- * @param {string} arg  The value whose format is to be checked
- * @returns {boolean} true if the argument is an HTTP URL
- */
-isURIl=function (arg, scheme='([a-zA-Z][-a-zA-Z\\d.+]*:)') {
-	let pattern = new RegExp('^'+scheme+ // protocol
-		'((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
-		'((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
-		'(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
-		'(\\?[\\/?;&a-z\\d%_.~+=-]*)?'+ // query string
-		'(\\#[\\/?-a-z\\d_]*)?$','i') // fragment locator
-	return pattern.test(arg)
-}
-
-
-/**
  * validate an <OnDemandProgram> elements in the <ProgramLocationTable>
  *
  * @param {Object} node              the element node containing the an XML AIT reference
@@ -2473,8 +2441,7 @@ function CheckTemplateAITApplication(node, errs, errcode=null) {
 		return
 	}
 	if (node.attr(tva.a_contentType).value()==dvbi.XML_AIT_CONTENT_TYPE) {
-//		if (!patterns.isHTTPURL(node.text()))
-		if (!isHTTPURLl(node.text()))
+		if (!patterns.isHTTPURL(node.text()))
 			errs.pushCode(errcode?errcode+"-2":"TA002", node.name().elementize()+"="+node.text().quote()+" is not a valid AIT URL", "invalid URL")
 	}
 	else
