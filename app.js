@@ -1748,21 +1748,21 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 		errs.pushCode("GIB000", "ValidateGroupInformationBoxSets() called with GroupInformation==null")
 		return;
 	}
-	let isCategoryGroup=GroupInformation==categoryGroup
+	let isParentGroup=GroupInformation==categoryGroup
 	
 	switch (requestType) {
 		case CG_REQUEST_BS_CATEGORIES:
-			if (isCategoryGroup) 
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB001")
+			if (isParentGroup) 
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems], errs, "GIB001")
 			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB002")
 			break;
 		case CG_REQUEST_BS_LISTS:
-			if (isCategoryGroup) 
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang], errs, "GIB003")
+			if (isParentGroup) 
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems], errs, "GIB003")
 			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_serviceIDRef], errs, "GIB004")
 			break;
 		case CG_REQUEST_BS_CONTENTS:
-			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId, tva.a_ordered, tva.a_numOfItems], [tva.a_lang, tva.a_serviceIDRef], errs, "GIB005")
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], errs, "GIB005")
 			break;
 	}
 
@@ -1779,17 +1779,17 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	let categoryCRID=(categoryGroup && categoryGroup.attr(tva.a_groupId)) ? categoryGroup.attr(tva.a_groupId).value() : ""
 
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES) {
-		if (!isCategoryGroup && GroupInformation.attr(tva.a_ordered)) 
+		if (!isParentGroup && GroupInformation.attr(tva.a_ordered)) 
 			errs.pushCode("GIB010", tva.a_ordered.attribute(GroupInformation.name())+" is only permitted in the "+CATEGORY_GROUP_NAME);
-		if (isCategoryGroup && !GroupInformation.attr(tva.a_ordered)) 
+		if (isParentGroup && !GroupInformation.attr(tva.a_ordered)) 
 			errs.pushCode("GIB011", tva.a_ordered.attribute(GroupInformation.name())+" is required for this request type")
-		if (!isCategoryGroup && GroupInformation.attr(tva.a_numOfItems)) 
+		if (!isParentGroup && GroupInformation.attr(tva.a_numOfItems)) 
 			errs.pushCode("GIB012", tva.a_numOfItems.attribute(GroupInformation.name())+" is only permitted in the "+CATEGORY_GROUP_NAME);
-		if (isCategoryGroup && !GroupInformation.attr(tva.a_numOfItems)) 
+		if (isParentGroup && !GroupInformation.attr(tva.a_numOfItems)) 
 			errs.pushCode("GIB013", tva.a_numOfItems.attribute(GroupInformation.name())+" is required for this request type")
 	}
 
-	if (!isCategoryGroup) {
+	if (!isParentGroup) {
 		let MemberOf=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_MemberOf), CG_SCHEMA)
 		if (MemberOf) {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MemberOf, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "GIB020")
