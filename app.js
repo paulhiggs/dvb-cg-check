@@ -672,7 +672,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 	}
 	let s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false
 	let shortLangs=[], mediumLangs=[], longLangs=[]
-	while (Synopsis=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Synopsis, ++s), CG_SCHEMA)) {
+	while (Synopsis=BasicDescription.get(xPath(SCHEMA_PREFIX,tva.e_Synopsis, ++s), CG_SCHEMA)) {
 		
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Synopsis, [tva.a_length], [tva.a_lang], errs, "SY001");
 
@@ -701,7 +701,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 				}
 			}
 			else
-				errs.pushCode(errCode?errCode+"-4":"SY014", tva.a_length.attribute(tva.e_Synopsis)+"="+synopsisLength.quote()+" is not permitted for this request type");
+				errs.pushCode(errCode?errCode+"-4":"SY014", tva.a_length.attribute()+"="+synopsisLength.quote()+" is not permitted for this request type");
 		}
 	
 		if (synopsisLang && synopsisLength) {
@@ -2478,22 +2478,16 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	let validRequest=true
 	switch (requestType) {
 		case CG_REQUEST_BS_CONTENTS:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, 
-					[tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], 
-					[tva.e_InstanceDescription,tva.e_AuxiliaryURL,tva.e_DeliveryMode], errs, "OD001");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_InstanceDescription,tva.e_AuxiliaryURL,tva.e_DeliveryMode], errs, "OD001");
 			break;
 		case CG_REQUEST_MORE_EPISODES:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, 
-					[tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], 
-					[tva.e_AuxiliaryURL], errs, "OD002");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD002");
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 		case CG_REQUEST_SCHEDULE_TIME:
 		case CG_REQUEST_SCHEDULE_WINDOW:
 		case CG_REQUEST_PROGRAM:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, 
-					[tva.e_Program,tva.e_ProgramURL,tva.e_InstanceDescription,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_DeliveryMode,tva.e_Free], 
-					[tva.e_AuxiliaryURL], errs, "OD003");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_InstanceDescription,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_DeliveryMode,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD003");
 			break;
 		default:
 			errs.pushCode("OD004", "requestType="+requestType+" is not valid for "+OnDemandProgram.name())
@@ -2526,10 +2520,8 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	let pUrl=0, ProgramURL
 	while (ProgramURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_ProgramURL, ++pUrl), CG_SCHEMA)) 
 		CheckTemplateAITApplication(ProgramURL, errs, "OD020");
-	/* this is not checked through schema validation
-		if (--pUrl>1)
+	if (--pUrl>1)
 		errs.pushCode("OD021", "only a single "+tva.e_ProgramURL.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
-	*/
 
 	// <AuxiliaryURL>
 	let aux=0, AuxiliaryURL
