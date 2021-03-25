@@ -1792,7 +1792,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	if (!isCategoryGroup) {
 		let MemberOf=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_MemberOf), CG_SCHEMA)
 		if (MemberOf) {
-			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Memberof, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "GIB020")
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MemberOf, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "GIB020")
 			if (MemberOf.attr(tva.a_type) && MemberOf.attr(tva.a_type).value()!=tva.t_MemberOfType)
 				errs.pushCode("GIB021", GroupInformation.name()+"."+tva.e_MemberOf+"@xsi:"+tva.a_type+" is invalid ("+MemberOf.attr(tva.a_type).value().quote()+")")
 			
