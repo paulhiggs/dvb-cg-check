@@ -39,7 +39,7 @@ var sprintf=require("sprintf-js").sprintf,
     vsprintf=require("sprintf-js").vsprintf
 	
 const https=require("https")
-const keyFilename=path.join(".","selfsigned.key"), certFilename=path.join(".","selfsigned.crt")
+const keyFilename=path.join(".", "selfsigned.key"), certFilename=path.join(".", "selfsigned.crt")
 
 
 // convenience/readability values
@@ -63,22 +63,22 @@ const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/
 	  COMMON_REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-common/master/",
 	  DVB_COMMON_DIR="dvb-common"
 
-const TVA_ContentCSFilename=path.join(DVB_COMMON_DIR, "tva","ContentCS.xml"),
+const TVA_ContentCSFilename=path.join(DVB_COMMON_DIR, "tva", "ContentCS.xml"),
 	  TVA_ContentCSURL=COMMON_REPO_RAW + "tva/" + "ContentCS.xml",
 
-	  TVA_FormatCSFilename=path.join(DVB_COMMON_DIR, "tva","FormatCS.xml"),
+	  TVA_FormatCSFilename=path.join(DVB_COMMON_DIR, "tva", "FormatCS.xml"),
       TVA_FormatCSURL=COMMON_REPO_RAW + "tva/" + "FormatCS.xml",
 
-	  DVBI_ContentSubjectFilename=path.join(DVB_COMMON_DIR, "dvbi","DVBContentSubjectCS-2019.xml"),
+	  DVBI_ContentSubjectFilename=path.join(DVB_COMMON_DIR, "dvbi", "DVBContentSubjectCS-2019.xml"),
       DVBI_ContentSubjectURL=COMMON_REPO_RAW + "dvbi/" + "DVBContentSubjectCS-2019.xml",
 
-	  DVBI_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values.txt"),
+	  DVBI_CreditsItemRolesFilename=path.join(".", "CreditsItem@role-values.txt"),
 	  DVBI_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values.txt",
 
-	  DVBIv2_CreditsItemRolesFilename=path.join(".","CreditsItem@role-values-v2.txt"),
+	  DVBIv2_CreditsItemRolesFilename=path.join(".", "CreditsItem@role-values-v2.txt"),
 	  DVBIv2_CreditsItemRolesURL=REPO_RAW+"CreditsItem@role-values-v2.txt"
   
-const TVAschemaFileName=path.join(".","tva_metadata_3-1.xsd")
+const TVAschemaFileName=path.join(".", "tva_metadata_3-1.xsd")
 var TVAschema
 
 const IANAlanguages=require("./"+DVB_COMMON_DIR+"/IANAlanguages.js")
@@ -133,7 +133,7 @@ function isIni(values, value){
  * @return {string} the string with entities replaced with a single character '*'
  */
 function unEntity(str) {
-	return str.replace(/(&.+;)/ig,"*");
+	return str.replace(/(&.+;)/ig, "*")
 }
 
 
@@ -234,7 +234,7 @@ function addRoles(values, data) {
  */
 function loadRolesFromFile(values, rolesFilename) {
 	console.log("reading Roles from", rolesFilename);
-    fs.readFile(rolesFilename, {encoding: "utf-8"}, function(err,data) {
+    fs.readFile(rolesFilename, {encoding: "utf-8"}, function(err, data) {
         if (!err) 
 			addRoles(values, data);
         else 
@@ -277,7 +277,7 @@ function loadRolesFromURL(values, rolesURL) {
  */ 
 function loadRoles(values, useURL, roleFilename, roleURL) {
 	if (useURL)
-		loadRolesFromURL(values,roleURL);
+		loadRolesFromURL(values, roleURL)
 	else loadRolesFromFile(values, roleFilename);	
 } 
 
@@ -293,7 +293,7 @@ function readmyfile(filename) {
         let stats=fs.statSync(filename)
         if (stats.isFile()) return fs.readFileSync(filename); 
     }
-    catch (err) {console.log(err.code,err.path);}
+    catch (err) {console.log(err.code, err.path)}
     return null;
 }
 
@@ -385,14 +385,14 @@ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, error
 	const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
 
 	const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
-	const ENTRY_FORM_REQUEST_TYPES=[{"value":CG_REQUEST_SCHEDULE_TIME,"label":"Schedule Info (time stamp)"},
-									{"value":CG_REQUEST_SCHEDULE_NOWNEXT,"label":"Schedule Info (now/next)"},
-									{"value":CG_REQUEST_SCHEDULE_WINDOW,"label":"Schedule Info (window)"},
-									{"value":CG_REQUEST_PROGRAM,"label":"Program Info"},
-									{"value":CG_REQUEST_MORE_EPISODES,"label":"More Episodes"},
-									{"value":CG_REQUEST_BS_CATEGORIES,"label":"Box Set Categories"},
-									{"value":CG_REQUEST_BS_LISTS,"label":"Box Set Lists"},
-									{"value":CG_REQUEST_BS_CONTENTS,"label":"Box Set Contents"}];
+	const ENTRY_FORM_REQUEST_TYPES=[{"value":CG_REQUEST_SCHEDULE_TIME, "label":"Schedule Info (time stamp)"},
+									{"value":CG_REQUEST_SCHEDULE_NOWNEXT, "label":"Schedule Info (now/next)"},
+									{"value":CG_REQUEST_SCHEDULE_WINDOW, "label":"Schedule Info (window)"},
+									{"value":CG_REQUEST_PROGRAM, "label":"Program Info"},
+									{"value":CG_REQUEST_MORE_EPISODES, "label":"More Episodes"},
+									{"value":CG_REQUEST_BS_CATEGORIES, "label":"Box Set Categories"},
+									{"value":CG_REQUEST_BS_LISTS, "label":"Box Set Lists"},
+									{"value":CG_REQUEST_BS_CONTENTS, "label":"Box Set Contents"}];
 	const FORM_END="</form>";
 									  
 	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
@@ -672,7 +672,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 	}
 	let s=0, Synopsis, hasShort=false, hasMedium=false, hasLong=false
 	let shortLangs=[], mediumLangs=[], longLangs=[]
-	while (Synopsis=BasicDescription.get(xPath(SCHEMA_PREFIX,tva.e_Synopsis, ++s), CG_SCHEMA)) {
+	while (Synopsis=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Synopsis, ++s), CG_SCHEMA)) {
 		
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Synopsis, [tva.a_length], [tva.a_lang], errs, "SY001");
 
@@ -708,17 +708,17 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 			switch (synopsisLength) {
 				case tva.SYNOPSIS_SHORT_LABEL:
 					if (isIn(shortLangs, synopsisLang)) 
-						errs.pushCode(errCode?errCode+"-6":"SY016",singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCode(errCode?errCode+"-6":"SY016", singleLengthLangError(synopsisLength, synopsisLang))
 					else shortLangs.push(synopsisLang);
 					break;
 				case tva.SYNOPSIS_MEDIUM_LABEL:
 					if (isIn(mediumLangs, synopsisLang)) 
-						errs.pushCode(errCode?errCode+"-7":"SY017",singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCode(errCode?errCode+"-7":"SY017", singleLengthLangError(synopsisLength, synopsisLang))
 					else mediumLangs.push(synopsisLang);
 					break;
 				case tva.SYNOPSIS_LONG_LABEL:
 					if (isIn(longLangs, synopsisLang)) 
-						errs.pushCode(errCode?errCode+"-8":"SY018",singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCode(errCode?errCode+"-8":"SY018", singleLengthLangError(synopsisLength, synopsisLang))
 					else longLangs.push(synopsisLang);
 					break;
 			}
@@ -726,11 +726,11 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 	}
 	
 	if (isIn(requiredLengths, tva.SYNOPSIS_SHORT_LABEL) && !hasShort)
-		errs.pushCode(errCode?errCode+"-9":"SY019",requiredSynopsisError(tva.SYNOPSIS_SHORT_LABEL));	
+		errs.pushCode(errCode?errCode+"-9":"SY019", requiredSynopsisError(tva.SYNOPSIS_SHORT_LABEL))	
 	if (isIn(requiredLengths, tva.SYNOPSIS_MEDIUM_LABEL) && !hasMedium)
-		errs.pushCode(errCode?errCode+"-10":"SY020",requiredSynopsisError(tva.SYNOPSIS_MEDIUM_LABEL));	
+		errs.pushCode(errCode?errCode+"-10":"SY020", requiredSynopsisError(tva.SYNOPSIS_MEDIUM_LABEL))	
 	if (isIn(requiredLengths, tva.SYNOPSIS_LONG_LABEL) && !hasLong)
-		errs.pushCode(errCode?errCode+"-11":"SY021",requiredSynopsisError(tva.SYNOPSIS_LONG_LABEL));	
+		errs.pushCode(errCode?errCode+"-11":"SY021", requiredSynopsisError(tva.SYNOPSIS_LONG_LABEL))
 }
 
 
@@ -764,14 +764,14 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 			counts[keywordLang]=1
 		else counts[keywordLang]++;
 		if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
-			errs.pushCode(errCode?errCode+"-1":"KW011",tva.a_type.attribute()+"="+keywordType.quote()+" not permitted for "+tva.e_Keyword.elementize());
+			errs.pushCode(errCode?errCode+"-1":"KW011", tva.a_type.attribute()+"="+keywordType.quote()+" not permitted for "+tva.e_Keyword.elementize());
 		if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
-			errs.pushCode(errCode?errCode+"-2":"KW012","length of "+tva.e_Keyword.elementize()+" is greater than "+dvbi.MAX_KEYWORD_LENGTH)
+			errs.pushCode(errCode?errCode+"-2":"KW012", " length of "+tva.e_Keyword.elementize()+" is greater than "+dvbi.MAX_KEYWORD_LENGTH)
 	}
 	
 	for (let i in counts) {
         if (counts[i]!=0 && counts[i]>maxKeywords) 
-            errs.pushCode(errCode?errCode+"-3":"KW013","More than "+maxKeywords+" "+tva.e_Keyword.elementize()+" element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language "+i.quote()));
+            errs.pushCode(errCode?errCode+"-3":"KW013", "More than "+maxKeywords+" "+tva.e_Keyword.elementize()+" element"+(maxKeywords>1?"s":"")+" specified"+(i==DEFAULT_LANGUAGE?"":" for language "+i.quote()));
 	}
 }
 
@@ -804,7 +804,7 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 			errs.pushCode(errCode?errCode+"-2":"GE002", "invalid "+tva.a_href.attribute()+" value "+genreValue.quote()+" for "+tva.e_Genre.elementize());
 	}
 	if (count>maxGenres)
-		errs.pushCode(errCode?errCode+"-3":"GE003","More than "+maxGenres+" "+tva.e_Genre.elementize()+" element"+(maxGenres>1?"s":"")+" specified");
+		errs.pushCode(errCode?errCode+"-3":"GE003", "More than "+maxGenres+" "+tva.e_Genre.elementize()+" element"+(maxGenres>1?"s":"")+" specified");
 }
 
 /**
@@ -929,7 +929,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 	let CreditsList=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_CreditsList), CG_SCHEMA)
 	if (CreditsList) {
 		let ci=0, CreditsItem
-		while (CreditsItem=CreditsList.get(xPath(SCHEMA_PREFIX,tva.e_CreditsItem, ++ci), CG_SCHEMA)) {
+		while (CreditsItem=CreditsList.get(xPath(SCHEMA_PREFIX, tva.e_CreditsItem, ++ci), CG_SCHEMA)) {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, [tva.a_role], [], errs, errCode?errCode+"-2":"CL002") 
 			if (CreditsItem.attr(tva.a_role)) {
 				let CreditsItemRole=CreditsItem.attr(tva.a_role).value()
@@ -2111,7 +2111,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 	let gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "NN002")
 	
 	let gi=0, GroupInformation
-	while (GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX,tva.e_GroupInformation, ++gi), CG_SCHEMA)) {	
+	while (GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformation, ++gi), CG_SCHEMA)) {	
 		switch (requestType) {
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
 				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 0, 1, 1, groupIds);
@@ -2205,7 +2205,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 		if (VerticalSize && valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
 			errs.pushCode("AV032", tva.e_VerticalSize.elementize()+" must be an unsigned short (0-"+MAX_UNSIGNED_SHORT+")")
 		
-		let AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX,tva.e_AspectRatio), CG_SCHEMA)
+		let AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_AspectRatio), CG_SCHEMA)
 		if (AspectRatio && !patterns.isRatioType(AspectRatio.text()))
 			errs.pushCode("AV033", tva.e_AspectRatio.elementize()+" is not a valid aspect ratio")
 	}
@@ -2478,16 +2478,22 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	let validRequest=true
 	switch (requestType) {
 		case CG_REQUEST_BS_CONTENTS:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_InstanceDescription,tva.e_AuxiliaryURL,tva.e_DeliveryMode], errs, "OD001");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, 
+					[tva.e_Program, tva.e_ProgramURL, tva.e_PublishedDuration, tva.e_StartOfAvailability, tva.e_EndOfAvailability, tva.e_Free], 
+					[tva.e_InstanceDescription, tva.e_AuxiliaryURL, tva.e_DeliveryMode], errs, "OD001")
 			break;
 		case CG_REQUEST_MORE_EPISODES:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD002");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, 
+					[tva.e_Program, tva.e_ProgramURL, tva.e_PublishedDuration, tva.e_StartOfAvailability, tva.e_EndOfAvailability, tva.e_Free], 
+					[tva.e_AuxiliaryURL], errs, "OD002")
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 		case CG_REQUEST_SCHEDULE_TIME:
 		case CG_REQUEST_SCHEDULE_WINDOW:
 		case CG_REQUEST_PROGRAM:
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [tva.e_Program,tva.e_ProgramURL,tva.e_InstanceDescription,tva.e_PublishedDuration,tva.e_StartOfAvailability,tva.e_EndOfAvailability,tva.e_DeliveryMode,tva.e_Free], [tva.e_AuxiliaryURL], errs, "OD003");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, 
+					[tva.e_Program, tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_PublishedDuration, tva.e_StartOfAvailability, tva.e_EndOfAvailability, tva.e_DeliveryMode, tva.e_Free], 
+					[tva.e_AuxiliaryURL], errs, "OD003")
 			break;
 		default:
 			errs.pushCode("OD004", "requestType="+requestType+" is not valid for "+OnDemandProgram.name())
@@ -2524,7 +2530,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	if (--pUrl>1)
 		errs.pushCode("OD021", "only a single "+tva.e_ProgramURL.elementize()+" is permitted in "+OnDemandProgram.name().elementize())
 	*/
-	
+
 	// <AuxiliaryURL>
 	let aux=0, AuxiliaryURL
 	while (AuxiliaryURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_AuxiliaryURL, ++aux), CG_SCHEMA)) 
@@ -2708,7 +2714,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		// <InstanceDescription>
 		let InstanceDescription=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_InstanceDescription), CG_SCHEMA)
 		if (InstanceDescription) 
-			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, isCurrentProgram, seLang, programCRIDs,requestType, errs);
+			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, isCurrentProgram, seLang, programCRIDs, requestType, errs)
 		
 		// <PublishedStartTime> and <PublishedDuration>
 		let pstElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedStartTime), CG_SCHEMA)
@@ -2947,7 +2953,8 @@ function doValidateContentGuide(CGtext, requestType, errs) {
 			break;
 		case CG_REQUEST_MORE_EPISODES:
 			// more episodes response (6.7.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG051"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, 
+					[tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG051")
 
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
@@ -2967,7 +2974,8 @@ function doValidateContentGuide(CGtext, requestType, errs) {
 			break;
 		case CG_REQUEST_BS_CONTENTS:
 			// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
-			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable,tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG081"); 
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, 
+					[tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG081") 
 			
 			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
 			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
@@ -3064,7 +3072,7 @@ function processQuery(req, res) {
 		fetch(req.query.CGurl)
 			.then(handleErrors)
 			.then(response => response.text())
-			.then(res=>validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm,""), req.body.requestType))
+			.then(res=>validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType))
 			.then(errs=>drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs))
 			.then(res=>res.end())
 			.catch(error => console.log("error ("+error+") handling "+req.query.CGurl))
@@ -3078,7 +3086,7 @@ function processQuery(req, res) {
  * @param {Object} req The request from Express
  * @param {Object} res The HTTP response to be sent to the client
  */ 
-function processFile(req,res) {
+function processFile(req, res) {
 	
 	function checkFile(req) {
 		if (req.files) {
@@ -3106,7 +3114,7 @@ function processFile(req,res) {
             errs.pushCode("PF001", "retrieval of FILE ("+fname+") failed");
         }
 		if (CGxml) 
-			doValidateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm,""), req.body.requestType, errs);
+			doValidateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType, errs);
 		
         drawForm(false, res, fname, req.body.requestType, null, errs);
     }
@@ -3130,14 +3138,14 @@ loadDataFiles(options.urls)
 morgan.token("protocol", function getProtocol(req) {
     return req.protocol;
 });
-morgan.token("parseErr",function getParseErr(req) {
+morgan.token("parseErr", function getParseErr(req) {
     if (req.parseErr) return "("+req.parseErr+")";
     return "";
 });
-morgan.token("agent",function getAgent(req) {
+morgan.token("agent", function getAgent(req) {
     return "("+req.headers["user-agent"]+")";
 });
-morgan.token("cgLoc",function getCheckedLocation(req) {
+morgan.token("cgLoc", function getCheckedLocation(req) {
 	if (req.files && req.files.CGfile) return "["+req.files.CGfile.name+"]";
     if (req.query.CGurl) return "["+req.query.CGurl+"]";
 	return "[*]";
@@ -3153,32 +3161,32 @@ app.use(fileUpload());
 // initialize Express
 app.use(express.urlencoded({ extended: true }));
 
-app.use(favicon(path.join('phlib','ph-icon.ico')))
+app.use(favicon(path.join('phlib', 'ph-icon.ico')))
 
 // handle HTTP POST requests to /check
-app.post("/check", function(req,res) {
+app.post("/check", function(req, res) {
     req.query.CGurl=req.body.CGurl;
-    processQuery(req,res);
+    processQuery(req, res);
 });
 
 // handle HTTP GET requests to /check
-app.get("/check", function(req,res){
-    processQuery(req,res);
+app.get("/check", function(req, res) {
+    processQuery(req, res);
 });
 
 // handle HTTP POST requests to /checkFile
-app.post("/checkFile", function(req,res) {
+app.post("/checkFile", function(req, res) {
 	req.query.CGfile=req.body.CGfile;
-    processFile(req,res);
+    processFile(req, res);
 });
 
 // handle HTTP GET requests to /checkFile
-app.get("/checkFile", function(req,res){
-    processFile(req,res);
+app.get("/checkFile", function(req, res) {
+    processFile(req, res);
 });
 
 // dont handle any other requests
-app.get("*", function(req,res) {
+app.get("*", function(req, res) {
     res.status(404).end();
 });
 
