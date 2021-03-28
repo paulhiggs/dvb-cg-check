@@ -1331,7 +1331,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 					if (subElems) subElems.forEach(child => {
 						if (child.type()=='element' && child.name()==tva.e_MediaUri) {
 							hasMediaURI=true;
-							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentTyoe], [], errs, "PS031")
+							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentType], [], errs, "PS031")
 							if (child.attr(tva.a_contentType)) {
 								let contentType=child.attr(tva.a_contentType).value()
 								if (!isJPEGmime(contentType) && !isPNGmime(contentType)) 
@@ -3075,7 +3075,7 @@ function processQuery(req, res) {
 			.then(res=>validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType))
 			.then(errs=>drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs))
 			.then(res=>res.end())
-			.catch(error => console.log("error ("+error+") handling "+req.query.CGurl))
+			.catch(error => {console.dir(error); console.log("error ("+error+") handling "+req.query.CGurl)})
     }
 }
 
