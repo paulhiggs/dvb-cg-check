@@ -1,4 +1,18 @@
+// node.js - https://nodejs.org/en/
+// express framework - https://expressjs.com/en/4x/api.html
+const express=require("express")
+
 const phlib=require('./phlib/phlib')
+
+const fs=require("fs"), path=require("path")
+
+// command line arguments - https://github.com/75lb/command-line-args
+const commandLineArgs=require('command-line-args')
+
+// favourite icon - https://www.npmjs.com/package/serve-favicon
+const favicon=require("serve-favicon")
+
+const fetch=require("node-fetch")
 
 const ErrorList=require("./dvb-common/ErrorList.js")
 const dvbi=require("./dvb-common/DVB-I_definitions.js")
@@ -75,6 +89,68 @@ var knownLanguages=new IANAlanguages()
 const IANA_Subtag_Registry_Filename=path.join("./dvb-common", knownLanguages.LanguagesFileName),
       IANA_Subtag_Registry_URL=knownLanguages.LanguagesURL
 
+
+/*
+ * alternate to Array.prototype.forEach that only returns XML tree nodes
+ * that are elements
+*/
+if (!Array.prototype['forEachSubElement']) {
+
+	Array.prototype.forEachSubElement = function(callback, thisArg) {
+  
+	  if (this == null) { throw new TypeError('Array.prototype.forEach called on null or undefined'); }
+  
+	  var T, k;
+	  // 1. Let O be the result of calling toObject() passing the
+	  // |this| value as the argument.
+	  var O = Object(this);
+  
+	  // 2. Let lenValue be the result of calling the Get() internal
+	  // method of O with the argument "length".
+	  // 3. Let len be toUint32(lenValue).
+	  var len = O.length >>> 0;
+  
+	  // 4. If isCallable(callback) is false, throw a TypeError exception.
+	  // See: https://es5.github.com/#x9.11
+	  if (typeof callback !== "function") { throw new TypeError(callback + ' is not a function'); }
+  
+	  // 5. If thisArg was supplied, let T be thisArg; else let
+	  // T be undefined.
+	  if (arguments.length > 1) { T = thisArg; }
+  
+	  // 6. Let k be 0
+	  k = 0;
+  
+	  // 7. Repeat, while k < len
+	  while (k < len) {
+  
+		var kValue;
+  
+		// a. Let Pk be ToString(k).
+		//    This is implicit for LHS operands of the in operator
+		// b. Let kPresent be the result of calling the HasProperty
+		//    internal method of O with argument Pk.
+		//    This step can be combined with c
+		// c. If kPresent is true, then
+		if (k in O) {
+  
+		  // i. Let kValue be the result of calling the Get internal
+		  // method of O with argument Pk.
+		  kValue = O[k];
+  
+		  // ii. Call the Call internal method of callback with T as
+		  // the this value and argument list containing kValue, k, and O.
+		  if (T.type()=='element')
+		  	callback.call(T, kValue, k, O);
+		}
+		// d. Increase k by 1.
+		k++;
+	  }
+	  // 8. return undefined
+	};
+  }
+
+
 /**
  * determines if a value is in a set of values 
  *
@@ -132,8 +208,8 @@ function unEntity(str) {
  */
 function CountChildElements(node, childElementName) {
 	let r=0, childElems=node?node.childNodes():null
-	if (childElems) childElems.forEach(elem => {
-		if (elem.type()=='element' && elem.name()==childElementName)
+	if (childElems) childElems.forEachSubElement(elem => {
+		if (elem.name()==childElementName)
 			r++
 	})
 	return r
@@ -428,13 +504,11 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	if (!isIn(optionalChildElements, OTHER_ELEMENTS_OK)) {
 		let c=0, child
 		let children=parentElement.childNodes()
-		if (children) children.forEach(child => {
-			if (child.type()=='element') {
-				let childName=child.name()
-				if (!isIn(mandatoryChildElements, childName) && !isIn(optionalChildElements, childName)) {		
-					errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+childName.elementize()+" is not permitted in "+thisElem)
-					rv=false;
-				}
+		if (children) children.forEachSubElement(child => {
+			let childName=child.name()
+			if (!isIn(mandatoryChildElements, childName) && !isIn(optionalChildElements, childName)) {		
+				errs.pushCode(errCode?errCode+"-2":"TE011", "Element "+childName.elementize()+" is not permitted in "+thisElem)
+				rv=false;
 			}
 		})
 
@@ -692,33 +766,31 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		countParentalGuidance++;
 		
 		let countExplanatoryText=0, children=ParentalGuidance.childNodes()
-		if (children) children.forEach( pgChild => {
-			if (pgChild.type()=='element') {
-				switch (pgChild.name()) {
-					case tva.e_MinimumAge:
-					case tva.e_ParentalRating:
-						if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-							errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+phlib.elementize("mpeg7:"+tva.e_MinimumAge))
-						
-						if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-							errs.pushCode(errCode?errCode+"-2":"PG012", tva.e_MinimumAge.elementize()+" must be in the first "+tva.e_ParentalGuidance.elementize()+" element");
-						
-						if (pgChild.name()==tva.e_ParentalRating) {
-							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
-						}
-						break;		
-					case tva.e_ExplanatoryText:
-						countExplanatoryText++;
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_length], [], errs, errCode?errCode+"-4":"PG004") 
-						if (pgChild.attr(tva.a_length)) {
-							if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
-								errs.pushCode(errCode?errCode+"-3":"PG003", tva.a_length.attribute()+"="+pgChild.attr(tva.a_length).value().quote()+" is not allowed for "+tva.e_ExplanatoryText.elementize())
-						}
-						
-						if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
-							errs.pushCode(errCode?errCode+"-5":"PG005", "length of "+tva.e_ExplanatoryText.elementize()+" cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters")
-						break;
-				}
+		if (children) children.forEachSubElement( pgChild => {
+			switch (pgChild.name()) {
+				case tva.e_MinimumAge:
+				case tva.e_ParentalRating:
+					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
+						errs.pushCode(errCode?errCode+"-1":"PG011", "first "+tva.e_ParentalGuidance.elementize()+" element must contain "+phlib.elementize("mpeg7:"+tva.e_MinimumAge))
+					
+					if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
+						errs.pushCode(errCode?errCode+"-2":"PG012", tva.e_MinimumAge.elementize()+" must be in the first "+tva.e_ParentalGuidance.elementize()+" element");
+					
+					if (pgChild.name()==tva.e_ParentalRating) {
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?errCode+"-3":"PG013")
+					}
+					break;		
+				case tva.e_ExplanatoryText:
+					countExplanatoryText++;
+					checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_length], [], errs, errCode?errCode+"-4":"PG004") 
+					if (pgChild.attr(tva.a_length)) {
+						if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
+							errs.pushCode(errCode?errCode+"-3":"PG003", tva.a_length.attribute()+"="+pgChild.attr(tva.a_length).value().quote()+" is not allowed for "+tva.e_ExplanatoryText.elementize())
+					}
+					
+					if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
+						errs.pushCode(errCode?errCode+"-5":"PG005", "length of "+tva.e_ExplanatoryText.elementize()+" cannot exceed "+dvbi.MAX_EXPLANATORY_TEXT_LENGTH+" characters")
+					break;
 			}
 		}) 
 		if (countExplanatoryText > 1)
@@ -750,20 +822,19 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 		return
 	}
 	let familyNameCount=0, givenNameCount=0, otherElemCount=0, children=elem.childNodes()
-	if (children) children.forEach(subElem => {
-		if (subElem.type()=="element") 
-			switch (subElem.name()) {
-				case tva.e_GivenName:
-					givenNameCount++;
-					checkNamePart(subElem, errs, errCode?errCode+"-2":"VN002");
-					break;
-				case tva.e_FamilyName:
-					familyNameCount++;
-					checkNamePart(subElem, errs, errCode?errCode+"-3":"VN003");
-					break;
-				default:
-					otherElemCount++;			
-			}
+	if (children) children.forEachSubElement(subElem => {
+		switch (subElem.name()) {
+			case tva.e_GivenName:
+				givenNameCount++;
+				checkNamePart(subElem, errs, errCode?errCode+"-2":"VN002");
+				break;
+			case tva.e_FamilyName:
+				familyNameCount++;
+				checkNamePart(subElem, errs, errCode?errCode+"-3":"VN003");
+				break;
+			default:
+				otherElemCount++;			
+		}
 	})
 		
 	if (givenNameCount==0)
@@ -802,39 +873,37 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 			let foundPersonName=0, foundCharacter=0, foundOrganizationName=0
 
 			let children=CreditsItem.childNodes()
-			if (children) children.forEach(elem => {
-				if (elem.type()=="element") {
-					switch (elem.name()) {
-						case tva.e_PersonName:
-							foundPersonName++;
-							// required to have a GivenName optionally have a FamilyName
-							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-							break;
-						case tva.e_Character:
-							foundCharacter++;
-							// required to have a GivenName optionally have a FamilyName
-							ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-							break;
-						case tva.e_OrganizationName:
-							foundOrganizationName++;
-							if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
-								errs.pushCode(errCode?errCode+"-3":"CL003", "length of "+tva.e_OrganizationName.elementize()+" in "+tva.e_CreditsItem.elementize()+" exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
-							break;
-						default:
-							if (elem.name()!="text")
-								errs.pushCode(errCode?errCode+"-4":"CL004", "extra element "+elem.name().elementize()+" found in "+tva.e_CreditsItem.elementize())
-					}
-					if (foundPersonName>1)
-						errs.pushCode(errCode?errCode+"-5":"CL005", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
-					if (foundCharacter>1)
-						errs.pushCode(errCode?errCode+"-6":"CL006", "only a single "+tva.e_Character.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
-					if (foundOrganizationName>1)
-						errs.pushCode(errCode?errCode+"-7":"CL007", "only a single "+tva.e_OrganizationName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
-					if (foundCharacter>0 && foundPersonName==0)
-						errs.pushCode(errCode?errCode+"-8":"CL008", tva.e_Character.elementize()+" in "+tva.e_CreditsItem.elementize()+" requires "+tva.e_PersonName.elementize())
-					if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
-						errs.pushCode(errCode?errCode+"-9":"CL009", tva.e_OrganizationName.elementize()+" can only be present when "+tva.e_PersonName.elementize()+" is absent in "+tva.e_CreditsItem.elementize())
-				}	
+			if (children) children.forEachSubElement(elem => {
+				switch (elem.name()) {
+					case tva.e_PersonName:
+						foundPersonName++;
+						// required to have a GivenName optionally have a FamilyName
+						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+						break;
+					case tva.e_Character:
+						foundCharacter++;
+						// required to have a GivenName optionally have a FamilyName
+						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+						break;
+					case tva.e_OrganizationName:
+						foundOrganizationName++;
+						if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
+							errs.pushCode(errCode?errCode+"-3":"CL003", "length of "+tva.e_OrganizationName.elementize()+" in "+tva.e_CreditsItem.elementize()+" exceeds "+dvbi.MAX_ORGANIZATION_NAME_LENGTH+" characters")
+						break;
+					default:
+						if (elem.name()!="text")
+							errs.pushCode(errCode?errCode+"-4":"CL004", "extra element "+elem.name().elementize()+" found in "+tva.e_CreditsItem.elementize())
+				}
+				if (foundPersonName>1)
+					errs.pushCode(errCode?errCode+"-5":"CL005", "only a single "+tva.e_PersonName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
+				if (foundCharacter>1)
+					errs.pushCode(errCode?errCode+"-6":"CL006", "only a single "+tva.e_Character.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
+				if (foundOrganizationName>1)
+					errs.pushCode(errCode?errCode+"-7":"CL007", "only a single "+tva.e_OrganizationName.elementize()+" is permitted in "+tva.e_CreditsItem.elementize())
+				if (foundCharacter>0 && foundPersonName==0)
+					errs.pushCode(errCode?errCode+"-8":"CL008", tva.e_Character.elementize()+" in "+tva.e_CreditsItem.elementize()+" requires "+tva.e_PersonName.elementize())
+				if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
+					errs.pushCode(errCode?errCode+"-9":"CL009", tva.e_OrganizationName.elementize()+" can only be present when "+tva.e_PersonName.elementize()+" is absent in "+tva.e_CreditsItem.elementize())
 			})
 		
 			if (foundPersonName>1)
@@ -1078,16 +1147,15 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
     let HowRelated=null, Format=null, MediaLocator=[]
 
 	let children=RelatedMaterial.childNodes()
-	if (children) children.forEach(elem => {
-		if (elem.type()=='element')
-			switch (elem.name()) {
-				case tva.e_HowRelated:
-					HowRelated=elem
-					break
-				case tva.e_MediaLocator:
-					MediaLocator.push(elem)
-					break
-			}
+	if (children) children.forEachSubElement(elem => {
+		switch (elem.name()) {
+			case tva.e_HowRelated:
+				HowRelated=elem
+				break
+			case tva.e_MediaLocator:
+				MediaLocator.push(elem)
+				break
+		}
 	})
 
     if (!HowRelated) {
@@ -1103,8 +1171,8 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 			if (MediaLocator.length!=0) 
 				MediaLocator.forEach(ml => {
 					let subElems=ml.childNodes(), hasAuxiliaryURI=false
-					if (subElems) subElems.forEach(child => {
-						if (child.type()=='element' && child.name()==tva.e_AuxiliaryURI) {
+					if (subElems) subElems.forEachSubElement(child => {
+						if (child.name()==tva.e_AuxiliaryURI) {
 							hasAuxiliaryURI=true;
 							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentType], [], errs, "TA010")
 							if (child.attr(tva.a_contentType)) {
@@ -1140,20 +1208,18 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 	}
     let HowRelated=null, Format=null, MediaLocator=[]
 	let children=RelatedMaterial.childNodes()
-	if (children) children.forEach(elem => {
-		if (elem.type()=='element')
-			switch (elem.name()) {
-				case tva.e_HowRelated:
-					HowRelated=elem;
-					break;
-				case tva.e_Format:
-					Format=elem;
-					break;
-				case tva.e_MediaLocator:
-					MediaLocator.push(elem);
-					break;
-			}
-
+	if (children) children.forEachSubElement(elem => {
+		switch (elem.name()) {
+			case tva.e_HowRelated:
+				HowRelated=elem;
+				break;
+			case tva.e_Format:
+				Format=elem;
+				break;
+			case tva.e_MediaLocator:
+				MediaLocator.push(elem);
+				break;
+		}
 	})
 
     if (!HowRelated) {
@@ -1168,8 +1234,8 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 		else {
 			if (Format) {
 				let subElems=Format.childNodes(), hasStillPictureFormat=false
-				if (subElems) subElems.forEach(child => {
-					if (child.type()=='element' && child.name()==tva.e_StillPictureFormat) {
+				if (subElems) subElems.forEachSubElement(child => {
+					if (child.name()==tva.e_StillPictureFormat) {
 						hasStillPictureFormat=true;
 						
 						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_horizontalSize, tva.a_verticalSize, tva.a_href], [], errs, "PS021");
@@ -1190,8 +1256,8 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 			if (MediaLocator.length!=0) 
 				MediaLocator.forEach(ml => {
 					let subElems=ml.childNodes(), hasMediaURI=false
-					if (subElems) subElems.forEach(child => {
-						if (child.type()=='element' && child.name()==tva.e_MediaUri) {
+					if (subElems) subElems.forEachSubElement(child => {
+						if (child.name()==tva.e_MediaUri) {
 							hasMediaURI=true;
 							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentType], [], errs, "PS031")
 							if (child.attr(tva.a_contentType)) {
@@ -1483,65 +1549,63 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
 
 	let children=ProgramInformation.childNodes()
-	if (children) children.forEach(child => {
-		if (child.type()=="element") {
-			switch (child.name()) {
-				case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
-					if (requestType==CG_REQUEST_MORE_EPISODES)
-						errs.pushCode("PI021", tva.e_OtherIdentifier.elementize()+" is not permitted in this request type")
-					break;
-				case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
-					checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI031");
-					
-					// <ProgramInformation><EpisodeOf>@crid
-					if (child.attr(tva.a_crid)) {
-						let foundCRID=child.attr(tva.a_crid).value()
-						if (groupCRIDs && !isIni(groupCRIDs, foundCRID)) 
-							errs.pushCode("PI032", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_EpisodeOf.elementize())
-						else
-							if (!isCRIDURI(foundCRID))
-								errs.pushCode("PI033", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a valid CRID")
-					}
-					break;
-				case tva.e_MemberOf:			// <ProgramInformation><MemberOf>
-					switch (requestType) {
-						case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
-						case CG_REQUEST_SCHEDULE_WINDOW:
-							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI041");
-							if (child.attr(tva.a_crid) && child.attr(tva.a_crid).value()==dvbi.CRID_NOW)
-									isCurrentProgram=true
-							break;
-						default:
-							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI042");
-					}
-							
-					// <ProgramInformation><MemberOf>@xsi:type
-					if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
-						errs.pushCode("PI043", attribute("xsi:"+tva.a_type)+" must be "+tva.t_MemberOfType.quote()+" for "+ProgramInformation.name()+"."+tva.e_MemberOf)
+	if (children) children.forEachSubElement(child => {
+		switch (child.name()) {
+			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
+				if (requestType==CG_REQUEST_MORE_EPISODES)
+					errs.pushCode("PI021", tva.e_OtherIdentifier.elementize()+" is not permitted in this request type")
+				break;
+			case tva.e_EpisodeOf:			// <ProgramInformation><EpisodeOf>
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_crid], [], errs, "PI031");
 				
-					// <ProgramInformation><MemberOf>@crid
-					let foundCRID=null
-					if (child.attr(tva.a_crid)) {
-						foundCRID=child.attr(tva.a_crid).value();
-						if (groupCRIDs && !isIni(groupCRIDs, foundCRID)) 
-							errs.pushCode("PI044", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_MemberOf.elementize())
-						else
-							if (!isCRIDURI(foundCRID))
-								errs.pushCode("PI045", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a valid CRID")
-					}
-					
-					// <ProgramInformation><MemberOf>@index
-					if (child.attr(tva.a_index)) {
-						let index=valUnsignedInt(child.attr(tva.a_index).value())
-						let indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")"
-						if (isIni(indexes, indexInCRID))
-							errs.pushCode("PI046", tva.a_index.attribute(tva.e_MemberOf)+"="+index+" is in use by another "+ProgramInformation.name()+" element")
-						else 
-							indexes.push(indexInCRID);
-					}
-					break;			
-			}	
-		}
+				// <ProgramInformation><EpisodeOf>@crid
+				if (child.attr(tva.a_crid)) {
+					let foundCRID=child.attr(tva.a_crid).value()
+					if (groupCRIDs && !isIni(groupCRIDs, foundCRID)) 
+						errs.pushCode("PI032", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_EpisodeOf.elementize())
+					else
+						if (!isCRIDURI(foundCRID))
+							errs.pushCode("PI033", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_EpisodeOf)+"="+foundCRID.quote()+" is not a valid CRID")
+				}
+				break;
+			case tva.e_MemberOf:			// <ProgramInformation><MemberOf>
+				switch (requestType) {
+					case CG_REQUEST_SCHEDULE_NOWNEXT:  // xsi:type is optional for Now/Next
+					case CG_REQUEST_SCHEDULE_WINDOW:
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_index, tva.a_crid], [tva.a_type], errs, "PI041");
+						if (child.attr(tva.a_crid) && child.attr(tva.a_crid).value()==dvbi.CRID_NOW)
+								isCurrentProgram=true
+						break;
+					default:
+						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "PI042");
+				}
+						
+				// <ProgramInformation><MemberOf>@xsi:type
+				if (child.attr(tva.a_type) && child.attr(tva.a_type).value()!=tva.t_MemberOfType)
+					errs.pushCode("PI043", attribute("xsi:"+tva.a_type)+" must be "+tva.t_MemberOfType.quote()+" for "+ProgramInformation.name()+"."+tva.e_MemberOf)
+			
+				// <ProgramInformation><MemberOf>@crid
+				let foundCRID=null
+				if (child.attr(tva.a_crid)) {
+					foundCRID=child.attr(tva.a_crid).value();
+					if (groupCRIDs && !isIni(groupCRIDs, foundCRID)) 
+						errs.pushCode("PI044", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a defined Group CRID for "+tva.e_MemberOf.elementize())
+					else
+						if (!isCRIDURI(foundCRID))
+							errs.pushCode("PI045", tva.a_crid.attribute(ProgramInformation.name()+"."+tva.e_MemberOf)+"="+foundCRID.quote()+" is not a valid CRID")
+				}
+				
+				// <ProgramInformation><MemberOf>@index
+				if (child.attr(tva.a_index)) {
+					let index=valUnsignedInt(child.attr(tva.a_index).value())
+					let indexInCRID=(foundCRID?foundCRID:"noCRID")+"("+index+")"
+					if (isIni(indexes, indexInCRID))
+						errs.pushCode("PI046", tva.a_index.attribute(tva.e_MemberOf)+"="+index+" is in use by another "+ProgramInformation.name()+" element")
+					else 
+						indexes.push(indexInCRID);
+				}
+				break;			
+		}	
 	})
 
 	return isCurrentProgram?programCRID:null;
@@ -2705,24 +2769,22 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	let cnt=0, foundServiceIds=[], plCRIDs=[]
 
 	let children=ProgramLocationTable.childNodes()
-	if (children) children.forEach(child => {
-		if (child.type()=="element") {		
-			switch (child.name()) {
-				case tva.e_OnDemandProgram:
-					ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
-					cnt++;
-					break;
-				case tva.e_Schedule:
-					let thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs)
-					if (thisServiceIdRef.length)
-						if (isIni(foundServiceIds, thisServiceIdRef))
-							errs.pushCode("PL020", "A "+tva.e_Schedule.elementize()+" element with "+tva.a_serviceIDRef.attribute()+"="+thisServiceIdRef.quote()+" is already specified")
-						else 
-							foundServiceIds.push(thisServiceIdRef);
-					cnt++;
-					break;
-			}
-		}		
+	if (children) children.forEachSubElement(child => {
+		switch (child.name()) {
+			case tva.e_OnDemandProgram:
+				ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
+				cnt++;
+				break;
+			case tva.e_Schedule:
+				let thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs)
+				if (thisServiceIdRef.length)
+					if (isIni(foundServiceIds, thisServiceIdRef))
+						errs.pushCode("PL020", "A "+tva.e_Schedule.elementize()+" element with "+tva.a_serviceIDRef.attribute()+"="+thisServiceIdRef.quote()+" is already specified")
+					else 
+						foundServiceIds.push(thisServiceIdRef);
+				cnt++;
+				break;
+		}
 	})
 
 	if (o && o.childCount!=0) {
