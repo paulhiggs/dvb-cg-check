@@ -1367,29 +1367,28 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 			errs.pushCode(errCode?errCode+"-11":"VT011", tva.e_Title.elementize()+" length exceeds "+dvbi.MAX_TITLE_LENGTH+" characters")
 			
 		switch (titleType) {
-			case dvbi.TITLE_MAIN_TYPE:
+			case mpeg7.TITLE_MAIN_TYPE:
 				if (isIn(mainSet, titleLang))
-					errs.pushCode(errCode?errCode+"-12":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_MAIN_TYPE.quote())
+					errs.pushCode(errCode?errCode+"-12":"VT012", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute(tva.e_Title)+"="+mpeg7.TITLE_MAIN_TYPE.quote())
 				else mainSet.push(titleLang)
 				break
-			case dvbi.TITLE_SECONDARY_TYPE:
+			case mpeg7.TITLE_SECONDARY_TYPE:
 				if (allowSecondary) {
 					if (isIn(secondarySet, titleLang))
-						errs.pushCode(errCode?errCode+"-13":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_SECONDARY_TYPE.quote())
+						errs.pushCode(errCode?errCode+"-13":"VT013", "only a single language ("+titleLang+") is permitted for "+tva.a_type.attribute(tva.e_Title)+"="+mpeg7.TITLE_SECONDARY_TYPE.quote())
 					else secondarySet.push(titleLang)
 				}
 				else 
-					errs.pushCode(errCode?errCode+"-14":"VT014", tva.a_type.attribute(tva.e_Title)+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" is not permitted for this "+BasicDescription.name().elementize())
+					errs.pushCode(errCode?errCode+"-14":"VT014", tva.a_type.attribute(tva.e_Title)+"="+mpeg7.TITLE_SECONDARY_TYPE.quote()+" is not permitted for this "+BasicDescription.name().elementize())
 				break
 			default:	
-				errs.pushCode(errCode?errCode+"-15":"VT015", tva.a_type.attribute()+" must be "+dvbi.TITLE_MAIN_TYPE.quote()+" or "+dvbi.TITLE_SECONDARY_TYPE.quote()+" for "+tva.e_Title.elementize())
+				errs.pushCode(errCode?errCode+"-15":"VT015", tva.a_type.attribute()+" must be "+mpeg7.TITLE_MAIN_TYPE.quote()+" or "+mpeg7.TITLE_SECONDARY_TYPE.quote()+" for "+tva.e_Title.elementize())
 		}	
-		
 		
 		secondarySet.forEach(lang => {
 			if (!isIn(mainSet, lang)) {
 				let tLoc= lang!=DEFAULT_LANGUAGE ? " for @xml:"+tva.a_lang+"="+lang.quote() : ""
-				errs.pushCode(errCode?errCode+"-16":"VT016", tva.a_type.attribute()+"="+dvbi.TITLE_SECONDARY_TYPE.quote()+" specified without "+tva.a_type.attribute()+"="+dvbi.TITLE_MAIN_TYPE.quote()+tLloc)
+				errs.pushCode(errCode?errCode+"-16":"VT016", tva.a_type.attribute()+"="+mpeg7.TITLE_SECONDARY_TYPE.quote()+" specified without "+tva.a_type.attribute()+"="+mpeg7.TITLE_MAIN_TYPE.quote()+tLloc)
 			}
 		});
 	}
