@@ -45,7 +45,7 @@ const keyFilename=path.join(".", "selfsigned.key"), certFilename=path.join(".", 
 // convenience/readability values
 const DEFAULT_LANGUAGE="***"
 const CATEGORY_GROUP_NAME="\"category group\""
-const PARENT_GROUP_NAME="\"parent group\""
+// const PARENT_GROUP_NAME="\"parent group\""
 
 const CG_REQUEST_SCHEDULE_TIME="Time"
 const CG_REQUEST_SCHEDULE_NOWNEXT="NowNext"
@@ -90,15 +90,15 @@ const IANA_Subtag_Registry_Filename=path.join("./dvb-common", knownLanguages.Lan
       IANA_Subtag_Registry_URL=knownLanguages.LanguagesURL
 
 
+// based on the polyfill at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach 
 /*
- * alternate to Array.prototype.forEach that only returns XML tree nodes
- * that are elements
+ * alternate to Array.prototype.forEach that only returns XML tree nodes that are elements
 */
 if (!Array.prototype['forEachSubElement']) {
 
 	Array.prototype.forEachSubElement = function(callback, thisArg) {
   
-	  if (this == null) { throw new TypeError('Array.prototype.forEach called on null or undefined'); }
+	  if (this == null) { throw new TypeError('Array.prototype.forEachSubElement called on null or undefined'); }
   
 	  var T, k;
 	  // 1. Let O be the result of calling toObject() passing the
@@ -158,12 +158,13 @@ if (!Array.prototype['forEachSubElement']) {
  * @param {String} value The value to check for existance
  * @return {boolean} if value is in the set of values
  */
-function isIn(values, value){
+function isIn(values, value, caseSensitive=true){
+	let vlc=value.toLowerCase()
     if (typeof(values)=="string")
-        return values==value;
+        return caseSensitive? values==value : values.toLowerCase()==vlc
    
     if (typeof(values)=="object") 	
-		return values.includes(value)
+		return caseSensitive? values.includes(value) : (values.find(element => element.toLowerCase()==vlc) != undefined)
     
     return false;
 }
@@ -177,14 +178,7 @@ function isIn(values, value){
  * @return {boolean} if value is in the set of values
  */
 function isIni(values, value){
-	let vlc=value.toLowerCase()
-    if (typeof(values)=="string")
-        return values.toLowerCase()==vlc
-   
-	if (typeof(values)=="object")
-		return (values.find(element => element.toLowerCase()==vlc) != undefined)
-    
-    return false;
+	return isIn(values, value, false)
 }
 
 
