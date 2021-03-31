@@ -2137,8 +2137,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Coding, [tva.a_href], [], errs, "AV041")
 			if (Coding.attr(tva.a_href)) {
 				let codingHref=Coding.attr(tva.a_href).value()
-				if (codingHref!=dvbi.DVB_BITMAP_SUBTITLES && codingHref!=DVB_CHARACTER_SUBTITLES 
-				  && codingHref!=dvbi.EBU_TT_D)
+				if (codingHref!=dvbi.DVB_BITMAP_SUBTITLES && codingHref!=dvbi.DVB_CHARACTER_SUBTITLES && codingHref!=dvbi.EBU_TT_D)
 					errs.pushCode("AV042", tva.a_href.attribute(tva.e_CaptioningAttributes+"."+tva.e_Coding)+" is not valid - should be DVB (bitmap or character) or EBU TT-D")
 			}
 		}		
