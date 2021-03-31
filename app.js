@@ -687,13 +687,13 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 		
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Keyword, [], [tva.a_lang, tva.a_type], errs, "KW001");
 
-		let keywordType=Keyword.attr(tva.a_type)?Keyword.attr(tva.a_type).value():dvbi.DEFAULT_KEYWORD_TYPE
+		let keywordType=Keyword.attr(tva.a_type)?Keyword.attr(tva.a_type).value():tva.DEFAULT_KEYWORD_TYPE
 		let keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW002")
 
 		if (counts[keywordLang]===undefined)
 			counts[keywordLang]=1
 		else counts[keywordLang]++;
-		if (keywordType!=dvbi.KEYWORD_TYPE_MAIN && keywordType!=dvbi.KEYWORD_TYPE_OTHER)
+		if (keywordType!=tva.KEYWORD_TYPE_MAIN && keywordType!=tva.KEYWORD_TYPE_OTHER)
 			errs.pushCode(errCode?errCode+"-1":"KW011", tva.a_type.attribute()+"="+keywordType.quote()+" not permitted for "+tva.e_Keyword.elementize());
 		if (unEntity(Keyword.text()).length > dvbi.MAX_KEYWORD_LENGTH)
 			errs.pushCode(errCode?errCode+"-2":"KW012", " length of "+tva.e_Keyword.elementize()+" is greater than "+dvbi.MAX_KEYWORD_LENGTH)
@@ -725,8 +725,8 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 	let g=0, Genre, count=0
 	while (Genre=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, ++g), CG_SCHEMA)) {
 		count++;
-		let genreType=Genre.attr(tva.a_type)?Genre.attr(tva.a_type).value():dvbi.DEFAULT_GENRE_TYPE
-		if (genreType!=dvbi.GENRE_TYPE_MAIN)
+		let genreType=Genre.attr(tva.a_type)?Genre.attr(tva.a_type).value():tva.DEFAULT_GENRE_TYPE
+		if (genreType!=tva.GENRE_TYPE_MAIN)
 			errs.pushCode(errCode?errCode+"-1":"GE001", tva.a_type.attribute()+"="+genreType.quote()+" not permitted for "+tva.e_Genre.elementize());
 		
 		let genreValue=Genre.attr(tva.a_href)?Genre.attr(tva.a_href).value():""
