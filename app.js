@@ -496,7 +496,6 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	
 	// check that no additional child elements existance if the "Other Child Elements are OK" flag is not set
 	if (!isIn(optionalChildElements, OTHER_ELEMENTS_OK)) {
-		let c=0, child
 		let children=parentElement.childNodes()
 		if (children) children.forEachSubElement(child => {
 			let childName=child.name()
@@ -505,7 +504,6 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 				rv=false;
 			}
 		})
-
 	}
 	return rv;
 }
@@ -1138,7 +1136,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 		errs.pushCode("TA000", "ValidateTemplateAIT() called with RelatedMaterial==null")
 		return
 	}
-    let HowRelated=null, Format=null, MediaLocator=[]
+    let HowRelated=null, MediaLocator=[]
 
 	let children=RelatedMaterial.childNodes()
 	if (children) children.forEachSubElement(elem => {
@@ -1226,6 +1224,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 		if (HowRelated.attr(tva.a_href).value()!=dvbi.PROMOTIONAL_STILL_IMAGE_URI) 
 			errs.pushCode("PS010", tva.a_href.attribute(tva.e_HowRelated)+"="+HowRelated.attr(tva.a_href).value().quote()+" does not designate a Promotional Still Image")
 		else {
+			let isJPEG=false, isPNG=false
 			if (Format) {
 				let subElems=Format.childNodes(), hasStillPictureFormat=false
 				if (subElems) subElems.forEachSubElement(child => {
@@ -1236,10 +1235,16 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						
 						if (child.attr(tva.a_href)) {
 							let href=child.attr(tva.a_href).value()
-							if (href!=JPEG_IMAGE_CS_VALUE && href!=PNG_IMAGE_CS_VALUE) 
-								InvalidHrefValue(errs, href, RelatedMaterial.name()+"."+tva.e_Format+"."+tva.e_StillPictureFormat, Location, "PS022")
-							if (href==JPEG_IMAGE_CS_VALUE) isJPEG=true;
-							if (href==PNG_IMAGE_CS_VALUE) isPNG=true;
+							switch (href) {
+								case dvbi.JPEG_IMAGE_CS_VALUE:
+									isJPEG=true
+									break
+								case dvbi.PNG_IMAGE_CS_VALUE:
+									isPNG=true
+									break
+								default:
+									InvalidHrefValue(errs, href, RelatedMaterial.name()+"."+tva.e_Format+"."+tva.e_StillPictureFormat, Location, "PS022")
+							}
 						}
 					}
 				});
