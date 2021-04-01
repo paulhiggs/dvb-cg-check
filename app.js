@@ -37,7 +37,7 @@ const cgCheck=require('./cg-check.js')
  * @param {string}  lastInput the url or file name previously used - used to keep the form intact
  * @param {string}  lastType  the previously request type - used to keep the form intact
  * @param {string}  error     a single error message to display on the form, generally related to loading the content to validate
- * @param {Object}  errors    the errors and warnings found during the content guide validation
+ * @param {ErrorList}  errors    the errors and warnings found during the content guide validation
  */
  function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errors=null) {
 
@@ -74,16 +74,14 @@ const cgCheck=require('./cg-check.js')
 			res.write(" checked")
 		res.write(">"+choice.label+"</input>")
 	});
-
 	res.write(FORM_END);
-
     res.write(RESULT_WITH_INSTRUCTION);
 	if (error) 
 		res.write("<p>"+error+"</p>");
 	let resultsShown=false
 	if (errors) {
 		let tableHeader=false
-		for (let i in errors.counts) {
+		for (let i of errors.counts) {
 			if (errors.counts[i]!=0) {
 				if (!tableHeader) {
 					res.write(SUMMARY_FORM_HEADER);
@@ -93,7 +91,7 @@ const cgCheck=require('./cg-check.js')
 				resultsShown=true;
 			}
 		}
-		for (let i in errors.countsWarn) {
+		for (let i of errors.countsWarn) {
 			if (errors.countsWarn[i]!=0) {
 				if (!tableHeader) {
 					res.write(SUMMARY_FORM_HEADER);

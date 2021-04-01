@@ -497,9 +497,10 @@ function hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
  */
 function checkTAGUri(elem, errs, errCode=null) {
 	if (elem && elem.attr(tva.a_serviceIDRef)) {
-		if (!isTAGURI(elem.attr(tva.a_serviceIDRef).value()))
-			errs.pushCodeW(errCode?errCode:"UR001", `${tva.a_serviceIDRef.attribute(elem.name())} is not a TAG URI`)
-		return elem.attr(tva.a_serviceIDRef).value();
+		let svcID=elem.attr(tva.a_serviceIDRef).value()
+		if (!isTAGURI(svcID))
+			errs.pushCodeW(errCode?errCode:"UR001", `${tva.a_serviceIDRef.attribute(elem.name())} ${svcID.quote()} is not a TAG URI`)
+		return svcID
 	}
 	return "";
 }
@@ -655,7 +656,6 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 		return
 	}
 
-	console.log('DEFAULT_GENRE_TYPE=', tva.DEFAULT_GENRE_TYPE)
 	let g=0, Genre, count=0
 	while (Genre=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, ++g), CG_SCHEMA)) {
 		count++;
