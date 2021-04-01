@@ -1,7 +1,7 @@
 {
 	"name": "DVB-ContentGuide-Check",
 	"description": "DVB Content Guide metadata validator",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"private": true,
 	"dependencies": {
 		"command-line-args": "^5.1.1",
@@ -10,8 +10,7 @@
 		"libxmljs2": "^0.26.5",
 		"morgan": "^1.10.0",
 		"node-fetch": "^2.6.1",
-		"serve-favicon": "^2.5.0",
-		"sprintf-js": "^1.1.2"
+		"serve-favicon": "^2.5.0"
 	},
 	"engines": {
 		"node": ">= 15.0.0",

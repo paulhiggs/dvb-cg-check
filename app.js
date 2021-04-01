@@ -17,9 +17,6 @@ const morgan=require("morgan")
 
 // express-fileupload - https://github.com/richardgirges/express-fileupload#readme
 const fileUpload=require('express-fileupload')
-
-// https://github.com/alexei/sprintf.js
-var sprintf=require("sprintf-js").sprintf
 	
 const https=require("https")
 const keyFilename=path.join(".", "selfsigned.key"), certFilename=path.join(".", "selfsigned.crt")
@@ -47,9 +44,9 @@ const cgCheck=require('./cg-check.js')
 	const TABLE_STYLE="<style>table {border-collapse: collapse;border: 1px solid black;} th, td {text-align: left; padding: 8px; }	tr:nth-child(even) {background-color: #f2f2f2;}	</style>"
 	const FORM_TOP="<html><head>"+TABLE_STYLE+"<title>DVB-I Content Guide Validator</title></head><body>";
 	const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
-	const ENTRY_FORM_URL="<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"%s\"/><input type=\"submit\" value=\"submit\"/>";
 
-	const ENTRY_FORM_FILE="<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"%s\"/><input type=\"submit\" value=\"submit\"/>";
+	const ENTRY_FORM_URL=`<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"${lastInput ? lastInput : ""}\"/><input type=\"submit\" value=\"submit\"/>`
+	const ENTRY_FORM_FILE=`<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"${lastInput ? lastInput : ""}\"/><input type=\"submit\" value=\"submit\"/>`
 
 	const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
 
@@ -59,12 +56,14 @@ const cgCheck=require('./cg-check.js')
 
 	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
 	const SUMMARY_FORM_HEADER="<table><tr><th>item</th><th>count</th></tr>";
-	const DETAIL_FORM_HEADER="<table><tr><th>code</th><th>%s</th></tr>"
+	function DETAIL_FORM_HEADER(mode) {
+		return `<table><tr><th>code</th><th>${mode}</th></tr>`
+	}
 	const FORM_BOTTOM="</body></html>";	
 
     res.write(FORM_TOP);    
     res.write(PAGE_HEADING);
-    res.write(sprintf(URLmode?ENTRY_FORM_URL:ENTRY_FORM_FILE, lastInput ? lastInput : ""))
+    res.write(URLmode?ENTRY_FORM_URL:ENTRY_FORM_FILE)
 
 	res.write(ENTRY_FORM_REQUEST_TYPE_HEADER);
 
@@ -109,7 +108,7 @@ const cgCheck=require('./cg-check.js')
 		tableHeader=false;
 		errors.messages.forEach(function(value) {
 			if (!tableHeader) {
-				res.write(sprintf(DETAIL_FORM_HEADER, "errors"))
+				res.write(DETAIL_FORM_HEADER("errors"))
 				tableHeader=true;                    
 			}
 			if (value.includes(errors.delim)) {
@@ -125,7 +124,7 @@ const cgCheck=require('./cg-check.js')
 		tableHeader=false;
 		errors.messagesWarn.forEach(function(value)	{
 			if (!tableHeader) {
-				res.write(sprintf(DETAIL_FORM_HEADER, "warnings"));
+				res.write(DETAIL_FORM_HEADER("warnings"))
 				tableHeader=true;                    
 			}
 			if (value.includes(errors.delim)) {
@@ -164,6 +163,7 @@ function readmyfile(filename) {
     return null;
 }
 
+
 /**
  * checks is an object has none of its own properties
  * 
@@ -179,7 +179,6 @@ function isEmpty(obj) {
 }
 
 
-
 /**
  * Process the content guide specificed for errors and display them
  *
@@ -187,27 +186,11 @@ function isEmpty(obj) {
  * @param {Object} res The HTTP response to be sent to the client
  */ 
 function processQuery(req, res) {
-
-	function checkQuery(req) {
-		if (req.query) {
-			if (req.query.CGurl)
-				return true;
-			
-			return false;
-		}
-		return true;
-	}
-	
     if (isEmpty(req.query)) {
 		drawForm(true, res)  
 		res.end();
 	}  
-    else if (!checkQuery(req)) {
-        drawForm(true, res, req.query.CGurl, req.body.requestType, "URL not specified");
-        res.status(400);
-		res.end();
-    }
-    else {
+    else if (req && req.query && req.query.CGurl) {
 		function handleErrors(response) {
 			if (!response.ok) {
 				throw Error(response.statusText)
@@ -221,14 +204,16 @@ function processQuery(req, res) {
 			.then(errs => drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs))
 			.then(res => res.end())
 			.catch(error => {
-				console.dir(error)
-				let errMsg="error ("+error+") handling "+req.query.CGurl
-				console.log(errMsg)
-				drawForm(true, res, req.query.CGurl, req.body.requestType, errMsg, null)
+				drawForm(true, res, req.query.CGurl, req.body.requestType, `error (${error}) handling ${req.query.CGurl}`)
 				res.status(400)
 				res.end()
 			})
     }
+	else {
+        drawForm(true, res, req.query.CGurl, req.body.requestType, "URL not specified")
+        res.status(400)
+		res.end()
+	}
 }
 
 
@@ -239,37 +224,26 @@ function processQuery(req, res) {
  * @param {Object} res The HTTP response to be sent to the client
  */ 
 function processFile(req, res) {
-	
-	function checkFile(req) {
-		if (req.files) {
-			if (req.files.CGfile)
-				return true;
-			
-			return false;
-		}
-		return true;
-	}
-	
     if (isEmpty(req.query)) 
         drawForm(false, res);    
-    else if (!checkFile(req)) {
-        drawForm(false, res, req.files.CGfile.name, req.body.requestType, "File not specified");
-        res.status(400);
-    }
-    else {
+    else if (req && req.files && req.files.CGfile) {
         let CGxml=null, errs=new ErrorList(), fname="***"
 		if (req && req.files && req.files.CGfile) fname=req.files.CGfile.name;
         try {
             CGxml=req.files.CGfile.data;
         }
         catch (err) {
-            errs.pushCode("PF001", "retrieval of FILE ("+fname+") failed");
+            errs.pushCode("PF001", `retrieval of FILE ${fname} failed`)
         }
 		if (CGxml) 
 			cgCheck.doValidateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType, errs);
 		
         drawForm(false, res, fname, req.body.requestType, null, errs);
     }
+	else {
+        drawForm(false, res, req.files.CGfile.name, req.body.requestType, "File not specified")
+        res.status(400)
+	}
     res.end();
 }
 
@@ -345,7 +319,7 @@ app.get("*", function(req, res) {
 
 // start the HTTP server
 var http_server=app.listen(options.port, function() {
-    console.log("HTTP listening on port number", http_server.address().port);
+    console.log(`HTTP listening on port number ${http_server.address().port}`);
 });
 
 
@@ -363,6 +337,6 @@ if (https_options.key && https_options.cert) {
 		
     var https_server=https.createServer(https_options, app);
     https_server.listen(options.sport, function() {
-        console.log("HTTPS listening on port number", https_server.address().port);
+        console.log(`HTTPS listening on port number ${https_server.address().port}` )
     });
 }
