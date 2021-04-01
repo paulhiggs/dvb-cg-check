@@ -22,7 +22,6 @@ const libxml=require("libxmljs2")
 // convenience/readability values
 const DEFAULT_LANGUAGE="***"
 const CATEGORY_GROUP_NAME="\"category group\""
-// const PARENT_GROUP_NAME="\"parent group\""
 
 const CG_REQUEST_SCHEDULE_TIME="Time"
 const CG_REQUEST_SCHEDULE_NOWNEXT="NowNext"
@@ -2069,7 +2068,9 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	let va=0, VideoAttributes
 	while (VideoAttributes=AVAttributes.get(xPath(SCHEMA_PREFIX, tva.e_VideoAttributes, ++va), CG_SCHEMA)) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "AV030");
-		
+
+	/*
+	 * checked through schema validation
 		let HorizontalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_HorizontalSize), CG_SCHEMA)
 		if (HorizontalSize && valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
 			errs.pushCode("AV031", `${tva.e_HorizontalSize.elementize()} must be an unsigned short (0-${MAX_UNSIGNED_SHORT})`)
@@ -2081,6 +2082,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 		let AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_AspectRatio), CG_SCHEMA)
 		if (AspectRatio && !patterns.isRatioType(AspectRatio.text()))
 			errs.pushCode("AV033", `${tva.e_AspectRatio.elementize()} is not a valid aspect ratio`)
+	*/
 	}
 
 	// <CaptioningAttributes>
@@ -2417,16 +2419,22 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	
 	// <PublishedDuration>
 	let pd=0, PublishedDuration 
-	while (PublishedDuration=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration, ++pd), CG_SCHEMA)) 
+	while (PublishedDuration=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration, ++pd), CG_SCHEMA)) {
+	/*
+	 * checked in schema based validation
 		if (!patterns.isISODuration(PublishedDuration.text()))
 			errs.pushCode("OD050", `${OnDemandProgram.name()}.${tva.e_PublishedDuration} is not a valid ISO Duration (xs:duration)`)
+	 */
+	}
 	if (--pd>1)
 		errs.pushCode("OD051", `only a single ${tva.e_PublishedDuration.elementize()} is permitted in ${OnDemandProgram.name().elementize()}`)
 	
 	// <StartOfAvailability> and <EndOfAvailability>
 	let soa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_StartOfAvailability), CG_SCHEMA),
 	    eoa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_EndOfAvailability), CG_SCHEMA)
-	
+
+	/*
+	 * checked in schema based validation
 	if (soa) 
 		if (!patterns.isUTCDateTime(soa.text())) {
 			errs.pushCode("OD060", `${tva.e_StartOfAvailability.elementize()} must be expressed in Zulu time`)
@@ -2437,6 +2445,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 			errs.pushCode("OD061", `${tva.e_EndOfAvailability.elementize()} must be expressed in Zulu time`)
 			eoa=null;
 		}
+	*/
 	if (soa && eoa) {
 		let fr=new Date(soa.text()), to=new Date(eoa.text())	
 		if (to.getTime() < fr.getTime()) 
