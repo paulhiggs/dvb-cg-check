@@ -126,7 +126,7 @@ if (!Array.prototype['forEachSubElement']) {
   
 		  // ii. Call the Call internal method of callback with T as
 		  // the this value and argument list containing kValue, k, and O.
-		  if (T.type()=='element')
+		  if (kValue.type()=='element')
 		  	callback.call(T, kValue, k, O);
 		}
 		// d. Increase k by 1.
@@ -654,6 +654,8 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 		errs.pushCode("GE000", "ValidateGenre() called with BasicDescription=null")
 		return
 	}
+
+	console.log('DEFAULT_GENRE_TYPE=', tva.DEFAULT_GENRE_TYPE)
 	let g=0, Genre, count=0
 	while (Genre=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre, ++g), CG_SCHEMA)) {
 		count++;
@@ -2596,21 +2598,25 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	let serviceIdRef=checkTAGUri(Schedule, errs, "VS004");
 	let startSchedule=Schedule.attr(tva.a_start), fr=null, endSchedule=Schedule.attr(tva.a_end), to=null;
 	if (startSchedule)
-		if (patterns.isUTCDateTime(startSchedule.value())) 
+//		if (patterns.isUTCDateTime(startSchedule.value())) 
 			fr=new Date(startSchedule.value());
+/*
+ * checked in schama based validation
 		else {
 			errs.pushCode("VS010", `${tva.a_start.attribute(Schedule.name())} is not expressed in UTC format (${startSchedule.value()})`)
 			startSchedule=null;
 		}
-
+*/
 	if (endSchedule)
-		if (patterns.isUTCDateTime(endSchedule.value())) 
+//		if (patterns.isUTCDateTime(endSchedule.value())) 
 			to=new Date(endSchedule.value());
-		else {
+/*
+ * checked in schema based validation
+			else {
 			errs.pushCode("VS011", `${tva.a_end.attribute(Schedule.name())} is not expressed in UTC format (${endSchedule.value()})`)
 			endSchedule=null;
 		}
-
+*/
 	if (startSchedule && endSchedule) 
 		if (to.getTime() <= fr.getTime()) 
 			errs.pushCode("VS012", `${tva.a_start.attribute(Schedule.name())} must be earlier than ${tva.a_end.attribute()}`)
