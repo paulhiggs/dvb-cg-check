@@ -69,15 +69,15 @@ const cgCheck=require('./cg-check.js')
 
 	if (!lastType) lastType=cgCheck.supportedRequests[0].value;
 	cgCheck.supportedRequests.forEach(choice => {
-		res.write("<input type=\"radio\" name="+ENTRY_FORM_REQUEST_TYPE_ID.quote()+" value="+choice.value.quote());
+		res.write(`<input type=\"radio\" name=${ENTRY_FORM_REQUEST_TYPE_ID.quote()} value=${choice.value.quote()}`)
 		if (lastType==choice.value)
 			res.write(" checked")
-		res.write(">"+choice.label+"</input>")
+		res.write(`>${choice.label}</input>`)
 	});
 	res.write(FORM_END);
     res.write(RESULT_WITH_INSTRUCTION);
 	if (error) 
-		res.write("<p>"+error+"</p>");
+		res.write(`<p>${error}</p>`)
 	let resultsShown=false
 	if (errors) {
 		let tableHeader=false
@@ -87,7 +87,7 @@ const cgCheck=require('./cg-check.js')
 					res.write(SUMMARY_FORM_HEADER);
 					tableHeader=true;
 				}
-				res.write("<tr><td>"+phlib.HTMLize(i)+"</td><td>"+errors.counts[i]+"</td></tr>");
+				res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errors.counts[i]}</td></tr>`)
 				resultsShown=true;
 			}
 		}
@@ -97,7 +97,7 @@ const cgCheck=require('./cg-check.js')
 					res.write(SUMMARY_FORM_HEADER);
 					tableHeader=true;
 				}
-				res.write("<tr><td><i>"+phlib.HTMLize(i)+"</i></td><td>"+errors.countsWarn[i]+"</td></tr>");
+				res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errors.countsWarn[i]}</td></tr>`)
 				resultsShown=true;
 			}
 		}
@@ -111,10 +111,10 @@ const cgCheck=require('./cg-check.js')
 			}
 			if (value.includes(errors.delim)) {
 				let x=value.split(errors.delim)
-				res.write("<tr><td>"+phlib.HTMLize(x[0])+"</td><td>"+phlib.HTMLize(x[1])+"</td></tr>");	
+				res.write(`<tr><td>${phlib.HTMLize(x[0])}</td><td>${phlib.HTMLize(x[1])}</td></tr>`)	
 			}
 			else 
-				res.write("<tr><td></td><td>"+phlib.HTMLize(value)+"</td></tr>")
+				res.write(`<tr><td></td><td>${phlib.HTMLize(value)}</td></tr>`)
 			resultsShown=true;
 		});
 		if (tableHeader) res.write("</table><br/>");
@@ -127,10 +127,10 @@ const cgCheck=require('./cg-check.js')
 			}
 			if (value.includes(errors.delim)) {
 				let x=value.split(errors.delim)
-				res.write("<tr><td>"+x[0]+"</td><td>"+phlib.HTMLize(x[1])+"</td></tr>");	
+				res.write(`<tr><td>${x[0]}</td><td>${phlib.HTMLize(x[1])}</td></tr>`)	
 			}
 			else 
-				res.write("<tr><td></td><td>"+phlib.HTMLize(value)+"</td></tr>")
+				res.write(`<tr><td></td><td>${phlib.HTMLize(value)}</td></tr>`)
 
 			resultsShown=true;
 		});
@@ -263,15 +263,15 @@ morgan.token("protocol", function getProtocol(req) {
     return req.protocol;
 });
 morgan.token("parseErr", function getParseErr(req) {
-    if (req.parseErr) return "("+req.parseErr+")";
-    return "";
+    if (req.parseErr) return `(${req.parseErr})`
+    return ""
 });
 morgan.token("agent", function getAgent(req) {
-    return "("+req.headers["user-agent"]+")";
+    return `(${req.headers["user-agent"]})`;
 });
 morgan.token("cgLoc", function getCheckedLocation(req) {
-	if (req.files && req.files.CGfile) return "["+req.files.CGfile.name+"]";
-    if (req.query.CGurl) return "["+req.query.CGurl+"]";
+	if (req.files && req.files.CGfile) return `[${req.files.CGfile.name}]`
+    if (req.query.CGurl) return `[${req.query.CGurl}]`
 	return "[*]";
 });
 
