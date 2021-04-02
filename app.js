@@ -42,8 +42,8 @@ const cgCheck=require('./cg-check.js')
  function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errors=null) {
 
 	const TABLE_STYLE="<style>table {border-collapse: collapse;border: 1px solid black;} th, td {text-align: left; padding: 8px; }	tr:nth-child(even) {background-color: #f2f2f2;}	</style>"
-	const FORM_TOP="<html><head>"+TABLE_STYLE+"<title>DVB-I Content Guide Validator</title></head><body>";
-	const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
+	const FORM_TOP=`<html><head>${TABLE_STYLE}<title>DVB-I Content Guide Validator</title></head><body>`
+	const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>"
 
 	const ENTRY_FORM_URL=`<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"${lastInput ? lastInput : ""}\"/><input type=\"submit\" value=\"submit\"/>`
 	const ENTRY_FORM_FILE=`<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"${lastInput ? lastInput : ""}\"/><input type=\"submit\" value=\"submit\"/>`
