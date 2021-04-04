@@ -1,7 +1,7 @@
 {
-	"name": "DVB-ContentGuide-Check",
+	"name": "dvb-content-guide-check",
 	"description": "DVB Content Guide metadata validator",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"private": true,
 	"dependencies": {
 		"command-line-args": "^5.1.1",
