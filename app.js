@@ -83,26 +83,28 @@ const cgCheck=require('./cg-check.js');
 	let resultsShown=false;
 	if (errors) {
 		let tableHeader=false;
-		for (let i of errors.counts) {
-			if (errors.counts[i]!=0) {
-				if (!tableHeader) {
-					res.write(SUMMARY_FORM_HEADER);
-					tableHeader=true;
+		for (let i of errors.counts) 
+			if (errors.counts.hasOwnProperty(i)) {
+				if (errors.counts[i]!=0) {
+					if (!tableHeader) {
+						res.write(SUMMARY_FORM_HEADER);
+						tableHeader=true;
+					}
+					res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errors.counts[i]}</td></tr>`);
+					resultsShown=true;
 				}
-				res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errors.counts[i]}</td></tr>`);
-				resultsShown=true;
-			}
 		}
-		for (let i of errors.countsWarn) {
-			if (errors.countsWarn[i]!=0) {
-				if (!tableHeader) {
-					res.write(SUMMARY_FORM_HEADER);
-					tableHeader=true;
+		for (let i of errors.countsWarn) 
+			if (errors.countsWarn.hasOwnProperty(i)) {
+				if (errors.countsWarn[i]!=0) {
+					if (!tableHeader) {
+						res.write(SUMMARY_FORM_HEADER);
+						tableHeader=true;
+					}
+					res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errors.countsWarn[i]}</td></tr>`);
+					resultsShown=true;
 				}
-				res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errors.countsWarn[i]}</td></tr>`);
-				resultsShown=true;
 			}
-		}
 		if (tableHeader) res.write("</table><br/>");
 
 		tableHeader=false;
