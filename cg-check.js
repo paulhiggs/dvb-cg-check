@@ -1,4 +1,4 @@
-/*jshint esversion: 6 */
+/* jshint esversion: 6 */
 
 const phlib=require('./phlib/phlib');
 
@@ -19,6 +19,7 @@ const patterns=require("./dvb-common/pattern_checks.js");
 
 // libxmljs2 - github.com/marudor/libxmljs2
 const libxml=require("libxmljs2");
+const { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } = require('constants');
 
 
 // convenience/readability values
@@ -695,40 +696,42 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
 		errs.pushCode("PG000", "ValidateParentalGuidance() called with BasicDescription=null");
 		return;
 	}
-	let pg=0, ParentalGuidance, countParentalGuidance=0;
+
+	let countParentalGuidance=0, countExplanatoryText;
+	function checkPGchild(pgChild, index, array) {
+		switch (pgChild.name()) {
+			case tva.e_MinimumAge:
+			case tva.e_ParentalRating:
+				if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
+					errs.pushCode(errCode?`${errCode}-1`:"PG011", `first ${tva.e_ParentalGuidance.elementize()} element must contain ${phlib.elementize("mpeg7:"+tva.e_MinimumAge)}`);
+				
+				if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
+					errs.pushCode(errCode?`${errCode}-2`:"PG012", `${tva.e_MinimumAge.elementize()} must be in the first ${tva.e_ParentalGuidance.elementize()} element`);
+				
+				if (pgChild.name()==tva.e_ParentalRating) {
+					checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?`${errCode}-3`:"PG013");
+				}
+				break;		
+			case tva.e_ExplanatoryText:
+				countExplanatoryText++;
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_length], [], errs, errCode?`${errCode}-4`:"PG004") ;
+				if (pgChild.attr(tva.a_length)) {
+					if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
+						errs.pushCode(errCode?`${errCode}-3`:"PG003", `${tva.a_length.attribute()}=${pgChild.attr(tva.a_length).value().quote()} is not allowed for ${tva.e_ExplanatoryText.elementize()}`);
+				}
+				
+				if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
+					errs.pushCode(errCode?`${errCode}-5`:"PG005", `length of ${tva.e_ExplanatoryText.elementize()} cannot exceed ${dvbi.MAX_EXPLANATORY_TEXT_LENGTH} characters`);
+				break;
+		}
+	}
+	let pg=0, ParentalGuidance;
 	while ((ParentalGuidance=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_ParentalGuidance, ++pg), CG_SCHEMA))!=null) {
 		countParentalGuidance++;
-		
-		let countExplanatoryText=0, children=ParentalGuidance.childNodes();
-		/*jshint -W083 */
-		if (children) children.forEachSubElement( pgChild => {
-			switch (pgChild.name()) {
-				case tva.e_MinimumAge:
-				case tva.e_ParentalRating:
-					if (countParentalGuidance==1 && pgChild.name()!=tva.e_MinimumAge)
-						errs.pushCode(errCode?`${errCode}-1`:"PG011", `first ${tva.e_ParentalGuidance.elementize()} element must contain ${phlib.elementize("mpeg7:"+tva.e_MinimumAge)}`);
-					
-					if (pgChild.name()==tva.e_MinimumAge && countParentalGuidance!=1)
-						errs.pushCode(errCode?`${errCode}-2`:"PG012", `${tva.e_MinimumAge.elementize()} must be in the first ${tva.e_ParentalGuidance.elementize()} element`);
-					
-					if (pgChild.name()==tva.e_ParentalRating) {
-						checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_href], [], errs, errCode?`${errCode}-3`:"PG013");
-					}
-					break;		
-				case tva.e_ExplanatoryText:
-					countExplanatoryText++;
-					checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, pgChild, [tva.a_length], [], errs, errCode?`${errCode}-4`:"PG004") ;
-					if (pgChild.attr(tva.a_length)) {
-						if (pgChild.attr(tva.a_length).value()!=tva.v_lengthLong)
-							errs.pushCode(errCode?`${errCode}-3`:"PG003", `${tva.a_length.attribute()}=${pgChild.attr(tva.a_length).value().quote()} is not allowed for ${tva.e_ExplanatoryText.elementize()}`);
-					}
-					
-					if (unEntity(pgChild.text()).length > dvbi.MAX_EXPLANATORY_TEXT_LENGTH)
-						errs.pushCode(errCode?`${errCode}-5`:"PG005", `length of ${tva.e_ExplanatoryText.elementize()} cannot exceed ${dvbi.MAX_EXPLANATORY_TEXT_LENGTH} characters`);
-					break;
-			}
-		});
-		/*jshint +W083 */
+		countExplanatoryText=0;
+
+		if (ParentalGuidance.childNodes()) ParentalGuidance.childNodes().forEachSubElement(checkPGchild);
+
 		if (countExplanatoryText > 1)
 			errs.pushCode(errCode?`${errCode}-6`:"PG006", `only a single ${tva.e_ExplanatoryText.elementize()} element is premitted in ${tva.e_ParentalGuidance.elementize()}`);
 	}
@@ -798,6 +801,41 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 		errs.pushCode("CL000", "ValidateCreditsList() called with BasicDescription==null");
 		return;
 	}
+	let foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
+	function validateCreditsItemChildren() {
+		switch (elem.name()) {
+			case tva.e_PersonName:
+				foundPersonName++;
+				// required to have a GivenName optionally have a FamilyName
+				ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+				break;
+			case tva.e_Character:
+				foundCharacter++;
+				// required to have a GivenName optionally have a FamilyName
+				ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+				break;
+			case tva.e_OrganizationName:
+				foundOrganizationName++;
+				if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
+					errs.pushCode(errCode?`${errCode}-3`:"CL003", 
+						`length of ${tva.e_OrganizationName.elementize()} in ${tva.e_CreditsItem.elementize()} exceeds ${dvbi.MAX_ORGANIZATION_NAME_LENGTH} characters`);
+				break;
+			default:
+				if (elem.name()!="text")
+					errs.pushCode(errCode?`${errCode}-4`:"CL004", `extra element ${elem.name().elementize()} found in ${tva.e_CreditsItem.elementize()}`);
+		}
+		if (foundPersonName>1)
+			errs.pushCode(errCode?`${errCode}-5`:"CL005", singleElementError(tva.e_PersonName, tva.e_CreditsItem));
+		if (foundCharacter>1)
+			errs.pushCode(errCode?`${errCode}-6`:"CL006", singleElementError(tva.e_Character, tva.e_CreditsItem));
+		if (foundOrganizationName>1)
+			errs.pushCode(errCode?`${errCode}-7`:"CL007", singleElementError(tva.e_OrganizationName, tva.e_CreditsItem));
+		if (foundCharacter>0 && foundPersonName==0)
+			errs.pushCode(errCode?`${errCode}-8`:"CL008", `${tva.e_Character.elementize()} in ${tva.e_CreditsItem.elementize()} requires ${tva.e_PersonName.elementize()}`);
+		if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
+			errs.pushCode(errCode?`${errCode}-9`:"CL009", `${tva.e_OrganizationName.elementize()} can only be present when ${tva.e_PersonName.elementize()} is absent in ${tva.e_CreditsItem.elementize()}`);
+	}
+
 	let CreditsList=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_CreditsList), CG_SCHEMA);
 	if (CreditsList) {
 		let ci=0, CreditsItem;
@@ -809,44 +847,9 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 					errs.pushCode(errCode?`${errCode}-2`:"CL002", `${CreditsItemRole.quote()} is not valid for ${tva.a_role.attribute(tva.e_CreditsItem)}`);
 			}
 			
-			let foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
+			foundPersonName=0; foundCharacter=SSL_OP_SSLEAY_080_CLIENT_DH_BUG; foundOrganizationName=0;
+			if (CreditsItem.childNodes()) CreditsItem.childNodes().forEachSubElement(validateCreditsItemChildren);
 
-			let children=CreditsItem.childNodes();
-			/*jshint -W083 */
-			if (children) children.forEachSubElement(elem => {
-				switch (elem.name()) {
-					case tva.e_PersonName:
-						foundPersonName++;
-						// required to have a GivenName optionally have a FamilyName
-						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-						break;
-					case tva.e_Character:
-						foundCharacter++;
-						// required to have a GivenName optionally have a FamilyName
-						ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-						break;
-					case tva.e_OrganizationName:
-						foundOrganizationName++;
-						if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
-							errs.pushCode(errCode?`${errCode}-3`:"CL003", 
-								`length of ${tva.e_OrganizationName.elementize()} in ${tva.e_CreditsItem.elementize()} exceeds ${dvbi.MAX_ORGANIZATION_NAME_LENGTH} characters`);
-						break;
-					default:
-						if (elem.name()!="text")
-							errs.pushCode(errCode?`${errCode}-4`:"CL004", `extra element ${elem.name().elementize()} found in ${tva.e_CreditsItem.elementize()}`);
-				}
-				if (foundPersonName>1)
-					errs.pushCode(errCode?`${errCode}-5`:"CL005", singleElementError(tva.e_PersonName, tva.e_CreditsItem));
-				if (foundCharacter>1)
-					errs.pushCode(errCode?`${errCode}-6`:"CL006", singleElementError(tva.e_Character, tva.e_CreditsItem));
-				if (foundOrganizationName>1)
-					errs.pushCode(errCode?`${errCode}-7`:"CL007", singleElementError(tva.e_OrganizationName, tva.e_CreditsItem));
-				if (foundCharacter>0 && foundPersonName==0)
-					errs.pushCode(errCode?`${errCode}-8`:"CL008", `${tva.e_Character.elementize()} in ${tva.e_CreditsItem.elementize()} requires ${tva.e_PersonName.elementize()}`);
-				if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
-					errs.pushCode(errCode?`${errCode}-9`:"CL009", `${tva.e_OrganizationName.elementize()} can only be present when ${tva.e_PersonName.elementize()} is absent in ${tva.e_CreditsItem.elementize()}`);
-			});
-			/*jshint +W083 */
 			if (foundPersonName>1)
 				errs.pushCode(errCode?`${errCode}-10`:"CL010", singleElementError(tva.e_PersonName, tva.e_CreditsItem));
 			if (foundCharacter>1)
@@ -1309,6 +1312,15 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 	}
 	
 	let mainSet=[], secondarySet=[];
+
+	function analyseLang(lang, index, array) {
+		if (!isIn(mainSet, lang)) {
+			let tLoc= lang!=DEFAULT_LANGUAGE ? ` for @xml:${tva.a_lang}=${lang.quote()}` : "";
+			errs.pushCode(errCode?`${errCode}-16`:"VT016", 
+				`${tva.a_type.attribute()}=${mpeg7.TITLE_TYPE_SECONDARY.quote()} specified without ${tva.a_type.attribute()}=${mpeg7.TITLE_TYPE_MAIN.quote()}${tLoc}`);
+		}
+	}
+
 	let t=0, Title;
 	while ((Title=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_Title, ++t), CG_SCHEMA))!=null) {
 
@@ -1343,15 +1355,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 				errs.pushCode(errCode?`${errCode}-15`:"VT015", 
 						`${tva.a_type.attribute()} must be ${mpeg7.TITLE_TYPE_MAIN.quote()} or ${mpeg7.TITLE_TYPE_SECONDARYE.quote()} for ${tva.e_Title.elementize()}`);
 		}	
-		/*jshint -W083 */
-		secondarySet.forEach(lang => {
-			if (!isIn(mainSet, lang)) {
-				let tLoc= lang!=DEFAULT_LANGUAGE ? ` for @xml:${tva.a_lang}=${lang.quote()}` : "";
-				errs.pushCode(errCode?`${errCode}-16`:"VT016", 
-					`${tva.a_type.attribute()}=${mpeg7.TITLE_TYPE_SECONDARY.quote()} specified without ${tva.a_type.attribute()}=${mpeg7.TITLE_TYPE_MAIN.quote()}${tLoc}`);
-			}
-		});
-		/*jshint +W083 */
+		secondarySet.forEach(analyseLang);
 	}
 }
 
