@@ -28,8 +28,8 @@ const phlib=require('./phlib/phlib');
 const ErrorList=require("./dvb-common/ErrorList.js");
 
 // the content guide validation
-const cgCheck=require('./cg-check.js');
-
+const ContentGuideCheck=require('./cg-check.js');
+var cgcheck;
 
 /**
  * constructs HTML output of the errors found in the content guide analysis
@@ -69,8 +69,9 @@ const cgCheck=require('./cg-check.js');
 
 	res.write(ENTRY_FORM_REQUEST_TYPE_HEADER);
 
-	if (!lastType) lastType=cgCheck.supportedRequests[0].value;
-	cgCheck.supportedRequests.forEach(choice => {
+	if (!lastType) 
+		lastType=cgcheck.supportedRequests[0].value;
+	cgcheck.supportedRequests.forEach(choice => {
 		res.write(`<input type=\"radio\" name=${ENTRY_FORM_REQUEST_TYPE_ID.quote()} value=${choice.value.quote()}`);
 		if (lastType==choice.value)
 			res.write(" checked");
@@ -204,7 +205,7 @@ function processQuery(req, res) {
 		fetch(req.query.CGurl)
 			.then(handleErrors)
 			.then(response => response.text())
-			.then(res => cgCheck.validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType))
+			.then(res => cgcheck.validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType))
 			.then(errs => drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs))
 			.then(res => res.end())
 			.catch(error => {
@@ -240,12 +241,12 @@ function processFile(req, res) {
             errs.pushCode("PF001", `retrieval of FILE ${fname} failed`);
         }
 		if (CGxml) 
-			cgCheck.doValidateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType, errs);
+			cgcheck.doValidateContentGuide(CGxml.toString().replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType, errs);
 		
         drawForm(false, res, fname, req.body.requestType, null, errs);
     }
 	else {
-        drawForm(false, res, req.files.CGfile.name, req.body.requestType, "File not specified");
+        drawForm(false, res, (req.files && req.files.CGfile)?req.files.CGfile.name:null, req.body.requestType, "File not specified");
         res.status(400);
 	}
     res.end();
@@ -261,8 +262,8 @@ const optionDefinitions=[
 ];
 const options=commandLineArgs(optionDefinitions);
 
-// read in the validation data
-cgCheck.loadDataFiles(options.urls);
+cgcheck=new ContentGuideCheck(options.urls);
+
 
 //middleware
 morgan.token("protocol", function getProtocol(req) {

@@ -7,19 +7,21 @@ const fs=require("fs"), path=require("path");
 const fetch=require("node-fetch");
 
 const ErrorList=require("./dvb-common/ErrorList.js");
+const ClassificationScheme=require("./dvb-common/ClassificationScheme.js");
+const Role=require("./dvb-common/Role.js");
+
 const dvbi=require("./dvb-common/DVB-I_definitions.js");
 const tva=require("./dvb-common/TVA_definitions.js");
 const mpeg7=require("./dvb-common/MPEG7_definitions.js");
 
 const {isJPEGmime, isPNGmime}=require("./dvb-common/MIME_checks.js");
 const {isCRIDURI, isTAGURI}=require("./dvb-common/URI_checks.js");
-const {loadCS}=require("./dvb-common/CS_handler.js");
+const {xPath, xPathM, isIn, isIni, unEntity, parseISOduration}=require("./dvb-common/utils.js");
 
 const patterns=require("./dvb-common/pattern_checks.js");
 
 // libxmljs2 - github.com/marudor/libxmljs2
 const libxml=require("libxmljs2");
-const { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } = require('constants');
 
 
 // convenience/readability values
@@ -35,7 +37,7 @@ const CG_REQUEST_BS_CATEGORIES="bsCategories";
 const CG_REQUEST_BS_LISTS="bsLists";
 const CG_REQUEST_BS_CONTENTS="bsContents";
 
-module.exports.supportedRequests=[
+const supportedRequests=[
 	{value:CG_REQUEST_SCHEDULE_TIME, label:"Schedule Info (time stamp)"},
 	{value:CG_REQUEST_SCHEDULE_NOWNEXT, label:"Schedule Info (now/next)"},
 	{value:CG_REQUEST_SCHEDULE_WINDOW, label:"Schedule Info (window)"},
@@ -45,7 +47,6 @@ module.exports.supportedRequests=[
 	{value:CG_REQUEST_BS_LISTS, label:"Box Set Lists"},
 	{value:CG_REQUEST_BS_CONTENTS, label:"Box Set Contents"}];
 
-const MAX_UNSIGNED_SHORT=65535;
 const OTHER_ELEMENTS_OK="!!!";
 
 const REPO_RAW="https://raw.githubusercontent.com/paulhiggs/dvb-cg-check/master/",
@@ -68,339 +69,8 @@ const TVA_ContentCSFilename=path.join(DVB_COMMON_DIR, "tva", "ContentCS.xml"),
 	  DVBIv2_CreditsItemRolesURL=`${REPO_RAW}CreditsItem@role-values-v2.txt`;
   
 const TVAschemaFileName=path.join(".", "tva_metadata_3-1.xsd");
-var TVAschema;
 
 const IANAlanguages=require(`./${DVB_COMMON_DIR}/IANAlanguages.js`);
-
-var allowedGenres=[], allowedCreditItemRoles=[];
-var knownLanguages=new IANAlanguages();
-
-const IANA_Subtag_Registry_Filename=path.join("./dvb-common", knownLanguages.LanguagesFileName),
-      IANA_Subtag_Registry_URL=knownLanguages.LanguagesURL;
-
-
-// based on the polyfill at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach 
-/*
- * alternate to Array.prototype.forEach that only returns XML tree nodes that are elements
-*/
-if (!Array.prototype.forEachSubElement) {
-
-	Array.prototype.forEachSubElement = function(callback, thisArg) {
-  
-	  if (this == null) { throw new TypeError('Array.prototype.forEachSubElement called on null or undefined'); }
-  
-	  var T, k;
-	  // 1. Let O be the result of calling toObject() passing the
-	  // |this| value as the argument.
-	  var O = Object(this);
-  
-	  // 2. Let lenValue be the result of calling the Get() internal
-	  // method of O with the argument "length".
-	  // 3. Let len be toUint32(lenValue).
-	  var len = O.length >>> 0;
-  
-	  // 4. If isCallable(callback) is false, throw a TypeError exception.
-	  // See: https://es5.github.com/#x9.11
-	  if (typeof callback !== "function") { throw new TypeError(`${callback} is not a function`); }
-  
-	  // 5. If thisArg was supplied, let T be thisArg; else let
-	  // T be undefined.
-	  if (arguments.length > 1) { T = thisArg; }
-  
-	  // 6. Let k be 0
-	  k = 0;
-  
-	  // 7. Repeat, while k < len
-	  while (k < len) {
-  
-		var kValue;
-  
-		// a. Let Pk be ToString(k).
-		//    This is implicit for LHS operands of the in operator
-		// b. Let kPresent be the result of calling the HasProperty
-		//    internal method of O with argument Pk.
-		//    This step can be combined with c
-		// c. If kPresent is true, then
-		if (k in O) {
-  
-		  // i. Let kValue be the result of calling the Get internal
-		  // method of O with argument Pk.
-		  kValue = O[k];
-  
-		  // ii. Call the Call internal method of callback with T as
-		  // the this value and argument list containing kValue, k, and O.
-		  if (kValue.type()=='element')
-		  	callback.call(T, kValue, k, O);
-		}
-		// d. Increase k by 1.
-		k++;
-	  }
-	  // 8. return undefined
-	};
-  }
-
-
-/** 
- * checks is the specified element (elem) has an attribute named attrName and that its value is on the given list)
- *
- * @param {Node}    elem       the XML element to be checked
- * @param {string}  attrName   the name of the attribute carrying the boolean value
- * @param {string}  errno      the error number used as a prefix for reporting errors
- * @param {Class}   errs       errors found in validaton
- * @param {array}   allowed    the set or permitted values
- * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
- */
- function AllowedValue(elem, attrName, errno, errs, allowed, isRequired=true) {
-	if (!elem) {
-		errs.pushCode(`${errno}-0`, "AllowedValue() called with elem==null");
-		return;
-	}
-
-	if (elem.attr(attrName)) {
-		if (!isIn(allowed, elem.attr(attrName).value())) {
-			let str="";
-			allowed.forEach(value => {str=str+((str.length!=0)?" or ":"")+value;});
-			errs.pushCode(`${errno}-1`, `${attrName.attribute(`${elem.parent().name}.${elem.name()}`)} must be ${str}`);
-		}
-	}
-	else 
-		if (isRequired) 
-			errs.pushCode(`${errno}-2`, `${attrName.attribute()} must be specified for ${elem.parent().name()}.${elem.name()}`);
-}
-
-
-/** 
- * checks is the specified element (elem) has an attribute named attrName and that its value is "true" or "false"
- *
- * @param {Node}    elem       the XML element to be checked
- * @param {string}  attrName   the name of the attribute carrying the boolean value
- * @param {string}  errno      the error number used as a prefix for reporting errors
- * @param {Class}   errs       errors found in validaton
- * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
- */
-function BooleanValue(elem, attrName, errno, errs, isRequired=true) {
-	AllowedValue(elem, attrName, errno, errs, ["true", "false"], isRequired);
-}
-
-
-/** 
- * checks is the specified element (elem) has an attribute named attrName and that its value is "true"
- *
- * @param {Node}    elem       the XML element to be checked
- * @param {string}  attrName   the name of the attribute carrying the boolean value
- * @param {string}  errno      the error number used as a prefix for reporting errors
- * @param {Class}   errs       errors found in validaton
- * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
- */
-function TrueValue(elem, attrName, errno, errs, isRequired=true) {
-	AllowedValue(elem, attrName, errno, errs, ["true"], isRequired);
-}
-
-/** 
- * checks is the specified element (elem) has an attribute named attrName and that its value is "false"
- *
- * @param {Node}    elem       the XML element to be checked
- * @param {string}  attrName   the name of the attribute carrying the boolean value
- * @param {string}  errno      the error number used as a prefix for reporting errors
- * @param {Class}   errs       errors found in validaton
- * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
- */
-function FalseValue(elem, attrName, errno, errs, isRequired=true) {
-	AllowedValue(elem, attrName, errno, errs, ["false"], isRequired);
-}
-
-
-
-/**
- * determines if a value is in a set of values 
- *
- * @param {String or Array} values The set of values to check existance in
- * @param {String} value The value to check for existance
- * @return {boolean} if value is in the set of values
- */
-function isIn(values, value, caseSensitive=true){
-	let vlc=value.toLowerCase();
-    if (typeof(values)=="string")
-        return caseSensitive? values==value : values.toLowerCase()==vlc;
-   
-    if (typeof(values)=="object") 	
-		return caseSensitive? values.includes(value) : (values.find(element => element.toLowerCase()==vlc) != undefined);
-    
-    return false;
-}
-
-
-/**
- * determines if a value is in a set of values using a case insensitive comparison
- *
- * @param {String or Array} values The set of values to check existance in
- * @param {String} value The value to check for existance
- * @return {boolean} if value is in the set of values
- */
-function isIni(values, value){
-	return isIn(values, value, false);
-}
-
-
-/**
- * replace ENTITY strings with a generic characterSet
- *
- * @param {string} str string containing HTML or XML entities (starts with & ends with ;)
- * @return {string} the string with entities replaced with a single character '*'
- */
-function unEntity(str) {
-	return str.replace(/(&.+;)/ig, "*");
-}
-
-
-/**
- * counts the number of named elements in the specificed node 
- * *
- * @param {Object} node the libxmljs node to check
- * @param {String} childElementName the name of the child element to count
- * @returns {integer} the number of named child elments 
- */
-function CountChildElements(node, childElementName) {
-	let r=0, childElems=node?node.childNodes():null;
-	if (childElems) childElems.forEachSubElement(elem => {
-		if (elem.name()==childElementName)
-			r++;
-	});
-	return r;
-}
-
-
-/** 
- * verify the language using a validation class
- *
- * @param {object} validator  the validation class to use
- * @param {Class}  errs       errors found in validaton
- * @param {string} lang 	  that should be displayed in HTML
- * @param {string} loc        (optional) "location" of the language being checked
- * @param {string} errno      (optional) error number to use instead of local values
- */
-function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
-	if (!validator) {
-		errs.pushCode(errno?`${errno}-1`:"LA001", `cannot validate language ${lang.quote()}${loc?" for "+loc.elementize():""}`);
-		return false;
-	}
-	if (!validator.isKnown(lang))  {
-		errs.pushCode(errno?`${errno}-2`:"LA002", `language ${lang.quote()} specified${loc?" for "+loc.elementize():""} is invalid`);
-		return false;
-	}
-	return true;
-}
-
-
-/**
- * validate the language specified record any errors
- *
- * @param {object} validator  the validation class to use
- * @param {Class}  errs       errors found in validaton
- * @param {Object} node       the XML node whose @lang attribute should be checked
- * @param {string} parentLang the language of the XML element which is the parent of node
- * @param {boolean} isRequired report an error if @lang is not explicitly stated
- * @param {string} errno      (optional) error number to use instead of local values
- * @returns {string} the @lang attribute of the node element of the parentLang if it does not exist of is not specified
- */
-function GetLanguage(validator, errs, node, parentLang, isRequired=false, errno=null) {
-	if (!node) 
-		return parentLang;
-	if (!node.attr(tva.a_lang) && isRequired) {
-		errs.pushCode(errno?errno:"AC001", `${tva.a_lang.attribute()} is required for ${node.name().quote()}`);
-		return parentLang;		
-	}
-
-	if (!node.attr(tva.a_lang))
-		return parentLang;
-	
-	let localLang=node.attr(tva.a_lang).value();
-	CheckLanguage(validator, errs, localLang, node.name(), errno);
-	return localLang;
-}
-
- 
-
-
-/**
- * converts a decimal representation of a string to a number
- *
- * @param {string} str    string contining the decimal value
- * @returns {integer}  the decimal representation of the string, or 0 is non-digits are included
- */
-function valUnsignedInt(str) {
-	const intRegex=/[\d]+/;
-	let s=str.match(intRegex);
-	return s[0]===str?parseInt(str, 10):0;
-}
-
-
-// credit to https://gist.github.com/adriengibrat/e0b6d16cdd8c584392d8#file-parseduration-es5-js
-function parseISOduration(duration) {
-	var durationRegex = /^(-)?P(?:(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?|(\d+)W)$/;
-	var parsed;
-	if (duration) duration.replace(durationRegex, function (_, sign, year, month, day, hour, minute, second, week) {
-		sign = sign ? -1 : 1;
-		// parse number for each unit
-		var units = [year, month, day, hour, minute, second, week].map(function (num) { return parseInt(num, 10) * sign || 0; });
-		parsed = {year: units[0], month: units[1], week: units[6], day: units[2], hour: units[3], minute: units[4], second: units[5]};
-	} );
-	// no regexp match
-	if (!parsed) { throw new Error('Invalid duration "' + duration + '"'); }
-	/**
-	 * Sum or substract parsed duration to date
-	 *
-	 * @param {Date} date: A valid date instance
-	 * @throws {TypeError} When date is not valid
-	 * @returns {Date} Date plus or minus duration, according duration sign
-	 */
-	parsed.add = function add (date) {
-		if (Object.prototype.toString.call(date) !== '[object Date]' || isNaN(date.valueOf())) {
-			throw new TypeError('Invalid date');
-		}
-		return new Date(Date.UTC(
-			date.getUTCFullYear() + parsed.year,
-			date.getUTCMonth() + parsed.month,
-			date.getUTCDate() + parsed.day + parsed.week * 7,
-			date.getUTCHours() + parsed.hour,
-			date.getUTCMinutes() + parsed.minute,
-			date.getUTCSeconds() + parsed.second,
-			date.getUTCMilliseconds()
-		));
-	};
-	
-	return parsed;	
-}
-
-
-/**
- * constructs an XPath based on the provided arguments
- * 
- * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
- * @param {string} elementName the name of the element to be searched for
- * @param {int} index the instance of the named element to be searched for (if specified)
- * @returns {string} the XPath selector
- */
-function xPath(SCHEMA_PREFIX, elementName, index=null) {
-	return `${SCHEMA_PREFIX}:${elementName}${index?`[${index}]`:""}`;
-}
-
-
-/**
- * constructs an XPath based on the provided arguments
- * 
- * @param {string} SCHEMA_PREFIX Used when constructing Xpath queries
- * @param {array} elementNames the name of the element to be searched for
- * @returns {string} the XPath selector
- */
-function xPathM(SCHEMA_PREFIX, elementNames) {
-	let t="";
-	elementNames.forEach(elementName => {
-		if (t.length) t+="/";
-		t+=(`${SCHEMA_PREFIX}:${elementName}`);
-	});
-	return t;
-}
 
 
 /**
@@ -464,7 +134,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
 	
 	requiredAttributes.forEach(attributeName => {
 		if (!parentElement.attr(attributeName)) {
-			let p=`${(parentElement.parent()?`${parentElement.parent().name()}."`:"")}${parentElement.name()}`;
+			let p=`${(parentElement.parent()?`${parentElement.parent().name()}.`:"")}${parentElement.name()}`;
 			errs.pushCode(errCode?`${errCode}-1`:"AT001", `${attributeName.attribute(`${p}`)} is a required attribute`);
 		}
 	});
@@ -480,6 +150,238 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
 
 
 /**
+ * converts a decimal representation of a string to a number
+ *
+ * @param {string} str    string contining the decimal value
+ * @returns {integer}  the decimal representation of the string, or 0 is non-digits are included
+ */
+ function valUnsignedInt(str) {
+	const intRegex=/[\d]+/;
+	let s=str.match(intRegex);
+	return s[0]===str?parseInt(str, 10):0;
+}
+
+
+/** 
+ * checks is the specified element (elem) has an attribute named attrName and that its value is on the given list)
+ *
+ * @param {Node}    elem       the XML element to be checked
+ * @param {string}  attrName   the name of the attribute carrying the boolean value
+ * @param {string}  errno      the error number used as a prefix for reporting errors
+ * @param {Class}   errs       errors found in validaton
+ * @param {array}   allowed    the set or permitted values
+ * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
+ */
+ function AllowedValue(elem, attrName, errno, errs, allowed, isRequired=true) {
+	if (!elem) {
+		errs.pushCode(`${errno}-0`, "AllowedValue() called with elem==null");
+		return;
+	}
+
+	if (elem.attr(attrName)) {
+		if (!isIn(allowed, elem.attr(attrName).value())) {
+			let str="";
+			allowed.forEach(value => {str=str+((str.length!=0)?" or ":"")+value;});
+			errs.pushCode(`${errno}-1`, `${attrName.attribute(`${elem.parent().name}.${elem.name()}`)} must be ${str}`);
+		}
+	}
+	else 
+		if (isRequired) 
+			errs.pushCode(`${errno}-2`, `${attrName.attribute()} must be specified for ${elem.parent().name()}.${elem.name()}`);
+}
+
+
+/** 
+ * checks is the specified element (elem) has an attribute named attrName and that its value is "true" or "false"
+ *
+ * @param {Node}    elem       the XML element to be checked
+ * @param {string}  attrName   the name of the attribute carrying the boolean value
+ * @param {string}  errno      the error number used as a prefix for reporting errors
+ * @param {Class}   errs       errors found in validaton
+ * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
+ */
+ function BooleanValue(elem, attrName, errno, errs, isRequired=true) {
+	AllowedValue(elem, attrName, errno, errs, ["true", "false"], isRequired);
+}
+
+
+/** 
+ * checks is the specified element (elem) has an attribute named attrName and that its value is "true"
+ *
+ * @param {Node}    elem       the XML element to be checked
+ * @param {string}  attrName   the name of the attribute carrying the boolean value
+ * @param {string}  errno      the error number used as a prefix for reporting errors
+ * @param {Class}   errs       errors found in validaton
+ * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
+ */
+ function TrueValue(elem, attrName, errno, errs, isRequired=true) {
+	AllowedValue(elem, attrName, errno, errs, ["true"], isRequired);
+}
+
+/** 
+ * checks is the specified element (elem) has an attribute named attrName and that its value is "false"
+ *
+ * @param {Node}    elem       the XML element to be checked
+ * @param {string}  attrName   the name of the attribute carrying the boolean value
+ * @param {string}  errno      the error number used as a prefix for reporting errors
+ * @param {Class}   errs       errors found in validaton
+ * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
+ */
+function FalseValue(elem, attrName, errno, errs, isRequired=true) {
+	AllowedValue(elem, attrName, errno, errs, ["false"], isRequired);
+}
+
+
+/** 
+ * verify the language using a validation class
+ *
+ * @param {object} validator  the validation class to use
+ * @param {Class}  errs       errors found in validaton
+ * @param {string} lang 	  that should be displayed in HTML
+ * @param {string} loc        (optional) "location" of the language being checked
+ * @param {string} errno      (optional) error number to use instead of local values
+ */
+function CheckLanguage(validator, errs, lang, loc=null, errno=null ) {
+	if (!validator) {
+		errs.pushCode(errno?`${errno}-1`:"LA001", `cannot validate language ${lang.quote()}${loc?" for "+loc.elementize():""}`);
+		return false;
+	}
+	if (!validator.isKnown(lang))  {
+		errs.pushCode(errno?`${errno}-2`:"LA002", `language ${lang.quote()} specified${loc?" for "+loc.elementize():""} is invalid`);
+		return false;
+	}
+	return true;
+}
+
+
+class ContentGuideCheck {
+
+	constructor(useURLs) {
+		this.allowedGenres=new ClassificationScheme();
+		this.allowedCreditItemRoles=new Role();
+		this.knownLanguages=new IANAlanguages();
+		this.TVAschema=null;
+
+		this.IANA_Subtag_Registry_Filename=path.join("./dvb-common", this.knownLanguages.LanguagesFileName);
+		this.IANA_Subtag_Registry_URL=this.knownLanguages.LanguagesURL;
+
+		this.supportedRequests=supportedRequests;
+
+		this.extendArray();
+		this.loadDataFiles(useURLs);
+	}
+
+/*private*/ extendArray() {
+	// based on the polyfill at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach 
+	/*
+	* alternate to Array.prototype.forEach that only returns XML tree nodes that are elements
+	*/
+	if (!Array.prototype.forEachSubElement) {
+
+		Array.prototype.forEachSubElement = function(callback, thisArg) {
+	
+		if (this == null) { throw new TypeError('Array.prototype.forEachSubElement called on null or undefined'); }
+	
+		var T, k;
+		// 1. Let O be the result of calling toObject() passing the
+		// |this| value as the argument.
+		var O = Object(this);
+	
+		// 2. Let lenValue be the result of calling the Get() internal
+		// method of O with the argument "length".
+		// 3. Let len be toUint32(lenValue).
+		var len = O.length >>> 0;
+	
+		// 4. If isCallable(callback) is false, throw a TypeError exception.
+		// See: https://es5.github.com/#x9.11
+		if (typeof callback !== "function") { throw new TypeError(`${callback} is not a function`); }
+	
+		// 5. If thisArg was supplied, let T be thisArg; else let
+		// T be undefined.
+		if (arguments.length > 1) { T = thisArg; }
+	
+		// 6. Let k be 0
+		k = 0;
+	
+		// 7. Repeat, while k < len
+		while (k < len) {
+	
+			var kValue;
+	
+			// a. Let Pk be ToString(k).
+			//    This is implicit for LHS operands of the in operator
+			// b. Let kPresent be the result of calling the HasProperty
+			//    internal method of O with argument Pk.
+			//    This step can be combined with c
+			// c. If kPresent is true, then
+			if (k in O) {
+	
+			// i. Let kValue be the result of calling the Get internal
+			// method of O with argument Pk.
+			kValue = O[k];
+	
+			// ii. Call the Call internal method of callback with T as
+			// the this value and argument list containing kValue, k, and O.
+			if (kValue.type()=='element')
+				callback.call(T, kValue, k, O);
+			}
+			// d. Increase k by 1.
+			k++;
+		}
+		// 8. return undefined
+		};
+	}
+}
+
+
+
+
+/**
+ * counts the number of named elements in the specificed node 
+ * *
+ * @param {Object} node the libxmljs node to check
+ * @param {String} childElementName the name of the child element to count
+ * @returns {integer} the number of named child elments 
+ */
+/* private */  CountChildElements(node, childElementName) {
+	let r=0, childElems=node?node.childNodes():null;
+	if (childElems) childElems.forEachSubElement(elem => {
+		if (elem.name()==childElementName)
+			r++;
+	});
+	return r;
+}
+
+
+/**
+ * validate the language specified record any errors
+ *
+ * @param {object} validator  the validation class to use
+ * @param {Class}  errs       errors found in validaton
+ * @param {Object} node       the XML node whose @lang attribute should be checked
+ * @param {string} parentLang the language of the XML element which is the parent of node
+ * @param {boolean} isRequired report an error if @lang is not explicitly stated
+ * @param {string} errno      (optional) error number to use instead of local values
+ * @returns {string} the @lang attribute of the node element of the parentLang if it does not exist of is not specified
+ */
+/* private */  GetLanguage(validator, errs, node, parentLang, isRequired=false, errno=null) {
+	if (!node) 
+		return parentLang;
+	if (!node.attr(tva.a_lang) && isRequired) {
+		errs.pushCode(errno?errno:"AC001", `${tva.a_lang.attribute()} is required for ${node.name().quote()}`);
+		return parentLang;		
+	}
+
+	if (!node.attr(tva.a_lang))
+		return parentLang;
+	
+	let localLang=node.attr(tva.a_lang).value();
+	CheckLanguage(validator, errs, localLang, node.name(), errno);
+	return localLang;
+}
+
+
+/**
  * check if the specificed element has the named child elemeny
  * 
  * @param {string} CG_SCHEMA       Used when constructing Xpath queries
@@ -488,7 +390,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
  * @param {string} elementName     the name of the child element
  * @returns {boolean} true if an element named node.elementName exists, else false
  */
-function hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
+/* private */  hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
 	if (!node) return false;
 	return (node.get(xPath(SCHEMA_PREFIX, elementName), CG_SCHEMA)!=null);
 }
@@ -502,7 +404,7 @@ function hasElement(CG_SCHEMA, SCHEMA_PREFIX,  node, elementName) {
  * @param {string} errCode    error code prefix to be used in reports, if not present then use local codes
  * @returns {string} the serviceIdRef, whether it is valid of not
  */
-function checkTAGUri(elem, errs, errCode=null) {
+/* private */  checkTAGUri(elem, errs, errCode=null) {
 	if (elem && elem.attr(tva.a_serviceIDRef)) {
 		let svcID=elem.attr(tva.a_serviceIDRef).value();
 		if (!isTAGURI(svcID))
@@ -526,7 +428,7 @@ function checkTAGUri(elem, errs, errCode=null) {
  * @param {string} parentLanguage	   the xml:lang of the parent element to ProgramInformation
  * @param {string} errCode             error code prefix to be used in reports, if not present then use local codes
  */
-function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
+/* private */  ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
 	
 	function synopsisLengthError(label, length) {
 		return `length of ${tva.a_length.attribute(tva.e_Synopsis)}=${label.quote()} exceeds ${length} characters`; }
@@ -545,7 +447,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 		
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Synopsis, [tva.a_length], [tva.a_lang], errs, "SY001");
 
-		let synopsisLang=GetLanguage(knownLanguages, errs, Synopsis, parentLanguage, false, "SY002");
+		let synopsisLang=this.GetLanguage(this.knownLanguages, errs, Synopsis, parentLanguage, false, "SY002");
 		let synopsisLength=Synopsis.attr(tva.a_length)?Synopsis.attr(tva.a_length).value():null;
 		
 		if (synopsisLength) {
@@ -564,7 +466,6 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
 				case tva.SYNOPSIS_LONG_LABEL:
 					if ((unEntity(Synopsis.text()).length) > tva.SYNOPSIS_LONG_LENGTH)
 						errs.pushCode(errCode?`${errCode}-13`:"SY013", synopsisLengthError(tva.SYNOPSIS_LONG_LABEL, tva.SYNOPSIS_LONG_LENGTH));
-					hasLong=true;
 					hasLong=true;
 					break;						
 				}
@@ -615,7 +516,7 @@ function ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLe
  * @param {string}  parentLanguage	    the xml:lang of the parent element to ProgramInformation
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
-function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs, parentLanguage, errCode=null) {
+/* private */  ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords, maxKeywords, errs, parentLanguage, errCode=null) {
 
 	if (!BasicDescription) {
 		errs.pushCode("KW000", "ValidateKeyword() called with BasicDescription=null");
@@ -627,7 +528,7 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Keyword, [], [tva.a_lang, tva.a_type], errs, "KW001");
 
 		let keywordType=Keyword.attr(tva.a_type)?Keyword.attr(tva.a_type).value():tva.DEFAULT_KEYWORD_TYPE;
-		let keywordLang=GetLanguage(knownLanguages, errs, Keyword, parentLanguage, false, "KW002");
+		let keywordLang=this.GetLanguage(this.knownLanguages, errs, Keyword, parentLanguage, false, "KW002");
 
 		if (counts[keywordLang]===undefined)
 			counts[keywordLang]=1;
@@ -656,7 +557,7 @@ function ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minKeywords
  * @param {Class}   errs                errors found in validaton
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
-function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, maxGenres, errs, errCode=null) {
+/* private */  ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, maxGenres, errs, errCode=null) {
 
 	if (!BasicDescription) {
 		errs.pushCode("GE000", "ValidateGenre() called with BasicDescription=null");
@@ -671,7 +572,7 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
 			errs.pushCode(errCode?`${errCode}-1`:"GE001", `${tva.a_type.attribute()}=${genreType.quote()} not permitted for ${tva.e_Genre.elementize()}`);
 		
 		let genreValue=Genre.attr(tva.a_href)?Genre.attr(tva.a_href).value():"";
-		if (!isIn(allowedGenres, genreValue))
+		if (!this.allowedGenres.isIn(genreValue))
 			errs.pushCode(errCode?`${errCode}-2`:"GE002", `invalid ${tva.a_href.attribute()} value ${genreValue.quote()} for ${tva.e_Genre.elementize()}`);
 	}
 	if (count>maxGenres)
@@ -689,7 +590,7 @@ function ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minGenres, ma
  * @param {Class}   errs                errors found in validaton
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
-function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minPGelements, maxPGelements, errs, errCode=null) {
+/* private */  ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minPGelements, maxPGelements, errs, errCode=null) {
 	// first <ParentalGuidance> element must contain an <mpeg7:MinimumAge> element
 
 	if (!BasicDescription) {
@@ -749,7 +650,7 @@ function ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, mi
  * @param {Class}   errs             errors found in validaton
  * @param {string}  errCode          error code prefix to be used in reports, if not present then use local codes
  */
-function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
+/* private */  ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
 	
 	function checkNamePart(elem, errs, errCode=null) {
 		if (unEntity(elem.text()).length > dvbi.MAX_NAME_PART_LENGTH)	
@@ -792,7 +693,7 @@ function ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs, errCode=null) {
  * @param {Class}   errs                errors found in validaton
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
-function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, errCode=null) {
+/* private */  ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, errCode=null) {
 	
 	function singleElementError(elementname, parentElemmentName) {
 		return `only a single ${elementname.elementize()} is permitted in ${parentElemmentName.elementize()}`;
@@ -801,41 +702,6 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 		errs.pushCode("CL000", "ValidateCreditsList() called with BasicDescription==null");
 		return;
 	}
-	let foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
-	function validateCreditsItemChildren() {
-		switch (elem.name()) {
-			case tva.e_PersonName:
-				foundPersonName++;
-				// required to have a GivenName optionally have a FamilyName
-				ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-				break;
-			case tva.e_Character:
-				foundCharacter++;
-				// required to have a GivenName optionally have a FamilyName
-				ValidateName(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
-				break;
-			case tva.e_OrganizationName:
-				foundOrganizationName++;
-				if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
-					errs.pushCode(errCode?`${errCode}-3`:"CL003", 
-						`length of ${tva.e_OrganizationName.elementize()} in ${tva.e_CreditsItem.elementize()} exceeds ${dvbi.MAX_ORGANIZATION_NAME_LENGTH} characters`);
-				break;
-			default:
-				if (elem.name()!="text")
-					errs.pushCode(errCode?`${errCode}-4`:"CL004", `extra element ${elem.name().elementize()} found in ${tva.e_CreditsItem.elementize()}`);
-		}
-		if (foundPersonName>1)
-			errs.pushCode(errCode?`${errCode}-5`:"CL005", singleElementError(tva.e_PersonName, tva.e_CreditsItem));
-		if (foundCharacter>1)
-			errs.pushCode(errCode?`${errCode}-6`:"CL006", singleElementError(tva.e_Character, tva.e_CreditsItem));
-		if (foundOrganizationName>1)
-			errs.pushCode(errCode?`${errCode}-7`:"CL007", singleElementError(tva.e_OrganizationName, tva.e_CreditsItem));
-		if (foundCharacter>0 && foundPersonName==0)
-			errs.pushCode(errCode?`${errCode}-8`:"CL008", `${tva.e_Character.elementize()} in ${tva.e_CreditsItem.elementize()} requires ${tva.e_PersonName.elementize()}`);
-		if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
-			errs.pushCode(errCode?`${errCode}-9`:"CL009", `${tva.e_OrganizationName.elementize()} can only be present when ${tva.e_PersonName.elementize()} is absent in ${tva.e_CreditsItem.elementize()}`);
-	}
-
 	let CreditsList=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_CreditsList), CG_SCHEMA);
 	if (CreditsList) {
 		let ci=0, CreditsItem;
@@ -843,13 +709,47 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, CreditsItem, [tva.a_role], [], errs, errCode?e`${errCode}-1`:"CL001");
 			if (CreditsItem.attr(tva.a_role)) {
 				let CreditsItemRole=CreditsItem.attr(tva.a_role).value();
-				if (!isIn(allowedCreditItemRoles, CreditsItemRole))
+				if (!this.allowedCreditItemRoles.isIn(CreditsItemRole))
 					errs.pushCode(errCode?`${errCode}-2`:"CL002", `${CreditsItemRole.quote()} is not valid for ${tva.a_role.attribute(tva.e_CreditsItem)}`);
 			}
 			
-			foundPersonName=0; foundCharacter=SSL_OP_SSLEAY_080_CLIENT_DH_BUG; foundOrganizationName=0;
-			if (CreditsItem.childNodes()) CreditsItem.childNodes().forEachSubElement(validateCreditsItemChildren);
-
+			let foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
+			/* jshint -W083 */
+			let vn=this.ValidateName;  // since this. is no allowed in => 
+			if (CreditsItem.childNodes()) CreditsItem.childNodes().forEachSubElement(elem => {
+				switch (elem.name()) {
+					case tva.e_PersonName:
+						foundPersonName++;
+						// required to have a GivenName optionally have a FamilyName
+						vn(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+						break;
+					case tva.e_Character:
+						foundCharacter++;
+						// required to have a GivenName optionally have a FamilyName
+						vn(CG_SCHEMA, SCHEMA_PREFIX, elem, errs );
+						break;
+					case tva.e_OrganizationName:
+						foundOrganizationName++;
+						if (unEntity(elem.text()).length > dvbi.MAX_ORGANIZATION_NAME_LENGTH)
+							errs.pushCode(errCode?`${errCode}-3`:"CL003", 
+								`length of ${tva.e_OrganizationName.elementize()} in ${tva.e_CreditsItem.elementize()} exceeds ${dvbi.MAX_ORGANIZATION_NAME_LENGTH} characters`);
+						break;
+					default:
+						if (elem.name()!="text")
+							errs.pushCode(errCode?`${errCode}-4`:"CL004", `extra element ${elem.name().elementize()} found in ${tva.e_CreditsItem.elementize()}`);
+				}
+				if (foundPersonName>1)
+					errs.pushCode(errCode?`${errCode}-5`:"CL005", singleElementError(tva.e_PersonName, tva.e_CreditsItem));
+				if (foundCharacter>1)
+					errs.pushCode(errCode?`${errCode}-6`:"CL006", singleElementError(tva.e_Character, tva.e_CreditsItem));
+				if (foundOrganizationName>1)
+					errs.pushCode(errCode?`${errCode}-7`:"CL007", singleElementError(tva.e_OrganizationName, tva.e_CreditsItem));
+				if (foundCharacter>0 && foundPersonName==0)
+					errs.pushCode(errCode?`${errCode}-8`:"CL008", `${tva.e_Character.elementize()} in ${tva.e_CreditsItem.elementize()} requires ${tva.e_PersonName.elementize()}`);
+				if (foundOrganizationName>0 && (foundPersonName>0 || foundCharacter>0))
+					errs.pushCode(errCode?`${errCode}-9`:"CL009", `${tva.e_OrganizationName.elementize()} can only be present when ${tva.e_PersonName.elementize()} is absent in ${tva.e_CreditsItem.elementize()}`);
+			});
+			/* jshint +W083 */
 			if (foundPersonName>1)
 				errs.pushCode(errCode?`${errCode}-10`:"CL010", singleElementError(tva.e_PersonName, tva.e_CreditsItem));
 			if (foundCharacter>1)
@@ -870,7 +770,7 @@ function ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, e
  * @param {Class}   errs              errors found in validaton
  * @returns {boolean}  true if the RelatedMaterial element is evaluated here
  */
-function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
+/* private */  CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
 
 	if (!RelatedMaterial) {
 		errs.pushCode("IRM000", "CheckImageRelatedMaterial() called with RelatedMaterial==null");
@@ -911,7 +811,7 @@ function CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, er
  * @param {integer} maxRMelements       the maximum number of RelatedMaterial elements
  * @param {Class}   errs                errors found in validaton
  */
-function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
+/* private */  ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, minRMelements, maxRMelements, errs) {
 	
 	if (!BasicDescription) {
 		errs.pushCode("RM000", "ValidateRelatedMaterial() called with BasicDescription==null");
@@ -920,7 +820,7 @@ function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, min
 	let rm=0, RelatedMaterial, countRelatedMaterial=0;
 	while ((RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA))!=null) {
 		countRelatedMaterial++;
-		CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs);
+		this.CheckImageRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs);
 	}
 	if (countRelatedMaterial > maxRMelements)
 		errs.pushCode("RM001", `a maximum of ${maxRMelements} ${tva.e_RelatedMaterial.elementize()} element${maxRMelements>1?"s are":" is"} permitted`);
@@ -936,7 +836,7 @@ function ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, min
  * @param {Class}   errs                errors found in validaton
  * @param {string}  Location			The location of the Basic Description element
  */
-function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
+/* private */  ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
 	
 	function checkLinkCount(errs, count, label, errCode) {
 		if (count>1) {
@@ -955,7 +855,7 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
 	while ((RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA))!=null) {
 		let HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 		if (!HowRelated) 
-			NoChildElement(errs, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize(), "VP001");
+			this.NoChildElement(errs, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize(), "VP001");
 		else {	
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "VP002");
 			if (HowRelated.attr(tva.a_href))
@@ -1011,7 +911,7 @@ function ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Lo
  * @param {Object}  BasicDescription    the element whose children should be checked
  * @param {Class}   errs                errors found in validaton
  */
-function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
+/* private */  ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs) {
 	
 	if (!BasicDescription) {
 		errs.pushCode("RMME000", "ValidateRelatedMaterial_MoreEpisodes() called with BasicDescription==null");
@@ -1022,13 +922,13 @@ function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
 			let rm=0, RelatedMaterial, countRelatedMaterial=0;
 			while ((RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA))!=null) {
 				countRelatedMaterial++;
-				ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes");
+				this.ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name(), "More Episodes");
 			}
 			if (countRelatedMaterial > 1)
 				errs.pushCode("RMME001", `a maximum of 1 ${tva.e_RelatedMaterial.elementize()} element is permitted in ${BasicDescription.name().elementize()} for this request type`);
 			break;
 		case tva.e_GroupInformation:
-			ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "More Episodes");
+			this.ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "More Episodes");
 			break;
 	}
 }
@@ -1044,7 +944,7 @@ function ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDes
  * @param {string} schemaLoctation The location in the schema of the element
  * @param {string} errno           The error number to show in the log
  */
-function NoChildElement(errs, missingElement, parentElement, schemaLocation=null, errno=null) {
+/* private */  NoChildElement(errs, missingElement, parentElement, schemaLocation=null, errno=null) {
 	errs.pushCode(errno?errno:"NC001", `${missingElement} element not specified for ${parentElement}${schemaLocation?(" in "+schemaLocation):""}`);
 }
 
@@ -1058,7 +958,7 @@ function NoChildElement(errs, missingElement, parentElement, schemaLocation=null
  * @param {string} loc     The location of the element
  * @param {string} errno   The error number to show in the log
  */
-function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
+/* private */  InvalidHrefValue(errs, value, src, loc=null, errno=null) {
 	errs.pushCode(errno?errno:"HV001", `invalid ${tva.a_href.attribute()}=${value.quote()} specified for ${src}${loc?(" in "+loc):""}`);
 }
 
@@ -1070,7 +970,7 @@ function InvalidHrefValue(errs, value, src, loc=null, errno=null) {
  * @param {String} src The type of element with the <MediaLocator>
  * @param {String} loc The location of the element
  */
-function NoAuxiliaryURI(errs, src, loc, errno=null) {
+/* private */  NoAuxiliaryURI(errs, src, loc, errno=null) {
 	NoChildElement(errs, tva.e_AuxiliaryURI.elementize(), `${src} ${tva.e_MediaLocator.elementize()}`, loc, errno?errno:"AU001");
 }
 
@@ -1081,7 +981,7 @@ function NoAuxiliaryURI(errs, src, loc, errno=null) {
  * @param {Object} errs              The class where errors and warnings relating to the serivce list processing are stored 
  * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
  */
-function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location) {
+/* private */  ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location) {
 	
 	if (!RelatedMaterial) {
 		errs.pushCode("TA000", "ValidateTemplateAIT() called with RelatedMaterial==null");
@@ -1102,11 +1002,11 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 	});
 
     if (!HowRelated) {
-		NoChildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "TA001");
+		this.NoChildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "TA001");
 		return;
     }
 	
-	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.h_href], [], errs, "TA002");
+	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "TA002");
 	if (HowRelated.attr(tva.a_href)) {
 		if (HowRelated.attr(tva.a_href).value()!=dvbi.TEMPLATE_AIT_URI) 
 			errs.pushCode("TA003", `${tva.a_href.attribute(tva.e_HowRelated)}=${HowRelated.attr(tva.a_href).value().quote()} does not designate a Template AIT`);
@@ -1127,10 +1027,10 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
 						}
 					});	
 					if (!hasAuxiliaryURI) 
-						NoAuxiliaryURI(errs, "template AIT", Location, "TA012");
+						this.NoAuxiliaryURI(errs, "template AIT", Location, "TA012");
 				});
 			else 
-				NoChildElement(errs, tva.e_MediaLocator.elementize(), RelatedMaterial.name(), Location, "TA013");
+				this.NoChildElement(errs, tva.e_MediaLocator.elementize(), RelatedMaterial.name(), Location, "TA013");
 		}
 	}
 }
@@ -1144,7 +1044,7 @@ function ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Lo
  * @param {string} Location          The printable name used to indicate the location of the <RelatedMaterial> element being checked. used for error reporting
  * @param {string} LocationType      The type of element containing the <RelatedMaterial> element. Different validation rules apply to different location types
  */
-function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
+/* private */  ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, Location, LocationType) {
 	
 	if (!RelatedMaterial) {
 		errs.pushCode("PS000", "ValidatePromotionalStillImage() called with RelatedMaterial==null");
@@ -1167,7 +1067,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 	});
 
     if (!HowRelated) {
-		NochildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "PS001");
+		this.NochildElement(errs, tva.e_HowRelated.elementize(), RelatedMaterial.name(), Location, "PS001");
 		return;
     }
 	
@@ -1195,13 +1095,13 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 									isPNG=true;
 									break;
 								default:
-									InvalidHrefValue(errs, href, `${RelatedMaterial.name()}.${tva.e_Format}.${tva.e_StillPictureFormat}`, Location, "PS022");
+									this.InvalidHrefValue(errs, href, `${RelatedMaterial.name()}.${tva.e_Format}.${tva.e_StillPictureFormat}`, Location, "PS022");
 							}
 						}
 					}
 				});
 				if (!hasStillPictureFormat) 
-					NoChildElement(errs, tva.e_StillPictureFormat.elementize(), tva.e_Format, Location, "PS023");
+					this.NoChildElement(errs, tva.e_StillPictureFormat.elementize(), tva.e_Format, Location, "PS023");
 			}
 
 			if (MediaLocator.length!=0) 
@@ -1224,10 +1124,10 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
 						}
 					});
 					if (!hasMediaURI) 
-						NoMediaLocator(errs, "logo", Location);
+						this.NoMediaLocator(errs, "logo", Location);
 				});
 			else 
-				NoChildElement(errs, tva.e_MediaLocator, RelatedMaterial.name().elementize(), Location, "PS039");
+				this.NoChildElement(errs, tva.e_MediaLocator, RelatedMaterial.name().elementize(), Location, "PS039");
 		}
 	}
 }
@@ -1243,7 +1143,7 @@ function ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial
  * @param {integer} maxRMelements       the maximum number of RelatedMaterial elements
  * @param {Class}   errs                errors found in validaton
  */
-function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
+/* private */  ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, Location) {
 	
 	if (!BasicDescription) {
 		errs.pushCode("MB000", "ValidateRelatedMaterial_BoxSetList() called with BasicDescription==null");
@@ -1254,7 +1154,7 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 	while ((RelatedMaterial=BasicDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial, ++rm), CG_SCHEMA))!=null) {
 		let HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
 		if (!HowRelated) 
-			NoChildElement(errs, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize());
+			this.NoChildElement(errs, tva.e_HowRelated.elementize(), tva.e_RelatedMaterial.elementize());
 		else {		
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, HowRelated, [tva.a_href], [], errs, "MB010");
 			if (HowRelated.attr(tva.a_href)) {
@@ -1262,7 +1162,7 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 				switch (hrHref) {
 					case dvbi.TEMPLATE_AIT_URI:
 						countTemplateAIT++;
-						ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name().elementize());
+						this.ValidateTemplateAIT(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name().elementize());
 						break;
 					case dvbi.PAGINATION_FIRST_URI:
 					case dvbi.PAGINATION_PREV_URI:
@@ -1273,10 +1173,10 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 						break;
 					case dvbi.PROMOTIONAL_STILL_IMAGE_URI:  // promotional still image
 						countImage++;
-						ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name().elementize());
+						this.ValidatePromotionalStillImage(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs, BasicDescription.name().elementize());
 						break;
 					default:
-						InvalidHrefValue(errs, hrHref, tva.e_HowRelated.elementize(), `${tva.e_RelatedMaterial.elementize()} in Box Set List`, "MB011");
+						this.InvalidHrefValue(errs, hrHref, tva.e_HowRelated.elementize(), `${tva.e_RelatedMaterial.elementize()} in Box Set List`, "MB011");
 				}	
 			}
 		}
@@ -1289,7 +1189,7 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
 		errs.pushCode("MB023", `only one ${tva.e_RelatedMaterial.elementize()} element signalling the promotional still image can be specified for a Box Set List`);
 	
 	if (hasPagination)
-		ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "Box Set List");
+		this.ValidatePagination(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs, "Box Set List");
 }
 
 
@@ -1304,7 +1204,7 @@ function ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescr
  * @param {string}  parentLanguage	    the xml:lang of the parent element to ProgramInformation
  * @param {string}  errCode             error code prefix to be used in reports, if not present then use local codes
  */
-function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondary, errs, parentLanguage, errCode=null) {
+/* private */  ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondary, errs, parentLanguage, errCode=null) {
 	
 	if (!BasicDescription) {
 		errs.pushCode("VT000", "ValidateTitle() called with BasicDescription==null");
@@ -1326,8 +1226,8 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 
 		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Title, [tva.a_type], [tva.a_lang], errs, errCode?`${errCode}-1`:"VT001");
 		
-		let titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : "unspecified";
-		let titleLang=GetLanguage(knownLanguages, errs, Title, parentLanguage, false, "VT002");
+		let titleType=Title.attr(tva.a_type) ? Title.attr(tva.a_type).value() : mpeg7.DEFAULT_TITLE_TYPE;
+		let titleLang=this.GetLanguage(this.knownLanguages, errs, Title, parentLanguage, false, "VT002");
 		let titleStr=unEntity(Title.text());
 		
 		if (titleStr.length > dvbi.MAX_TITLE_LENGTH)
@@ -1353,7 +1253,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
 				break;
 			default:	
 				errs.pushCode(errCode?`${errCode}-15`:"VT015", 
-						`${tva.a_type.attribute()} must be ${mpeg7.TITLE_TYPE_MAIN.quote()} or ${mpeg7.TITLE_TYPE_SECONDARYE.quote()} for ${tva.e_Title.elementize()}`);
+					`${tva.a_type.attribute()} must be ${mpeg7.TITLE_TYPE_MAIN.quote()} or ${mpeg7.TITLE_TYPE_SECONDARY.quote()} for ${tva.e_Title.elementize()}`);
 		}	
 		secondarySet.forEach(analyseLang);
 	}
@@ -1371,7 +1271,7 @@ function ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, allowSecondar
  * @param {string} parentLanguage	   the xml:lang of the parent element to parentElement
  * @param {object} categoryGroup       the GroupInformationElement that others must refer to through <MemberOf>
  */
-function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage, categoryGroup) {
+/* private */  ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requestType, errs, parentLanguage, categoryGroup) {
 
 	if (!parentElement) {
 		errs.pushCode("BD000", "ValidateBasicDescription() called with parentElement==null");
@@ -1381,7 +1281,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 	let isParentGroup=parentElement==categoryGroup;
 	let BasicDescription=parentElement.get(xPath(SCHEMA_PREFIX, tva.e_BasicDescription), CG_SCHEMA);
 	if (!BasicDescription) {
-		NoChildElement(errs, tva.e_BasicDescription.elementize(), parentElement.name());
+		this.NoChildElement(errs, tva.e_BasicDescription.elementize(), parentElement.name());
 		return;
 	}
 
@@ -1392,32 +1292,32 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 				case CG_REQUEST_SCHEDULE_WINDOW:
 				case CG_REQUEST_SCHEDULE_TIME:
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD010");	
-					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
-					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [tva.SYNOPSIS_SHORT_LABEL], requestType, errs, parentLanguage);
-					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
-					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					this.ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
+					this.ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [tva.SYNOPSIS_SHORT_LABEL], requestType, errs, parentLanguage);
+					this.ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+					this.ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
+					this.ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
 				case CG_REQUEST_PROGRAM:	// 6.10.5.3
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_Genre, tva.e_ParentalGuidance, tva.e_CreditsList, tva.e_RelatedMaterial], errs, "BD020");
-					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
-					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [tva.SYNOPSIS_SHORT_LABEL, tva.SYNOPSIS_LONG_LABEL], requestType, errs, parentLanguage);
-					ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, parentLanguage);
-					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);	
-					ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);	
-					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);						
+					this.ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
+					this.ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [tva.SYNOPSIS_SHORT_LABEL, tva.SYNOPSIS_LONG_LABEL], requestType, errs, parentLanguage);
+					this.ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, parentLanguage);
+					this.ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+					this.ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);	
+					this.ValidateCreditsList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  errs);	
+					this.ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);						
 					break;
 				case CG_REQUEST_BS_CONTENTS:  // 6.10.5.4					
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_Synopsis, tva.e_ParentalGuidance, tva.e_RelatedMaterial], errs, "BD030");
-					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
-					ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.SYNOPSIS_MEDIUM_LABEL], requestType, errs, parentLanguage);
-					ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
-					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+					this.ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, true, errs, parentLanguage);
+					this.ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.SYNOPSIS_MEDIUM_LABEL], requestType, errs, parentLanguage);
+					this.ValidateParentalGuidance(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 2, errs);
+					this.ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
 				case CG_REQUEST_MORE_EPISODES:
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_RelatedMaterial], errs, "BD040");
-					ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+					this.ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					break;
 			//	default:
 			//		errs.pushCode("BD050", `ValidateBasicDescription() called with invalid requestType/element (${requestType}/${parentElement.name()+)`)
@@ -1435,27 +1335,27 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
 						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [], errs, "BD061");
 					else checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Keyword, tva.e_RelatedMaterial], errs, "BD062");
 					
-					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, parentLanguage);						
+					this.ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, parentLanguage);						
 					if (!isParentGroup) {
-						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, parentLanguage);
-						ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, parentLanguage);
-						ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+						this.ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_MEDIUM_LABEL], [], requestType, errs, parentLanguage);
+						this.ValidateKeyword(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 20, errs, parentLanguage);
+						this.ValidateRelatedMaterial_BoxSetList(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					}
 			break;
 				case CG_REQUEST_MORE_EPISODES: 
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [], [tva.e_RelatedMaterial], errs, "BD070");	
-					ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
+					this.ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					break;
 				case CG_REQUEST_BS_CATEGORIES:
 					if (isParentGroup) 
 						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [], errs, "BD080");	
 					else 
 						checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title, tva.e_Synopsis], [tva.e_Genre, tva.e_RelatedMaterial], errs, "BD081");
-					ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, parentLanguage);
+					this.ValidateTitle(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, false, errs, parentLanguage);
 					if (!isParentGroup)
-						ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_SHORT_LABEL], [], requestType, errs, parentLanguage);
-					ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
-					ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
+						this.ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.SYNOPSIS_SHORT_LABEL], [], requestType, errs, parentLanguage);
+					this.ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
+					this.ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
 				// default:
 				//	errs.pushCode("BD100", `ValidateBasicDescription() called with invalid requestType/element (${requestType}/${parentElement.name()})`);
@@ -1481,7 +1381,7 @@ function ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, parentElement, reque
  * @param {Class}  errs                errors found in validaton
  * @returns {String}				CRID if the current program, if this is it
  */
-function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
+/* private */  ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, parentLanguage, programCRIDs, groupCRIDs, requestType, indexes, errs) {
 	
 	if (!ProgramInformation) {
 		errs.pushCode("PI000", "ValidateProgramInformation() called with ProgramInformation==null");
@@ -1492,7 +1392,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, [tva.a_programId], [tva.a_lang], errs, "PI002");
 
-	let piLang=GetLanguage(knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
+	let piLang=this.GetLanguage(this.knownLanguages, errs, ProgramInformation, parentLanguage, false, "PI010");
 	let isCurrentProgram=false, programCRID=null;
 	
 	if (ProgramInformation.attr(tva.a_programId)) {
@@ -1505,7 +1405,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
 	}
 
 	// <ProgramInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
+	this.ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
 
 	let children=ProgramInformation.childNodes();
 	if (children) children.forEachSubElement(child => {
@@ -1585,7 +1485,7 @@ function ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation
  * @param {integer} o.childCount       the number of child elements to be present (to match GroupInformation@numOfItems)
  * @returns {string} the CRID of the currently airing program (that which is a member of the "now" structural crid)
  */
-function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, groupCRIDs, requestType, errs, o=null) { 
+/* private */  CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, groupCRIDs, requestType, errs, o=null) { 
 	if (!ProgramDescription) {
 		errs.pushCode("PI100", "CheckProgramInformation() called with ProgramDescription==null");
 		return null;
@@ -1597,11 +1497,11 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
 		return null;
 	}
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformationTable, [], [tva.a_lang], errs, "PI102");
-	let pitLang=GetLanguage(knownLanguages, errs, ProgramInformationTable, parentLang, false, "PI103");
+	let pitLang=this.GetLanguage(this.knownLanguages, errs, ProgramInformationTable, parentLang, false, "PI103");
 
 	let pi=0, ProgramInformation, cnt=0, indexes=[], currentProgramCRID=null;
 	while ((ProgramInformation=ProgramInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_ProgramInformation, ++pi), CG_SCHEMA))!=null) {
-		let t=ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
+		let t=this.ValidateProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, pitLang, programCRIDs, groupCRIDs, requestType, indexes, errs);
 		if (t) currentProgramCRID=t;
 		cnt++; 
 	}
@@ -1628,7 +1528,7 @@ function CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, p
  * @param {array}  indexes			   an accumulation of the @index values found
  * @param {string} groupsFound         groupId values found (null if not needed)
  */
-function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
+/* private */  ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 
 	if (!GroupInformation) {
 		errs.pushCode("GIB000", "ValidateGroupInformationBoxSets() called with GroupInformation==null");
@@ -1686,7 +1586,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 				let index=valUnsignedInt(MemberOf.attr(tva.a_index).value());
 				if (index>=1) {
 					if (indexes) {
-						if (isIn(indexes, index)) 
+						if (indexes.includes(index)) 
 							errs.pushCode("GI022", `duplicated ${tva.a_index.attribute(`${GroupInformation.name()}.${tva.e_MemberOf}`)} values (${index})`);
 						else indexes.push(index);
 					}
@@ -1703,10 +1603,10 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 			errs.pushCode("GIB027", `${GroupInformation.name()} requires a ${tva.e_MemberOf.elementize()} element referring to the ${CATEGORY_GROUP_NAME} (${categoryCRID})`);
 	}
 	
-	checkTAGUri(GroupInformation, errs, "GIB030");	
+	this.checkTAGUri(GroupInformation, errs, "GIB030");	
 	
 	// <GroupInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
+	this.ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
 }
 
 
@@ -1723,7 +1623,7 @@ function ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
  * @param {array}  indexes			   an accumulation of the @index values found
  * @param {string} groupsFound         groupId values found (null if not needed)
  */
-function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
+/* private */  ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 
 	if (!GroupInformation) {
 		errs.pushCode("GIS000", "ValidateGroupInformationSchedules() called with GroupInformation==null");
@@ -1746,7 +1646,7 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
 	}
 
 	// <GroupInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);	
+	this.ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);	
 }
 
 
@@ -1763,7 +1663,7 @@ function ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInform
  * @param {array}  indexes			   an accumulation of the @index values found
  * @param {string} groupsFound         groupId values found (null if not needed)
  */
-function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
+/* private */  ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 	
 	if (!GroupInformation) {
 		errs.pushCode("GIM000", "ValidateGroupInformationMoreEpisodes() called with GroupInformation==null");
@@ -1797,7 +1697,7 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
 		errs.pushCode("GIM014", `${tva.e_GroupType.elementize()} is required in ${GroupInformation.name().elementize()}`);
 
 	// <GroupInformation><BasicDescription>
-	ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
+	this.ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
 }
 
 
@@ -1814,27 +1714,27 @@ function ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInf
  * @param {array}  indexes			   an accumulation of the @index values found
  * @param {string} groupsFound         groupId values found (null if not needed)
  */
-function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
+/* private */  ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup, indexes, groupsFound) {
 
 	if (!GroupInformation) {
 		errs.pushCode("GI000", "ValidateGroupInformation() called with GroupInformation==null");
 		return;
 	}
 
-	let giLang=GetLanguage(knownLanguages, errs, GroupInformation, parentLanguage, false, "GI001");
+	let giLang=this.GetLanguage(this.knownLanguages, errs, GroupInformation, parentLanguage, false, "GI001");
 	
 	switch (requestType) {
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 		case CG_REQUEST_SCHEDULE_WINDOW:
-			ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, giLang, categoryGroup, indexes, groupsFound);
+			this.ValidateGroupInformationSchedules(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, giLang, categoryGroup, indexes, groupsFound);
 			break;
 		case CG_REQUEST_BS_CATEGORIES:
 		case CG_REQUEST_BS_LISTS:
 		case CG_REQUEST_BS_CONTENTS:
-			ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, giLang, categoryGroup, indexes, groupsFound);
+			this.ValidateGroupInformationBoxSets(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, giLang, categoryGroup, indexes, groupsFound);
 			break;		
 		case CG_REQUEST_MORE_EPISODES:
-			ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, giLang, categoryGroup, indexes, groupsFound);
+			this.ValidateGroupInformationMoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, giLang, categoryGroup, indexes, groupsFound);
 			break;				
 	}
 
@@ -1862,7 +1762,7 @@ function ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, re
  * @param {Class}  errs                errors found in validaton
  * @param {integer} o.childCount       the value from the @numItems attribute of the "category group"
  */
-function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, requestType, groupIds, errs, o) { 
+/* private */  CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, requestType, groupIds, errs, o) { 
 	
 	if (!ProgramDescription) {
 		errs.pushCode("GI100", "CheckGroupInformation() called with ProgramDescription==null");
@@ -1875,7 +1775,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 		errs.pushCode("GI101", `${tva.e_GroupInformationTable.elementize()} not specified in ${ProgramDescription.name().elementize()}`);
 		return;
 	}
-	let gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "GI102");
+	let gitLang=this.GetLanguage(this.knownLanguages, errs, GroupInformationTable, parentLang, false, "GI102");
 
 	// find which GroupInformation element is the "category group"
 	let categoryGroup=null;
@@ -1883,7 +1783,7 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 		gi=0;
 		while ((GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformation, ++gi), CG_SCHEMA))!=null) {
 			// this GroupInformation element is the "category group" if it does not contain a <MemberOf> element
-			if (CountChildElements(GroupInformation, tva.e_MemberOf)==0) {
+			if (this.CountChildElements(GroupInformation, tva.e_MemberOf)==0) {
 				// this GroupInformation element is not a member of another GroupInformation so it must be the "category group"
 				if (categoryGroup)
 					errs.pushCode("GI111", `only a single ${CATEGORY_GROUP_NAME} can be present in ${tva.e_GroupInformationTable.elementize()}`);
@@ -1897,14 +1797,14 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
 	let indexes=[], giCount=0;
 	gi=0;
 	while ((GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformation, ++gi), CG_SCHEMA))!=null) {
-		ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, categoryGroup, indexes, groupIds);
+		this.ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, categoryGroup, indexes, groupIds);
 		if (GroupInformation!=categoryGroup) 
 			giCount++;
 	}
 	if (categoryGroup) {
 		let numOfItems=(categoryGroup.attr(tva.a_numOfItems) ? valUnsignedInt(categoryGroup.attr(tva.a_numOfItems).value()) : 0);
 		if (requestType!=CG_REQUEST_BS_CONTENTS && numOfItems!=giCount)
-			errs.pushCode("GI113", `${tva.a_numOfItems.attribute(tva.e_GroupInformation)} specified in ${+CATEGORY_GROUP_NAME} (${numOfItems}) does match the number of items (${giCount})`);
+			errs.pushCode("GI113", `${tva.a_numOfItems.attribute(tva.e_GroupInformation)} specified in ${CATEGORY_GROUP_NAME} (${numOfItems}) does match the number of items (${giCount})`);
 
 		if (o) 
 			o.childCount=numOfItems;
@@ -1929,9 +1829,9 @@ function CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, par
  * @param {int}    numLater			   maximum number of <GroupInformation> elements that are later
  * @param {array}  groupCRIDsFound     list of structural crids already found in this response
  */
-function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, numEarlier, numNow, numLater, groupCRIDsFound) {
+/* private */  ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, numEarlier, numNow, numLater, groupCRIDsFound) {
 
-	function ValidValues(errs, numOfItems, numAllowed, grp) {
+	function validValues(errs, numOfItems, numAllowed, grp) {
 		if (numOfItems<=0)
 			errs.pushCode("VNN101", `${tva.a_numOfItems.attribute(tva.e_GroupInformation)} must be > 0 for ${grp.quote()}`);		
 		if (numOfItems>numAllowed)
@@ -1944,7 +1844,7 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 	}
 
 	// NOWNEXT and WINDOW GroupInformationElements contains the same syntax as other GroupInformationElements
-	ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, null, null, null );
+	this.ValidateGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, null, null, null );
 	
 	if (GroupInformation.attr(tva.a_groupId)) {
 		let grp=GroupInformation.attr(tva.a_groupId).value();
@@ -1952,13 +1852,13 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
 			let numOfItems=GroupInformation.attr(tva.a_numOfItems)?valUnsignedInt(GroupInformation.attr(tva.a_numOfItems).value()):-1;
 			switch (grp) {
 				case dvbi.CRID_EARLIER:
-					ValidValues(errs, numOfItems, numEarlier, grp);
+					validValues(errs, numOfItems, numEarlier, grp);
 					break;
 				case dvbi.CRID_NOW:
-					ValidValues(errs, numOfItems, numNow, grp);
+					validValues(errs, numOfItems, numNow, grp);
 					break;
 				case dvbi.CRID_LATER:
-					ValidValues(errs, numOfItems, numLater, grp);
+					validValues(errs, numOfItems, numLater, grp);
 					break;
 			}
 			if (isIni(groupCRIDsFound, grp))
@@ -1983,7 +1883,7 @@ function ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformat
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, groupIds, requestType, errs) { 
+/* private */  CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, groupIds, requestType, errs) { 
 	
 	if (!ProgramDescription) {
 		errs.pushCode("NN000", "CheckGroupInformationNowNext() called with ProgramDescription==null");
@@ -1995,16 +1895,16 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
 		errs.pushCode("NN001", `${tva.e_GroupInformationTable.elementize()} not specified in ${ProgramDescription.name().elementize()}`);
 		return;
 	}
-	let gitLang=GetLanguage(knownLanguages, errs, GroupInformationTable, parentLang, false, "NN002");
+	let gitLang=this.GetLanguage(this.knownLanguages, errs, GroupInformationTable, parentLang, false, "NN002");
 	
 	let gi=0, GroupInformation;
 	while ((GroupInformation=GroupInformationTable.get(xPath(SCHEMA_PREFIX, tva.e_GroupInformation, ++gi), CG_SCHEMA))!=null) {	
 		switch (requestType) {
 			case CG_REQUEST_SCHEDULE_NOWNEXT:
-				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 0, 1, 1, groupIds);
+				this.ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 0, 1, 1, groupIds);
 				break;
 			case CG_REQUEST_SCHEDULE_WINDOW:
-				ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
+				this.ValidateGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, gitLang, 10, 1, 10, groupIds);
 				break;
 			default:
 				errs.pushCode("NN003", `${tva.e_GroupInformation.elementize()} not processed for this request type`);
@@ -2023,7 +1923,7 @@ function CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescripti
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs) {
+/* private */  ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs) {
 	
 	function isValidAudioMixType(mixType) {
 		return mixType==mpeg7.AUDIO_MIX_MONO || mixType==mpeg7.AUDIO_MIX_STEREO || mixType==mpeg7.AUDIO_MIX_5_1;
@@ -2059,7 +1959,8 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 				if (!(validPurpose=isValidAudioLanguagePurpose(AudioLanguage.attr(tva.a_purpose).value())))
 					errs.pushCode("AV014", `${tva.a_purpose.attribute(tva.e_AudioLanguage)} is not valid`);
 			}
-			validLanguage=CheckLanguage(knownLanguages, errs, audioLang, `${tva.e_AudioAttributes}.${tva.e_AudioLanguage}`, "AV015");
+
+			validLanguage=CheckLanguage(this.knownLanguages, errs, audioLang, `${tva.e_AudioAttributes}.${tva.e_AudioLanguage}`, "AV015");
 			
 			if (validLanguage && validPurpose) {	
 				if (audioCounts[audioLang]===undefined)
@@ -2083,21 +1984,6 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
 	let va=0, VideoAttributes;
 	while ((VideoAttributes=AVAttributes.get(xPath(SCHEMA_PREFIX, tva.e_VideoAttributes, ++va), CG_SCHEMA))!=null) {
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, VideoAttributes, [], [tva.e_HorizontalSize, tva.e_VerticalSize, tva.e_AspectRatio], errs, "AV030");
-
-	/*
-	 * checked through schema validation
-		let HorizontalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_HorizontalSize), CG_SCHEMA)
-		if (HorizontalSize && valUnsignedInt(HorizontalSize.text()) > MAX_UNSIGNED_SHORT) 
-			errs.pushCode("AV031", `${tva.e_HorizontalSize.elementize()} must be an unsigned short (0-${MAX_UNSIGNED_SHORT})`)
-		
-		let VerticalSize=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_VerticalSize), CG_SCHEMA)
-		if (VerticalSize && valUnsignedInt(VerticalSize.text()) > MAX_UNSIGNED_SHORT) 
-			errs.pushCode("AV032", `${tva.e_VerticalSize.elementize()} must be an unsigned short (0-${MAX_UNSIGNED_SHORT})`)
-		
-		let AspectRatio=VideoAttributes.get(xPath(SCHEMA_PREFIX, tva.e_AspectRatio), CG_SCHEMA)
-		if (AspectRatio && !patterns.isRatioType(AspectRatio.text()))
-			errs.pushCode("AV033", `${tva.e_AspectRatio.elementize()} is not a valid aspect ratio`)
-	*/
 	}
 
 	// <CaptioningAttributes>
@@ -2127,7 +2013,7 @@ function ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLang
  * @param {Class}  errs                errors found in validaton
  * @returns {boolean} true if this RelatedMaterial element contains a restart link (proper HowRelated@href and MediaLocator.MediaUri and MediaLocator.AuxiliaryURI)
  */
-function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
+/* private */  ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs) {
 	
 	function isRestartLink(str) { return str==dvbi.RESTART_LINK; }
 
@@ -2171,7 +2057,7 @@ function ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMateria
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, isCurrentProgram, parentLanguage, programCRIDs, requestType, errs) {
+/* private */  ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, InstanceDescription, isCurrentProgram, parentLanguage, programCRIDs, requestType, errs) {
 
 	function countElements(CG_SCHEMA, SCHEMA_PREFIX, node, elementName) {
 		let count=0;
@@ -2186,7 +2072,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 	
 	function checkGenre(node, CG_SCHEMA, SCHEMA_PREFIX, errs, errcode=null) {
 		if (!node) return null;
-		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, node, [tva.a_href], [tva.a_type], errs, errcode?`${errCode}-1`:"ChG001");
+		checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, node, [tva.a_href], [tva.a_type], errs, errcode?`${errcode}-1`:"ChG001");
 		let GenreType=(node.attr(tva.a_type)?node.attr(tva.a_type).value():"other");
 		if (GenreType!="other")
 			errs.pushCode(errcode?`${errcode}-2`:"ChG002", `${tva.a_type.attribute(`${node.parent().name()}.${+node.name()}`)} must contain ${"other".quote()}`);
@@ -2239,10 +2125,13 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		case tva.e_ScheduleEvent:
 			let Genre=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_Genre), CG_SCHEMA);
 			if (Genre) {
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Genre, [tva.a_href], [], errs, "ID016");
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Genre, [tva.a_href], [tva.a_type], errs, "ID016");
 				if (Genre.attr(tva.a_href)) {
-					if (isRestartAvailability(Genre.attr(tva.a_href).value())) 
+					if (isRestartAvailability(Genre.attr(tva.a_href).value())) {
 						restartGenre=Genre;
+						if (Genre.attr(tva.a_type) && Genre.attr(tva.a_type).value()!=tva.GENRE_TYPE_OTHER) 
+							errs.pushCode("ID018", `${tva.a_type.attribute(Genre.name())} must be ${tva.GENRE_TYPE_OTHER.quote()} or omitted`);
+					}
 					else 
 						errs.pushCode("ID017", `${phlib.elementize(`${InstanceDescription.name()}.+${tva.e_Genre}`)} must contain a restart link indicator`);
 				}
@@ -2256,7 +2145,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		errs.pushCode("ID020", `only a single ${tva.e_CaptionLanguage.elementize()} element is permitted in ${InstanceDescription.name().elementize()}`);
 	let CaptionLanguage=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_CaptionLanguage), CG_SCHEMA);
 	if (CaptionLanguage) {
-		CheckLanguage(knownLanguages, errs, CaptionLanguage.text(), `${InstanceDescription.name()}.${tva.e_CaptionLanguage}`, "ID021");
+		CheckLanguage(this.knownLanguages, errs, CaptionLanguage.text(), `${InstanceDescription.name()}.${tva.e_CaptionLanguage}`, "ID021");
 		BooleanValue(CaptionLanguage, tva.a_closed, "ID022", errs);
 	}
 	
@@ -2266,17 +2155,17 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		errs.pushCode("ID030", `only a single ${tva.e_SignLanguage.elementize()} element is premitted in ${InstanceDescription.name().elementize()}`);
 	let SignLanguage=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_SignLanguage), CG_SCHEMA);
 	if (SignLanguage) {
-		CheckLanguage(knownLanguages, errs, SignLanguage.text(), `${InstanceDescription.name()}.${tva.e_SignLanguage}`, "ID-310");
+		CheckLanguage(this.knownLanguages, errs, SignLanguage.text(), `${InstanceDescription.name()}.${tva.e_SignLanguage}`, "ID-310");
 		FalseValue(SignLanguage, tva.a_closed, "ID032", errs);
 		// check value is "sgn" according to ISO 639-2 or a sign language listed in ISO 639-3
-		if (SignLanguage.text()!="sgn" && !knownLanguages.isKnownSignLanguage(SignLanguage.text())) 
+		if (SignLanguage.text()!="sgn" && !this.knownLanguages.isKnownSignLanguage(SignLanguage.text())) 
 			errs.pushCode("ID033", `invalid ${tva.e_SignLanguage.elementize()} ${SignLanguage.text().quote()} in ${InstanceDescription.name().elementize()}`);
 	}
 	
 	// <AVAttributes>
 	let AVAttributes=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_AVAttributes), CG_SCHEMA);
 	if (AVAttributes)
-		ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs);
+		this.ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs);
 	
 	// <OtherIdentifier>
 	let oi=0, OtherIdentifier;
@@ -2302,7 +2191,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
 		case tva.e_ScheduleEvent:
 			let RelatedMaterial=InstanceDescription.get(xPath(SCHEMA_PREFIX, tva.e_RelatedMaterial), CG_SCHEMA);
 			if (RelatedMaterial) {
-				if (ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs))
+				if (this.ValidateRestartRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, RelatedMaterial, errs))
 					restartRelatedMaterial=RelatedMaterial; 		
 			}
 			break;
@@ -2325,7 +2214,7 @@ function ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, VerifyType, Insta
  * @param {Class}  errs              errors found in validaton
  * @param {string} errcode           error code to be used with any errors founf
  */
-function CheckTemplateAITApplication(node, errs, errcode=null) {
+/* private */  CheckTemplateAITApplication(node, errs, errcode=null) {
 
 	if (!node)  {
 		errs.pushCode(errcode?`${errcode}-0`:"TA000", "CheckTemplateAITApplication() called with node==null");
@@ -2356,7 +2245,7 @@ function CheckTemplateAITApplication(node, errs, errcode=null) {
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, plCRIDs, requestType, errs) {
+/* private */  ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, parentLanguage, programCRIDs, plCRIDs, requestType, errs) {
 
 	if (!OnDemandProgram) {
 		errs.pushCode("OD000", "ValidateOnDemandProgram() called with OnDemandProgram==null");
@@ -2388,8 +2277,8 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	}
 		
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, [], [tva.a_serviceIDRef, tva.a_lang], errs, "OD005"); 
-	let odpLang=GetLanguage(knownLanguages, errs, OnDemandProgram, parentLanguage, false, "OD006");
-	checkTAGUri(OnDemandProgram, errs, "OD007");	
+	let odpLang=this.GetLanguage(this.knownLanguages, errs, OnDemandProgram, parentLanguage, false, "OD006");
+	this.checkTAGUri(OnDemandProgram, errs, "OD007");	
 	
 	// <Program>
 	let prog=0, Program;
@@ -2413,12 +2302,12 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	// <ProgramURL>
 	let pUrl=0, ProgramURL;
 	while ((ProgramURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_ProgramURL, ++pUrl), CG_SCHEMA))!=null) 
-		CheckTemplateAITApplication(ProgramURL, errs, "OD020");
+		this.CheckTemplateAITApplication(ProgramURL, errs, "OD020");
 
 	// <AuxiliaryURL>
 	let aux=0, AuxiliaryURL;
 	while ((AuxiliaryURL=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_AuxiliaryURL, ++aux), CG_SCHEMA))!=null) 
-		CheckTemplateAITApplication(AuxiliaryURL, errs, "OD030");
+		this.CheckTemplateAITApplication(AuxiliaryURL, errs, "OD030");
 	if (--aux>1)
 		errs.pushCode("OD031", `only a single ${tva.e_AuxiliaryURL.elementize()} is permitted in ${OnDemandProgram.name().elementize()}`);
 	
@@ -2426,7 +2315,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	let id=0, InstanceDescription;
 	if (validRequest)
 		while ((InstanceDescription=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_InstanceDescription, ++id), CG_SCHEMA))!=null)
-			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, false, odpLang, programCRIDs, requestType, errs);
+			this.ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram.name(), InstanceDescription, false, odpLang, programCRIDs, requestType, errs);
 	if (--id>1)
 		errs.pushCode("OD041", `only a single ${tva.e_InstanceDescription.elementize()} is permitted in ${OnDemandProgram.name().elementize()}`);
 	
@@ -2446,19 +2335,6 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	let soa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_StartOfAvailability), CG_SCHEMA),
 	    eoa=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_EndOfAvailability), CG_SCHEMA);
 
-	/*
-	 * checked in schema based validation
-	if (soa) 
-		if (!patterns.isUTCDateTime(soa.text())) {
-			errs.pushCode("OD060", `${tva.e_StartOfAvailability.elementize()} must be expressed in Zulu time`)
-			soa=null;
-		}
-	if (eoa) 
-		if (!patterns.isUTCDateTime(eoa.text())) {
-			errs.pushCode("OD061", `${tva.e_EndOfAvailability.elementize()} must be expressed in Zulu time`)
-			eoa=null;
-		}
-	*/
 	if (soa && eoa) {
 		let fr=new Date(soa.text()), to=new Date(eoa.text());	
 		if (to.getTime() < fr.getTime()) 
@@ -2475,14 +2351,12 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
 	
 	// <Free>
 	let fr=0, Free;
-	while ((Free=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_Free, ++fr), CG_SCHEMA))!=nul)
+	while ((Free=OnDemandProgram.get(xPath(SCHEMA_PREFIX, tva.e_Free, ++fr), CG_SCHEMA))!=null)
 		TrueValue(Free, tva.a_value, "OD080", errs);
 	if (--fr>1)
 		errs.pushCode("OD081", `only a single ${tva.e_Free.elementize()} is permitted in ${OnDemandProgram.name().elementize()}`);
 }	
 
-
-	
 
 /**
  * validate any <ScheduleEvent> elements in the <ProgramLocationTable.Schedule>
@@ -2499,7 +2373,7 @@ function ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, OnDemandProgram, pare
  * @param {string} requestType         the type of content guide request being checked
  * @param {Class}  errs                errors found in validaton
  */
-function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, plCRIDs, currentProgramCRID, scheduleStart, scheduleEnd, requestType, errs) {
+/* private */  ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDs, plCRIDs, currentProgramCRID, scheduleStart, scheduleEnd, requestType, errs) {
 	
 	if (!Schedule) {
 		errs.pushCode("SE000", "ValidateScheduleEvents() called with Schedule==null");
@@ -2509,7 +2383,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 	let isCurrentProgram=false;
 	let se=0, ScheduleEvent;
 	while ((ScheduleEvent=Schedule.get(xPath(SCHEMA_PREFIX, tva.e_ScheduleEvent, ++se), CG_SCHEMA))!=null) {
-		let seLang=GetLanguage(knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE001");
+		let seLang=this.GetLanguage(this.knownLanguages, errs, ScheduleEvent, parentLanguage, false, "SE001");
 		
 		checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ScheduleEvent, [tva.e_Program, tva.e_PublishedStartTime, tva.e_PublishedDuration], 
 			[tva.e_ProgramURL, tva.e_InstanceDescription, tva.e_ActualStartTime, tva.e_FirstShowing, tva.e_Free], errs, "SE002");
@@ -2539,7 +2413,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 		// <InstanceDescription>
 		let InstanceDescription=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_InstanceDescription), CG_SCHEMA);
 		if (InstanceDescription) 
-			ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, isCurrentProgram, seLang, programCRIDs, requestType, errs);
+			this.ValidateInstanceDescription(CG_SCHEMA, SCHEMA_PREFIX, tva.e_ScheduleEvent, InstanceDescription, isCurrentProgram, seLang, programCRIDs, requestType, errs);
 		
 		// <PublishedStartTime> and <PublishedDuration>
 		let pstElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedStartTime), CG_SCHEMA);
@@ -2555,7 +2429,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
 
 				let pdElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration), CG_SCHEMA);
 				if (pdElem && scheduleEnd) {
-					let parsedPublishedDuration = parseISOduration(pdElem.text());
+					let parsedPublishedDuration=parseISOduration(pdElem.text());
 					if (parsedPublishedDuration.add(PublishedStartTime) > scheduleEnd) 
 						errs.pushCode("SE043", `${tva.e_PublishedStartTime}+${tva.e_PublishedDuration} of event is after ${tva.a_end.attribute(tva.e_Schedule)}`);
 				}
@@ -2596,7 +2470,7 @@ function ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLangua
  * @param {Class}  errs                errors found in validaton
  * @returns {string} the serviceIdRef for this <Schedule> element
  */
-function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, plCRIDs, currentProgramCRID, requestType, errs) {
+/* private */  ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, programCRIDS, plCRIDs, currentProgramCRID, requestType, errs) {
 
 	if (!Schedule) {
 		errs.pushCode("VS000", "ValidateSchedule() called with Schedule==null");
@@ -2606,34 +2480,20 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [], [tva.e_ScheduleEvent], errs, "VS001");
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Schedule, [tva.a_serviceIDRef, tva.a_start, tva.a_end], [], errs, "VS002");
 	
-	let scheduleLang=GetLanguage(knownLanguages, errs, Schedule, parentLanguage, false, "VS003");	
-	let serviceIdRef=checkTAGUri(Schedule, errs, "VS004");
+	let scheduleLang=this.GetLanguage(this.knownLanguages, errs, Schedule, parentLanguage, false, "VS003");	
+	let serviceIdRef=this.checkTAGUri(Schedule, errs, "VS004");
 	let startSchedule=Schedule.attr(tva.a_start), fr=null, endSchedule=Schedule.attr(tva.a_end), to=null;
 	if (startSchedule)
-//		if (patterns.isUTCDateTime(startSchedule.value())) 
-			fr=new Date(startSchedule.value());
-/*
- * checked in schama based validation
-		else {
-			errs.pushCode("VS010", `${tva.a_start.attribute(Schedule.name())} is not expressed in UTC format (${startSchedule.value()})`);
-			startSchedule=null;
-		}
-*/
+		fr=new Date(startSchedule.value());
+
 	if (endSchedule)
-//		if (patterns.isUTCDateTime(endSchedule.value())) 
-			to=new Date(endSchedule.value());
-/*
- * checked in schema based validation
-			else {
-			errs.pushCode("VS011", `${tva.a_end.attribute(Schedule.name())} is not expressed in UTC format (${endSchedule.value()})`);
-			endSchedule=null;
-		}
-*/
+		to=new Date(endSchedule.value());
+
 	if (startSchedule && endSchedule) 
 		if (to.getTime() <= fr.getTime()) 
 			errs.pushCode("VS012", `${tva.a_start.attribute(Schedule.name())} must be earlier than ${tva.a_end.attribute()}`);
 	
-	ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, plCRIDs, currentProgramCRID, fr, to, requestType, errs);
+			this.ValidateScheduleEvents(CG_SCHEMA, SCHEMA_PREFIX, Schedule, scheduleLang, programCRIDS, plCRIDs, currentProgramCRID, fr, to, requestType, errs);
 	
 	return serviceIdRef;
 }
@@ -2652,7 +2512,7 @@ function ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, Schedule, parentLanguage, pr
  * @param {Class}  errs                errors found in validaton
  * @param {integer} o.childCount         the number of child elements to be present (to match GroupInformation@numOfItems)
  */
-function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, currentProgramCRID, requestType, errs, o=null) {
+/* private */  CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, parentLang, programCRIDs, currentProgramCRID, requestType, errs, o=null) {
 
 	if (!ProgramDescription) {
 		errs.pushCode("PL000", "CheckProgramLocation() called with ProgramDescription==null");
@@ -2667,7 +2527,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], [tva.e_Schedule, tva.e_OnDemandProgram], errs, "PL010");
 	checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, ProgramLocationTable, [], [tva.a_lang], errs, "PL011");
 	
-	let pltLang=GetLanguage(knownLanguages, errs, ProgramLocationTable, parentLang, false, "PL012");	
+	let pltLang=this.GetLanguage(this.knownLanguages, errs, ProgramLocationTable, parentLang, false, "PL012");	
 	
 	let cnt=0, foundServiceIds=[], plCRIDs=[];
 
@@ -2675,11 +2535,11 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
 	if (children) children.forEachSubElement(child => {
 		switch (child.name()) {
 			case tva.e_OnDemandProgram:
-				ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
+				this.ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
 				cnt++;
 				break;
 			case tva.e_Schedule:
-				let thisServiceIdRef=ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs);
+				let thisServiceIdRef=this.ValidateSchedule(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, currentProgramCRID, requestType, errs);
 				if (thisServiceIdRef.length)
 					if (isIni(foundServiceIds, thisServiceIdRef))
 						errs.pushCode("PL020", `A ${tva.e_Schedule.elementize()} element with ${tva.a_serviceIDRef.attribute()}=${thisServiceIdRef.quote()} is already specified`);
@@ -2709,7 +2569,7 @@ function CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, pare
  * @param {String} requestType the type of CG request/response (specified in the form/query as not possible to deduce from metadata)
  * @param {Class} errs errors found in validaton
  */
-module.exports.doValidateContentGuide=function(CGtext, requestType, errs) {
+doValidateContentGuide(CGtext, requestType, errs) {
 	let CG=null;
 
 	if (CGtext) try {
@@ -2719,7 +2579,7 @@ module.exports.doValidateContentGuide=function(CGtext, requestType, errs) {
 	}
 	if (!CG) return;
 
-	if (!CG.validate(TVAschema)) 
+	if (!CG.validate(this.TVAschema)) 
 		CG.validationErrors.forEach(ve => {
 			let s=ve.toString().split('\r');
 			s.forEach(err => errs.pushCode("CG001", err)); 
@@ -2734,7 +2594,7 @@ module.exports.doValidateContentGuide=function(CGtext, requestType, errs) {
 		SCHEMA_NAMESPACE=CG.root().namespace()?CG.root().namespace().href():"";
 	CG_SCHEMA[SCHEMA_PREFIX]=SCHEMA_NAMESPACE;
 
-	let tvaMainLang=GetLanguage(knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
+	let tvaMainLang=this.GetLanguage(this.knownLanguages, errs, CG.root(), DEFAULT_LANGUAGE, true, "CG003");
 	let ProgramDescription=CG.get(xPath(SCHEMA_PREFIX, tva.e_ProgramDescription), CG_SCHEMA);
 	if (!ProgramDescription) {
 		errs.pushCode("CG004", `No ${tva.e_ProgramDescription.elementize()} element specified.`);
@@ -2748,67 +2608,67 @@ module.exports.doValidateContentGuide=function(CGtext, requestType, errs) {
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable], [], errs, "CG011"); 
 			
-			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
+			this.CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
+			this.CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_NOWNEXT:
 			// schedule response (6.5.4.1) has <ProgramLocationTable> and <ProgramInformationTable> elements 
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG021"); 
 		
 			// <GroupInformation> may become optional for now/next, the program sequence should be determined by ScheduleEvent.PublishedStartTime
-			if (hasElement(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tva.e_GroupInformationTable))
-				CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
-			let currentProgramCRIDnn=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRIDnn, requestType, errs);
+			if (this.hasElement(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tva.e_GroupInformationTable))
+				this.CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
+			let currentProgramCRIDnn=this.CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
+			this.CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRIDnn, requestType, errs);
 			break;
 		case CG_REQUEST_SCHEDULE_WINDOW:
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG031"); 
 
 			// <GroupInformation> may become optional for now/next, the program sequence should be determined by ScheduleEvent.PublishedStartTime
-			if (hasElement(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tva.e_GroupInformationTable))
-				CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
-			let currentProgramCRIDsw=CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRIDsw, requestType, errs);
+			if (this.hasElement(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tva.e_GroupInformationTable))
+				this.CheckGroupInformationNowNext(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, groupIds, requestType, errs);
+			let currentProgramCRIDsw=this.CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs);
+			this.CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, currentProgramCRIDsw, requestType, errs);
 			break;
 		case CG_REQUEST_PROGRAM:
 			// program information response (6.6.2) has <ProgramLocationTable> and <ProgramInformationTable> elements
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_ProgramLocationTable, tva.e_ProgramInformationTable], [], errs, "CG041"); 
 		
-			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
+			this.CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
+			this.CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs);
 			break;
 		case CG_REQUEST_MORE_EPISODES:
 			// more episodes response (6.7.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, 
 					[tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG051");
 
-			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
-			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs, o);
+			this.CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
+			this.CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
+			this.CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs, o);
 			break;
 		case CG_REQUEST_BS_CATEGORIES:
 			// box set categories response (6.8.2.3) has <GroupInformationTable> element
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG061"); 
 
-			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, null, errs, null);
+			this.CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, null, errs, null);
 			break;
 		case CG_REQUEST_BS_LISTS:
 			// box set lists response (6.8.3.3) has <GroupInformationTable> element
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, [tva.e_GroupInformationTable], [], errs, "CG071"); 
 			
-			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, null, errs, null);
+			this.CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, null, errs, null);
 			break;
 		case CG_REQUEST_BS_CONTENTS:
 			// box set contents response (6.8.4.3) has <ProgramInformationTable>, <GroupInformationTable> and <ProgramLocationTable> elements 
 			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  ProgramDescription, 
-					[tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG081");
+				[tva.e_ProgramLocationTable, tva.e_ProgramInformationTable, tva.e_GroupInformationTable], [], errs, "CG081");
 			
-			CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
-			CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
-			CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs, o);
+			this.CheckGroupInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, requestType, groupIds, errs, o);
+			this.CheckProgramInformation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, groupIds, requestType, errs, o);
+			this.CheckProgramLocation(CG_SCHEMA, SCHEMA_PREFIX, ProgramDescription, tvaMainLang, programCRIDs, null, requestType, errs, o);
 			break;
 	}
-};
+}
 
 
 /**
@@ -2818,92 +2678,15 @@ module.exports.doValidateContentGuide=function(CGtext, requestType, errs) {
  * @param {String} requestType the type of CG request/response (specified in the form/query as not possible to deduce from metadata)
  * @returns {Class} errs errors found in validaton
  */
-module.exports.validateContentGuide=function(CGtext, requestType)  {
+validateContentGuide(CGtext, requestType)  {
 	var errs=new ErrorList();
 	this.doValidateContentGuide(CGtext, requestType, errs);
 
 	return new Promise((resolve, reject) => {
 		resolve(errs);
 	});
-};
-
-
-//---------------- CreditsItem@role LOADING ----------------
-
-if (typeof(String.prototype.trim)==="undefined") {
-    String.prototype.trim=function() 
-    {
-        return String(this).replace(/^\s+|\s+$/g, '');
-    };
 }
 
-
-/**
- * add the seperate lines from the buffer into the array 
- *
- * @param {Array} values  the linear list of values 
- * @param {String} data   the list of values, 1 per line
- */
-function addRoles(values, data) {
-	let lines=data.split('\n');
-	lines.forEach(line => values.push(line.trim()));
-}
-
-
-/**
- * read the list of valid roles from a file 
- *
- * @param {Array} values         the linear list of values 
- * @param {String} rolesFilename the filename to load
- */
-function loadRolesFromFile(values, rolesFilename) {
-	console.log(`reading Roles from ${rolesFilename}`);
-    fs.readFile(rolesFilename, {encoding: "utf-8"}, function(err, data) {
-        if (!err) 
-			addRoles(values, data);
-        else 
-            console.log(err);
-    });
-}
-
-
-/**
- * read the list of valid roles from a network location referenced by a URL  
- *
- * @param {Array} values 	The linear list of values
- * @param {String} rolesURL URL to the load
- */
-function loadRolesFromURL(values, rolesURL) { 
-	console.log(`retrieving Roles from ${rolesURL} using fetch()`);
-
-	function handleErrors(response) {
-		if (!response.ok) {
-			throw Error(response.statusText);
-		}
-		return response;
-	}
-	
-	fetch(rolesURL)
-		.then(handleErrors)
-		.then(response => response.text())
-		.then(strCS => addRoles(values, strCS))
-		.catch(error => console.log(`error (${error}) retrieving ${rolesURL}`));
-} 	
-
-
-/**
- * loads role values from either a local file or an URL based location
- *
- * @param {Array} values        The linear list of values within the classification scheme
- * @param {boolean} useURL      if true use the URL loading method else use the local file
- * @param {String} roleFilename the filename of the classification scheme
- * @param {String} roleURL      URL to the classification scheme
- */ 
-function loadRoles(values, useURL, roleFilename, roleURL) {
-	if (useURL)
-		loadRolesFromURL(values, roleURL);
-	else loadRolesFromFile(values, roleFilename);	
-} 
 
 
 /**
@@ -2911,30 +2694,26 @@ function loadRoles(values, useURL, roleFilename, roleURL) {
  *
  * @param {boolean} useURLs when true, load configuration files from network locations
  */ 
-module.exports.loadDataFiles=function(useURLs) {
+/* private */ loadDataFiles(useURLs) {
 	console.log("loading classification schemes...");
-    allowedGenres=[];
-	loadCS(allowedGenres, useURLs, TVA_ContentCSFilename, TVA_ContentCSURL);
-	loadCS(allowedGenres, useURLs, TVA_FormatCSFilename, TVA_FormatCSURL);
-	loadCS(allowedGenres, useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL);
-/*
-	console.log("loading countries...")
-	if (useURLs) 
-		knownCountries.loadCountriesFromURL(ISO3166_URL, true)
-	else knownCountries.loadCountriesFromFile(ISO3166_Filename, true)
-*/  
+	this.allowedGenres.loadCS(useURLs, TVA_ContentCSFilename, TVA_ContentCSURL, false);
+	this.allowedGenres.loadCS(useURLs, TVA_FormatCSFilename, TVA_FormatCSURL, false);
+	this.allowedGenres.loadCS(useURLs, DVBI_ContentSubjectFilename, DVBI_ContentSubjectURL, false);
+
     console.log("loading languages...");
 	if (useURLs) 
-		knownLanguages.loadLanguagesFromURL(IANA_Subtag_Registry_URL, true);
-	else knownLanguages.loadLanguagesFromFile(IANA_Subtag_Registry_Filename, true);
+		this.knownLanguages.loadLanguagesFromURL(this.IANA_Subtag_Registry_URL, true);
+	else this.knownLanguages.loadLanguagesFromFile(this.IANA_Subtag_Registry_Filename, true);
 	
 	console.log("loading CreditItem roles...");
-	allowedCreditItemRoles=[];
-	loadRoles(allowedCreditItemRoles, useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
-	loadRoles(allowedCreditItemRoles, useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
+	this.allowedCreditItemRoles.loadRoles(useURLs, DVBI_CreditsItemRolesFilename, DVBI_CreditsItemRolesURL);
+	this.allowedCreditItemRoles.loadRoles(useURLs, DVBIv2_CreditsItemRolesFilename, DVBIv2_CreditsItemRolesURL);
 
 	console.log("loading Schemas...");
-    TVAschema=libxml.parseXmlString(fs.readFileSync(TVAschemaFileName));
-};
+    this.TVAschema=libxml.parseXmlString(fs.readFileSync(TVAschemaFileName));
+}
 
 
+}
+
+module.exports = ContentGuideCheck;
