@@ -41,29 +41,35 @@ var cgcheck;
  * @param {string}  error     a single error message to display on the form, generally related to loading the content to validate
  * @param {ErrorList}  errors    the errors and warnings found during the content guide validation
  */
- function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errors=null) {
+ function drawForm(URLmode, res, lastInput=null, lastType=null, error=null, errs=null) {
 
 	const TABLE_STYLE="<style>table {border-collapse: collapse;border: 1px solid black;} th, td {text-align: left; padding: 8px; }	tr:nth-child(even) {background-color: #f2f2f2;}	</style>";
-	const FORM_TOP=`<html><head>${TABLE_STYLE}<title>DVB-I Content Guide Validator</title></head><body>`;
+	const XML_STYLE="<style>.xmlfont {font-family: Arial, Helvetica, sans-serif; font-size:90%;}</style>";
+
+	const PAGE_TOP=`<html><head>${TABLE_STYLE}${XML_STYLE}<title>DVB-I Content Guide Validator</title></head><body>`;
+	const PAGE_BOTTOM="</body></html>";
+
 	const PAGE_HEADING="<h1>DVB-I Content Guide Validator</h1>";
 
-	const ENTRY_FORM_URL=`<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"${lastInput ? lastInput : ""}\"/><input type=\"submit\" value=\"submit\"/>`;
+	const ENTRY_FORM_URL=`<form method=\"post\"><p><i>URL:</i></p><input type=\"url\" name=\"CGurl\" value=\"${lastInput?lastInput:""}\"/><input type=\"submit\" value=\"submit\"/>`;
 	const ENTRY_FORM_FILE=`<form method=\"post\" encType=\"multipart/form-data\"><p><i>FILE:</i></p><input type=\"file\" name=\"CGfile\" value=\"${lastInput ? lastInput : ""}\"/><input type=\"submit\" value=\"submit\"/>`;
+	const ENTRY_FORM_END="</form>";
 
 	const ENTRY_FORM_REQUEST_TYPE_HEADER="<p><i>REQUEST TYPE:</i></p>";
 
 	const ENTRY_FORM_REQUEST_TYPE_ID="requestType";
-
-	const FORM_END="</form>";
 
 	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
 	const SUMMARY_FORM_HEADER="<table><tr><th>item</th><th>count</th></tr>";
 	function DETAIL_FORM_HEADER(mode) {
 		return `<table><tr><th>code</th><th>${mode}</th></tr>`;
 	}
-	const FORM_BOTTOM="</body></html>";	
-
-    res.write(FORM_TOP);    
+	
+	function tabluateMessage(value) {
+		res.write(`<tr><td>${value.code?phlib.HTMLize(value.code):""}</td>`);
+		res.write(`<td>${value.message?phlib.HTMLize(value.message):""}${value.element?`<br/><span class=\"xmlfont\">${phlib.HTMLize(value.element)}</span>`:""}</td></tr>`);
+	}	
+    res.write(PAGE_TOP);    
     res.write(PAGE_HEADING);
     res.write(URLmode?ENTRY_FORM_URL:ENTRY_FORM_FILE);
 
@@ -77,73 +83,45 @@ var cgcheck;
 			res.write(" checked");
 		res.write(`>${choice.label}</input>`);
 	});
-	res.write(FORM_END);
+	res.write(ENTRY_FORM_END);
+
     res.write(RESULT_WITH_INSTRUCTION);
 	if (error) 
 		res.write(`<p>${error}</p>`);
 	let resultsShown=false;
-	if (errors) {
-		let tableHeader=false;
-		for (let i of errors.counts) 
-			if (errors.counts.hasOwnProperty(i)) {
-				if (errors.counts[i]!=0) {
-					if (!tableHeader) {
-						res.write(SUMMARY_FORM_HEADER);
-						tableHeader=true;
-					}
-					res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errors.counts[i]}</td></tr>`);
-					resultsShown=true;
-				}
+	if (errs) {
+
+		if (errs.numCountsErr()>0 || errs.numCountsWarn()>0 ) {
+			res.write(SUMMARY_FORM_HEADER);
+			for (let i of errs.countsErr) 
+				if (errs.countsErr.hasOwnProperty(i)) 
+					if (errs.countsErr[i]!=0)
+						res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errs.countsErr[i]}</td></tr>`);
+			for (let i of errs.countsWarn) 
+				if (errs.countsWarn.hasOwnProperty(i)) 
+					if (errs.countsWarn[i]!=0) 
+						res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errs.countsWarn[i]}</td></tr>`);
+			resultsShown=true;
+			res.write("</table><br/>");
 		}
-		for (let i of errors.countsWarn) 
-			if (errors.countsWarn.hasOwnProperty(i)) {
-				if (errors.countsWarn[i]!=0) {
-					if (!tableHeader) {
-						res.write(SUMMARY_FORM_HEADER);
-						tableHeader=true;
-					}
-					res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errors.countsWarn[i]}</td></tr>`);
-					resultsShown=true;
-				}
-			}
-		if (tableHeader) res.write("</table><br/>");
 
-		tableHeader=false;
-		errors.messages.forEach(function(value) {
-			if (!tableHeader) {
-				res.write(DETAIL_FORM_HEADER("errors"));
-				tableHeader=true;                    
-			}
-			if (value.includes(errors.delim)) {
-				let x=value.split(errors.delim);
-				res.write(`<tr><td>${phlib.HTMLize(x[0])}</td><td>${phlib.HTMLize(x[1])}</td></tr>`);	
-			}
-			else 
-				res.write(`<tr><td></td><td>${phlib.HTMLize(value)}</td></tr>`);
+		if (errs.numErrors() > 0) {
+			res.write(DETAIL_FORM_HEADER("errors"));
+			errs.errors.forEach(tabluateMessage);
 			resultsShown=true;
-		});
-		if (tableHeader) res.write("</table><br/>");
+			res.write("</table><br/>");
+		} 
 
-		tableHeader=false;
-		errors.messagesWarn.forEach(function(value)	{
-			if (!tableHeader) {
-				res.write(DETAIL_FORM_HEADER("warnings"));
-				tableHeader=true;                    
-			}
-			if (value.includes(errors.delim)) {
-				let x=value.split(errors.delim);
-				res.write(`<tr><td>${x[0]}</td><td>${phlib.HTMLize(x[1])}</td></tr>`);
-			}
-			else 
-				res.write(`<tr><td></td><td>${phlib.HTMLize(value)}</td></tr>`);
-
+		if (errs.numWarnings()>0) {
+			res.write(DETAIL_FORM_HEADER("warnings"));
+			errs.warnings.forEach(tabluateMessage);
 			resultsShown=true;
-		});
-		if (tableHeader) res.write("</table>");        
+			res.write("</table><br/>");
+		}     
 	}
 	if (!error && !resultsShown) res.write("no errors or warnings");
 
-	res.write(FORM_BOTTOM);
+	res.write(PAGE_BOTTOM);
 
 	return new Promise((resolve, reject) => {
 		resolve(res);
