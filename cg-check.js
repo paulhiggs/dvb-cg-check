@@ -430,8 +430,8 @@ class ContentGuideCheck {
  */
 /* private */  ValidateSynopsis(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, requiredLengths, optionalLengths, requestType, errs, parentLanguage, errCode=null) {
 	
-	function synopsisLengthError(label, length) {
-		return `length of ${tva.a_length.attribute(tva.e_Synopsis)}=${label.quote()} exceeds ${length} characters`; }
+	function synopsisLengthError(label, length, actual) {
+		return `length of ${tva.a_length.attribute(tva.e_Synopsis)}=${label.quote()} exceeds ${length} characters, measured(${actual})`; }
 	function singleLengthLangError(length, lang) {
 		return `only a single ${tva.e_Synopsis.elementize()} is permitted per length (${length}) and language (${lang})`; }
 	function requiredSynopsisError(length) {
@@ -452,43 +452,44 @@ class ContentGuideCheck {
 		
 		if (synopsisLength) {
 			if (isIn(requiredLengths, synopsisLength) || isIn(optionalLengths, synopsisLength)) {
+				let _len=unEntity(Synopsis.text()).length;
 				switch (synopsisLength) {
 				case tva.SYNOPSIS_SHORT_LABEL:
-					if ((unEntity(Synopsis.text()).length) > tva.SYNOPSIS_SHORT_LENGTH)
-						errs.pushCode(errCode?`${errCode}-11`:"SY011", synopsisLengthError(tva.SYNOPSIS_SHORT_LABEL, tva.SYNOPSIS_SHORT_LENGTH));
+					if (_len > tva.SYNOPSIS_SHORT_LENGTH)
+						errs.pushCodeWithFragment(errCode?`${errCode}-11`:"SY011", synopsisLengthError(tva.SYNOPSIS_SHORT_LABEL, tva.SYNOPSIS_SHORT_LENGTH, _len), Synopsis.toString());
 					hasShort=true;
 					break;
 				case tva.SYNOPSIS_MEDIUM_LABEL:
-					if ((unEntity(Synopsis.text()).length) > tva.SYNOPSIS_MEDIUM_LENGTH)
-						errs.pushCode(errCode?`${errCode}-12`:"SY012", synopsisLengthError(tva.SYNOPSIS_MEDIUM_LABEL, tva.SYNOPSIS_MEDIUM_LENGTH));
+					if (_len > tva.SYNOPSIS_MEDIUM_LENGTH)
+						errs.pushCodeWithFragment(errCode?`${errCode}-12`:"SY012", synopsisLengthError(tva.SYNOPSIS_MEDIUM_LABEL, tva.SYNOPSIS_MEDIUM_LENGTH, _len), Synopsis.toString());
 					hasMedium=true;
 					break;
 				case tva.SYNOPSIS_LONG_LABEL:
-					if ((unEntity(Synopsis.text()).length) > tva.SYNOPSIS_LONG_LENGTH)
-						errs.pushCode(errCode?`${errCode}-13`:"SY013", synopsisLengthError(tva.SYNOPSIS_LONG_LABEL, tva.SYNOPSIS_LONG_LENGTH));
+					if (_len > tva.SYNOPSIS_LONG_LENGTH)
+						errs.pushCodeWithFragment(errCode?`${errCode}-13`:"SY013", synopsisLengthError(tva.SYNOPSIS_LONG_LABEL, tva.SYNOPSIS_LONG_LENGTH, _len), Synopsis.toString());
 					hasLong=true;
 					break;						
 				}
 			}
 			else
-				errs.pushCode(errCode?`${errCode}-14`:"SY014", `${tva.a_length.attribute()}=${synopsisLength.quote()} is not permitted for this request type`);
+				errs.pushCodeWithFragment(errCode?`${errCode}-14`:"SY014", `${tva.a_length.attribute()}=${synopsisLength.quote()} is not permitted for this request type`, Synopsis.toString());
 		}
 	
 		if (synopsisLang && synopsisLength) {
 			switch (synopsisLength) {
 				case tva.SYNOPSIS_SHORT_LABEL:
 					if (isIn(shortLangs, synopsisLang)) 
-						errs.pushCode(errCode?`${errCode}-16`:"SY016", singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCodeWithFragment(errCode?`${errCode}-16`:"SY016", singleLengthLangError(synopsisLength, synopsisLang), Synopsis.toString());
 					else shortLangs.push(synopsisLang);
 					break;
 				case tva.SYNOPSIS_MEDIUM_LABEL:
 					if (isIn(mediumLangs, synopsisLang)) 
-						errs.pushCode(errCode?`${errCode}-17`:"SY017", singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCodeWithFragment(errCode?`${errCode}-17`:"SY017", singleLengthLangError(synopsisLength, synopsisLang), Synopsis.toString());
 					else mediumLangs.push(synopsisLang);
 					break;
 				case tva.SYNOPSIS_LONG_LABEL:
 					if (isIn(longLangs, synopsisLang)) 
-						errs.pushCode(errCode?`${errCode}-18`:"SY018", singleLengthLangError(synopsisLength, synopsisLang));
+						errs.pushCodeWithFragment(errCode?`${errCode}-18`:"SY018", singleLengthLangError(synopsisLength, synopsisLang), Synopsis.toString());
 					else longLangs.push(synopsisLang);
 					break;
 			}
