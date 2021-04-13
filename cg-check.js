@@ -22,6 +22,7 @@ const patterns=require("./dvb-common/pattern_checks.js");
 
 // libxmljs2 - github.com/marudor/libxmljs2
 const libxml=require("libxmljs2");
+const { e_BasicDescription } = require('../dvb-sl-check/dvb-common/TVA_definitions');
 
 
 // convenience/readability values
@@ -200,7 +201,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
  * @param {Class}   errs       errors found in validaton
  * @param {boolean} isRequired true if the specificed attribued is required to be specified for the element
  */
- function BooleanValue(elem, attrName, errno, errs, isRequired=true) {
+function BooleanValue(elem, attrName, errno, errs, isRequired=true) {
 	AllowedValue(elem, attrName, errno, errs, ["true", "false"], isRequired);
 }
 
@@ -1539,9 +1540,14 @@ class ContentGuideCheck {
 	
 	switch (requestType) {
 		case CG_REQUEST_BS_CATEGORIES:
-			if (isParentGroup) 
+			if (isParentGroup) {
 				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems], errs, "GIB001");
-			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB002");
+				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType], [tva.e_BasicDescription], errs, "GIB001a");
+			}
+			else {
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB002");
+				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType, tva.e_MemberOf], [tva.e_BasicDescription], errs, "GIB002a");
+			}
 			break;
 		case CG_REQUEST_BS_LISTS:
 			if (isParentGroup) 

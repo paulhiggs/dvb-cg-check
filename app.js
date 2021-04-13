@@ -61,9 +61,7 @@ var cgcheck;
 
 	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
 	const SUMMARY_FORM_HEADER="<table><tr><th>item</th><th>count</th></tr>";
-	function DETAIL_FORM_HEADER(mode) {
-		return `<table><tr><th>code</th><th>${mode}</th></tr>`;
-	}
+	DETAIL_FORM_HEADER = (mode) =>`<table><tr><th>code</th><th>${mode}</th></tr>`;
 	
 	function tabluateMessage(value) {
 		res.write(`<tr><td>${value.code?phlib.HTMLize(value.code):""}</td>`);
