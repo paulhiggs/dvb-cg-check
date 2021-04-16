@@ -89,16 +89,10 @@ var cgcheck;
 	let resultsShown=false;
 	if (errs) {
 
-		if (errs.numCountsErr()>0 || errs.numCountsWarn()>0 ) {
+		if (errs.numCountsErr()>0 || errs.numCountsWarn()>0 ) {		
 			res.write(SUMMARY_FORM_HEADER);
-			for (let i of errs.countsErr) 
-				if (errs.countsErr.hasOwnProperty(i)) 
-					if (errs.countsErr[i]!=0)
-						res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errs.countsErr[i]}</td></tr>`);
-			for (let i of errs.countsWarn) 
-				if (errs.countsWarn.hasOwnProperty(i)) 
-					if (errs.countsWarn[i]!=0) 
-						res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errs.countsWarn[i]}</td></tr>`);
+			Object.keys(errs.countsErr).forEach( i => {res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errs.countsErr[i]}</td></tr>`); });
+			Object.keys(errs.countsWarn).forEach( i => {res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errs.countsWarn[i]}</td></tr>`); });
 			resultsShown=true;
 			res.write("</table><br/>");
 		}

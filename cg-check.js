@@ -779,7 +779,7 @@ class ContentGuideCheck {
 		return;
 	}
 	let HowRelated=RelatedMaterial.get(xPath(SCHEMA_PREFIX, tva.e_HowRelated), CG_SCHEMA);
-	if (!HowRelated || !HowRelated.attr(tva.a_href)) return false;
+	if (!(HowRelated && HowRelated.attr(tva.a_href))) return false;
 
 	if (HowRelated.attr(tva.a_href).value()==tva.cs_PromotionalStillImage) {
 		// Promotional Still Image
@@ -1321,8 +1321,8 @@ class ContentGuideCheck {
 					checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, [tva.e_Title], [tva.e_RelatedMaterial], errs, "BD040");
 					this.ValidateRelatedMaterial_MoreEpisodes(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, errs);
 					break;
-			//	default:
-			//		errs.pushCode("BD050", `ValidateBasicDescription() called with invalid requestType/element (${requestType}/${parentElement.name()+)`)
+				default:
+					errs.pushCode("BD050", `ValidateBasicDescription() called with invalid requestType/element (${requestType}/${parentElement.name()})`);
 			}
 			break;
 
@@ -1359,8 +1359,8 @@ class ContentGuideCheck {
 					this.ValidateGenre(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription, 0, 1, errs);
 					this.ValidateRelatedMaterial(CG_SCHEMA, SCHEMA_PREFIX, BasicDescription,  0, 1, errs);
 					break;
-				// default:
-				//	errs.pushCode("BD100", `ValidateBasicDescription() called with invalid requestType/element (${requestType}/${parentElement.name()})`);
+				default:
+					errs.pushCode("BD100", `ValidateBasicDescription() called with invalid requestType/element (${requestType}/${parentElement.name()})`);
 				}
 			break;
 		default:
@@ -1542,20 +1542,26 @@ class ContentGuideCheck {
 		case CG_REQUEST_BS_CATEGORIES:
 			if (isParentGroup) {
 				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems], errs, "GIB001");
-				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType], [tva.e_BasicDescription], errs, "GIB001a");
+				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType], [tva.e_BasicDescription], errs, "GIB002");
 			}
 			else {
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB002");
-				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType, tva.e_MemberOf], [tva.e_BasicDescription], errs, "GIB002a");
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang], errs, "GIB003");
+				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType, tva.e_MemberOf], [tva.e_BasicDescription], errs, "GIB004");
 			}
 			break;
 		case CG_REQUEST_BS_LISTS:
-			if (isParentGroup) 
-				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems], errs, "GIB003");
-			else checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_serviceIDRef], errs, "GIB004");
+			if (isParentGroup) {
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems], errs, "GIB005");
+				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType], [tva.e_BasicDescription], errs, "GIB006");
+			}
+			else {
+				checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_serviceIDRef], errs, "GIB007");
+				checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType, tva.e_MemberOf], [tva.e_BasicDescription], errs, "GIB008");
+			}
 			break;
 		case CG_REQUEST_BS_CONTENTS:
-			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], errs, "GIB005");
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.a_groupId], [tva.a_lang, tva.a_ordered, tva.a_numOfItems, tva.a_serviceIDRef], errs, "GIB009");
+			checkTopElements(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, [tva.e_GroupType], [tva.e_BasicDescription], errs, "GIB0010");
 			break;
 	}
 
@@ -1566,51 +1572,51 @@ class ContentGuideCheck {
 				groupsFound.push(groupId);				
 		}
 		else
-			errs.pushCode("GIB006", `${tva.a_groupId.attribute(GroupInformation.name())} value ${groupId.quote()} is not a CRID`);
+			errs.pushCode("GIB021", `${tva.a_groupId.attribute(GroupInformation.name())} value ${groupId.quote()} is not a CRID`);
 	}
 
 	let categoryCRID=(categoryGroup && categoryGroup.attr(tva.a_groupId)) ? categoryGroup.attr(tva.a_groupId).value() : "";
 
 	if (requestType==CG_REQUEST_BS_LISTS || requestType==CG_REQUEST_BS_CATEGORIES) {
 		if (!isParentGroup && GroupInformation.attr(tva.a_ordered)) 
-			errs.pushCode("GIB010", `${tva.a_ordered.attribute(GroupInformation.name())} is only permitted in the ${CATEGORY_GROUP_NAME}`);
+			errs.pushCode("GIB031", `${tva.a_ordered.attribute(GroupInformation.name())} is only permitted in the ${CATEGORY_GROUP_NAME}`);
 		if (isParentGroup && !GroupInformation.attr(tva.a_ordered)) 
-			errs.pushCode("GIB011", `${tva.a_ordered.attribute(GroupInformation.name())} is required for this request type`);
+			errs.pushCode("GIB032", `${tva.a_ordered.attribute(GroupInformation.name())} is required for this request type`);
 		if (!isParentGroup && GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GIB012", `${tva.a_numOfItems.attribute(GroupInformation.name())} is only permitted in the ${CATEGORY_GROUP_NAME}`);
+			errs.pushCode("GIB033", `${tva.a_numOfItems.attribute(GroupInformation.name())} is only permitted in the ${CATEGORY_GROUP_NAME}`);
 		if (isParentGroup && !GroupInformation.attr(tva.a_numOfItems)) 
-			errs.pushCode("GIB013", `${tva.a_numOfItems.attribute(GroupInformation.name())}is required for this request type`);
+			errs.pushCode("GIB034", `${tva.a_numOfItems.attribute(GroupInformation.name())}is required for this request type`);
 	}
 
 	if (!isParentGroup) {
 		let MemberOf=GroupInformation.get(xPath(SCHEMA_PREFIX, tva.e_MemberOf), CG_SCHEMA);
 		if (MemberOf) {
-			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MemberOf, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "GIB020");
+			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, MemberOf, [tva.a_type, tva.a_index, tva.a_crid], [], errs, "GIB041");
 			if (MemberOf.attr(tva.a_type) && MemberOf.attr(tva.a_type).value()!=tva.t_MemberOfType)
-				errs.pushCode("GIB021", `${GroupInformation.name()}.${tva.e_MemberOf}@xsi:${tva.a_type} is invalid (${MemberOf.attr(tva.a_type).value().quote()})`);
+				errs.pushCode("GIB042", `${GroupInformation.name()}.${tva.e_MemberOf}@xsi:${tva.a_type} is invalid (${MemberOf.attr(tva.a_type).value().quote()})`);
 			
 			if (MemberOf.attr(tva.a_index)) {
 				let index=valUnsignedInt(MemberOf.attr(tva.a_index).value());
 				if (index>=1) {
 					if (indexes) {
 						if (indexes.includes(index)) 
-							errs.pushCode("GI022", `duplicated ${tva.a_index.attribute(`${GroupInformation.name()}.${tva.e_MemberOf}`)} values (${index})`);
+							errs.pushCode("GI043", `duplicated ${tva.a_index.attribute(`${GroupInformation.name()}.${tva.e_MemberOf}`)} values (${index})`);
 						else indexes.push(index);
 					}
 				}
 				else 
-					errs.pushCode("GIB023", `${tva.a_index.attribute(`${GroupInformation.name()}.${tva.e_MemberOf}`)} must be an integer >= 1 (parsed ${index})`);
+					errs.pushCode("GIB44", `${tva.a_index.attribute(`${GroupInformation.name()}.${tva.e_MemberOf}`)} must be an integer >= 1 (parsed ${index})`);
 			}
 
 			if (MemberOf.attr(tva.a_crid) && MemberOf.attr(tva.a_crid).value()!=categoryCRID)
-				errs.pushCode("GIB025", 
+				errs.pushCode("GIB045", 
 					`${tva.a_crid.attribute(`${GroupInformation.name()}.${tva.e_MemberOf}`)} (${MemberOf.attr(tva.a_crid).value()}) does not match the ${CATEGORY_GROUP_NAME} crid (${categoryCRID})`);
 		}
 		else
-			errs.pushCode("GIB027", `${GroupInformation.name()} requires a ${tva.e_MemberOf.elementize()} element referring to the ${CATEGORY_GROUP_NAME} (${categoryCRID})`);
+			errs.pushCode("GIB046", `${GroupInformation.name()} requires a ${tva.e_MemberOf.elementize()} element referring to the ${CATEGORY_GROUP_NAME} (${categoryCRID})`);
 	}
 	
-	this.checkTAGUri(GroupInformation, errs, "GIB030");	
+	this.checkTAGUri(GroupInformation, errs, "GIB51");	
 	
 	// <GroupInformation><BasicDescription>
 	this.ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, GroupInformation, requestType, errs, parentLanguage, categoryGroup);
@@ -1640,13 +1646,12 @@ class ContentGuideCheck {
 
 	if (GroupInformation.attr(tva.a_groupId)) {
 		let groupId=GroupInformation.attr(tva.a_groupId).value();
-		if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {
-			if (groupId!=dvbi.CRID_NOW && groupId!=dvbi.CRID_LATER && groupId!=dvbi.CRID_EARLIER )
+		if ([CG_REQUEST_SCHEDULE_NOWNEXT, CG_REQUEST_SCHEDULE_WINDOW].includes(requestType)) 
+			if (!([dvbi.CRID_NOW, dvbi.CRID_LATER, dvbi.CRID_EARLIER].includes(groupId)))
 				errs.pushCode("GIS011", `${tva.a_groupId.attribute(GroupInformation.name())} value ${groupId.quote()} is valid for this request type`);
-		}
 	}
 
-	if (requestType==CG_REQUEST_SCHEDULE_NOWNEXT || requestType==CG_REQUEST_SCHEDULE_WINDOW) {		
+	if ([CG_REQUEST_SCHEDULE_NOWNEXT], CG_REQUEST_SCHEDULE_WINDOW.inclues(requestType)) {		
 		TrueValue(GroupInformation, tva.a_ordered, "GIS013", errs);
 		if (!GroupInformation.attr(tva.a_numOfItems)) 
 			errs.pushCode("GIS015", `${tva.a_numOfItems.attribute(GroupInformation.name())} is required for this request type`);
@@ -1932,12 +1937,8 @@ class ContentGuideCheck {
  */
 /* private */  ValidateAVAttributes(CG_SCHEMA, SCHEMA_PREFIX, AVAttributes, parentLanguage, requestType, errs) {
 	
-	function isValidAudioMixType(mixType) {
-		return mixType==mpeg7.AUDIO_MIX_MONO || mixType==mpeg7.AUDIO_MIX_STEREO || mixType==mpeg7.AUDIO_MIX_5_1;
-	}
-	function isValidAudioLanguagePurpose(purpose) {
-		return purpose==dvbi.AUDIO_PURPOSE_MAIN || purpose==dvbi.AUDIO_PURPOSE_DESCRIPTION;
-	}
+	function isValidAudioMixType(mixType) { return [mpeg7.AUDIO_MIX_MONO, mpeg7.AUDIO_MIX_STEREO, mpeg7.AUDIO_MIX_5_1].includes(mixType); }
+	function isValidAudioLanguagePurpose(purpose) {	return [dvbi.AUDIO_PURPOSE_MAIN,dvbi.AUDIO_PURPOSE_DESCRIPTION].includes(purpose);	}
 	
 	if (!AVAttributes) {
 		errs.pushCode("AV000", "ValidateAVAttributes() called with AVAttributes==null");
@@ -2003,7 +2004,7 @@ class ContentGuideCheck {
 			checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, Coding, [tva.a_href], [], errs, "AV041");
 			if (Coding.attr(tva.a_href)) {
 				let codingHref=Coding.attr(tva.a_href).value();
-				if (codingHref!=dvbi.DVB_BITMAP_SUBTITLES && codingHref!=dvbi.DVB_CHARACTER_SUBTITLES && codingHref!=dvbi.EBU_TT_D)
+				if (!([dvbi.DVB_BITMAP_SUBTITLES, dvbi.DVB_CHARACTER_SUBTITLES, dvbi.EBU_TT_D].includes(codingHref)))
 					errs.pushCode("AV042", `${tva.a_href.attribute(`${tva.e_CaptioningAttributes}.${tva.e_Coding}`)} is not valid - should be DVB (bitmap or character) or EBU TT-D`);
 			}
 		}		
@@ -2072,9 +2073,9 @@ class ContentGuideCheck {
 		return count-1;
 	}
 
-	function isRestartAvailability(str) { return str==dvbi.RESTART_AVAILABLE || str==dvbi.RESTART_CHECK || str==dvbi.RESTART_PENDING; }
-	function isMediaAvailability(str) { return str==dvbi.MEDIA_AVAILABLE || str==dvbi.MEDIA_UNAVAILABLE; }
-	function isEPGAvailability(str) { return str==dvbi.FORWARD_EPG_AVAILABLE || str==dvbi.FORWARD_EPG_UNAVAILABLE; }
+	function isRestartAvailability(str) { return [dvbi.RESTART_AVAILABLE, dvbi.RESTART_CHECK, dvbi.RESTART_PENDING].includes(str); }
+	function isMediaAvailability(str) { return [dvbi.MEDIA_AVAILABLE, dvbi.MEDIA_UNAVAILABLE].includes(str); }
+	function isEPGAvailability(str) { return [dvbi.FORWARD_EPG_AVAILABLE, dvbi.FORWARD_EPG_UNAVAILABLE].includes(str); }
 	function isAvailability(str) { return isMediaAvailability(str) || isEPGAvailability(str); }
 	
 	function checkGenre(node, CG_SCHEMA, SCHEMA_PREFIX, errs, errcode=null) {
@@ -2181,13 +2182,13 @@ class ContentGuideCheck {
 		if (OtherIdentifier.attr(tva.a_type)) {			
 			let oiType=OtherIdentifier.attr(tva.a_type).value();
 	
-			if ((VerifyType==tva.e_ScheduleEvent  && (oiType=="CPSIndex" || oiType==dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE)) ||
+			if ((VerifyType==tva.e_ScheduleEvent  && (oiType=="CPSIndex" || [dvbi.EIT_PROGRAMME_CRID_TYPE, dvbi.EIT_SERIES_CRID_TYPE].inclues(oiType))) ||
 			    (VerifyType==tva.e_OnDemandProgram && oiType=="CPSIndex")) {
 					// all good
 				}
 				else 
 					errs.pushCode("ID050", `${tva.a_type.attribute(tva.e_OtherIdentifier)}=${oiType.quote()} is not valid for ${VerifyType}.${InstanceDescription.name()}`);		
-				if (oiType==dvbi.EIT_PROGRAMME_CRID_TYPE || oiType==dvbi.EIT_SERIES_CRID_TYPE);
+				if ([dvbi.EIT_PROGRAMME_CRID_TYPE, dvbi.EIT_SERIES_CRID_TYPE].includes(oiType))
 					if (!isCRIDURI(OtherIdentifier.text()))
 						errs.pushCode("ID051", `${tva.e_OtherIdentifier} must be a CRID for ${tva.a_type.attribute()}=${oiType.quote()}`);
 		}
@@ -2429,9 +2430,9 @@ class ContentGuideCheck {
 			if (patterns.isUTCDateTime(pstElem.text())) {
 				let PublishedStartTime=new Date(pstElem.text());
 				
-				if (scheduleStart && PublishedStartTime < scheduleStart) 
+				if (scheduleStart && (PublishedStartTime < scheduleStart)) 
 					errs.pushCode("SE041", `${tva.e_PublishedStartTime.elementize()} (${PublishedStartTime}) is earlier than ${tva.a_start.attribute(tva.e_Schedule)}`);
-				if (scheduleEnd && PublishedStartTime > scheduleEnd) 
+				if (scheduleEnd && (PublishedStartTime > scheduleEnd)) 
 					errs.pushCode("SE042", `${tva.e_PublishedStartTime.elementize()} (${PublishedStartTime}) is after ${tva.a_end.attribute(tva.e_Schedule)}`);
 
 				let pdElem=ScheduleEvent.get(xPath(SCHEMA_PREFIX, tva.e_PublishedDuration), CG_SCHEMA);
