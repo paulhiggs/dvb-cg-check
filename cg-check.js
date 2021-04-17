@@ -93,7 +93,7 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	}
 	let rv=true, thisElem=phlib.elementize(`${parentElement.parent().name()}.${parentElement.name()}`);
 	// check that each of the specifid childElements exists
-	mandatoryChildElements.forEach(elem => {
+	mandatoryChildElements.forEach(function (elem) {
 		if (!parentElement.get(xPath(SCHEMA_PREFIX, elem), CG_SCHEMA)) {
 			errs.pushCode(errCode?`${errCode}-1`:"TE010", `Mandatory element ${elem.elementize()} not specified in ${thisElem}`);
 			rv=false;
@@ -103,7 +103,7 @@ function checkTopElements(CG_SCHEMA, SCHEMA_PREFIX,  parentElement, mandatoryChi
 	// check that no additional child elements existance if the "Other Child Elements are OK" flag is not set
 	if (!isIn(optionalChildElements, OTHER_ELEMENTS_OK)) {
 		let children=parentElement.childNodes();
-		if (children) children.forEachSubElement(child => {
+		if (children) children.forEachSubElement(function (child) {
 			let childName=child.name();
 			if (!isIn(mandatoryChildElements, childName) && !isIn(optionalChildElements, childName)) {		
 				errs.pushCode(errCode?`${errCode}-2`:"TE011", `Element ${childName.elementize()} is not permitted in ${thisElem}`);
@@ -133,14 +133,14 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
 		return;
 	}
 	
-	requiredAttributes.forEach(attributeName => {
+	requiredAttributes.forEach(function (attributeName) {
 		if (!parentElement.attr(attributeName)) {
 			let p=`${(parentElement.parent()?`${parentElement.parent().name()}.`:"")}${parentElement.name()}`;
 			errs.pushCode(errCode?`${errCode}-1`:"AT001", `${attributeName.attribute(`${p}`)} is a required attribute`);
 		}
 	});
 	
-	parentElement.attrs().forEach(attr => {
+	parentElement.attrs().forEach(function (attr) {
 		if (!isIn(requiredAttributes, attr.name()) && !isIn(optionalAttributes, attr.name())) {
 			let p=`${phlib.elementize(`${parentElement.parent()?`${parentElement.parent().name()}.`:""}${parentElement.name()}`)}`;
 			errs.pushCode(errCode?`${errCode}-2`:"AT002", 
@@ -182,7 +182,7 @@ function checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, parentElement, requiredAttrib
 	if (elem.attr(attrName)) {
 		if (!isIn(allowed, elem.attr(attrName).value())) {
 			let str="";
-			allowed.forEach(value => {str=str+((str.length!=0)?" or ":"")+value;});
+			allowed.forEach(function (value) {str=str+((str.length!=0)?" or ":"")+value;});
 			errs.pushCode(`${errno}-1`, `${attrName.attribute(`${elem.parent().name}.${elem.name()}`)} must be ${str}`);
 		}
 	}
@@ -346,7 +346,7 @@ class ContentGuideCheck {
  */
 /* private */  CountChildElements(node, childElementName) {
 	let r=0, childElems=node?node.childNodes():null;
-	if (childElems) childElems.forEachSubElement(elem => {
+	if (childElems) childElems.forEachSubElement(function (elem) {
 		if (elem.name()==childElementName)
 			r++;
 	});
@@ -664,7 +664,7 @@ class ContentGuideCheck {
 		return;
 	}
 	let familyNameCount=0, givenNameCount=0, otherElemCount=0, children=elem.childNodes();
-	if (children) children.forEachSubElement(subElem => {
+	if (children) children.forEachSubElement(function (subElem) {
 		switch (subElem.name()) {
 			case tva.e_GivenName:
 				givenNameCount++;
@@ -717,8 +717,8 @@ class ContentGuideCheck {
 			
 			let foundPersonName=0, foundCharacter=0, foundOrganizationName=0;
 			/* jshint -W083 */
-			let vn=this.ValidateName;  // since this. is no allowed in => 
-			if (CreditsItem.childNodes()) CreditsItem.childNodes().forEachSubElement(elem => {
+			let vn=this.ValidateName;  // since this. is not allowed in a function declared within a loop
+			if (CreditsItem.childNodes()) CreditsItem.childNodes().forEachSubElement(function (elem) {
 				switch (elem.name()) {
 					case tva.e_PersonName:
 						foundPersonName++;
@@ -992,7 +992,7 @@ class ContentGuideCheck {
     let HowRelated=null, MediaLocator=[];
 
 	let children=RelatedMaterial.childNodes();
-	if (children) children.forEachSubElement(elem => {
+	if (children) children.forEachSubElement(function (elem) {
 		switch (elem.name()) {
 			case tva.e_HowRelated:
 				HowRelated=elem;
@@ -1014,9 +1014,9 @@ class ContentGuideCheck {
 			errs.pushCode("TA003", `${tva.a_href.attribute(tva.e_HowRelated)}=${HowRelated.attr(tva.a_href).value().quote()} does not designate a Template AIT`);
 		else {		
 			if (MediaLocator.length!=0) 
-				MediaLocator.forEach(ml => {
+				MediaLocator.forEach(function (ml) {
 					let subElems=ml.childNodes(), hasAuxiliaryURI=false;
-					if (subElems) subElems.forEachSubElement(child => {
+					if (subElems) subElems.forEachSubElement(function (child) {
 						if (child.name()==tva.e_AuxiliaryURI) {
 							hasAuxiliaryURI=true;
 							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentType], [], errs, "TA010");
@@ -1054,7 +1054,7 @@ class ContentGuideCheck {
 	}
     let HowRelated=null, Format=null, MediaLocator=[];
 	let children=RelatedMaterial.childNodes();
-	if (children) children.forEachSubElement(elem => {
+	if (children) children.forEachSubElement(function (elem) {
 		switch (elem.name()) {
 			case tva.e_HowRelated:
 				HowRelated=elem;
@@ -1081,7 +1081,7 @@ class ContentGuideCheck {
 			let isJPEG=false, isPNG=false;
 			if (Format) {
 				let subElems=Format.childNodes(), hasStillPictureFormat=false;
-				if (subElems) subElems.forEachSubElement(child => {
+				if (subElems) subElems.forEachSubElement(function (child) {
 					if (child.name()==tva.e_StillPictureFormat) {
 						hasStillPictureFormat=true;
 						
@@ -1107,9 +1107,9 @@ class ContentGuideCheck {
 			}
 
 			if (MediaLocator.length!=0) 
-				MediaLocator.forEach(ml => {
+				MediaLocator.forEach(function (ml) {
 					let subElems=ml.childNodes(), hasMediaURI=false;
-					if (subElems) subElems.forEachSubElement(child => {
+					if (subElems) subElems.forEachSubElement(function (child) {
 						if (child.name()==tva.e_MediaUri) {
 							hasMediaURI=true;
 							checkAttributes(CG_SCHEMA, SCHEMA_PREFIX, child, [tva.a_contentType], [], errs, "PS031");
@@ -1410,7 +1410,7 @@ class ContentGuideCheck {
 	this.ValidateBasicDescription(CG_SCHEMA, SCHEMA_PREFIX, ProgramInformation, requestType, errs, piLang, null);
 
 	let children=ProgramInformation.childNodes();
-	if (children) children.forEachSubElement(child => {
+	if (children) children.forEachSubElement(function (child) {
 		switch (child.name()) {
 			case tva.e_OtherIdentifier:		// <ProgramInformation><OtherIdentifier>
 				if (requestType==CG_REQUEST_MORE_EPISODES)
@@ -1983,7 +1983,7 @@ class ContentGuideCheck {
 			}
 		}
 	}
-	audioCounts.forEach(audioLang => {
+	audioCounts.forEach(function (audioLang) {
 		if (audioCounts[audioLang]>2)
 			errs.pushCode("AV020", `more than 2 ${tva.e_AudioAttributes.elementize()} elements for language ${audioLang.quote()}`);
 	});
@@ -2540,7 +2540,7 @@ class ContentGuideCheck {
 	let cnt=0, foundServiceIds=[], plCRIDs=[];
 
 	let children=ProgramLocationTable.childNodes();
-	if (children) children.forEachSubElement(child => {
+	if (children) children.forEachSubElement(function (child) {
 		switch (child.name()) {
 			case tva.e_OnDemandProgram:
 				this.ValidateOnDemandProgram(CG_SCHEMA, SCHEMA_PREFIX, child, pltLang, programCRIDs, plCRIDs, requestType, errs);
@@ -2563,7 +2563,7 @@ class ContentGuideCheck {
 			errs.pushCode("PL021", `number of items (${cnt}) in the ${tva.e_ProgramLocationTable.elementize()} does match ${tva.a_numOfItems.attribute(tva.e_GroupInformation)} specified in ${CATEGORY_GROUP_NAME} (${o.childCount})`);
 	}
 
-	programCRIDs.forEach(programCRID => {
+	programCRIDs.forEach(function (programCRID) {
 		if (!isIni(plCRIDs, programCRID))
 			errs.pushCode("PL022", `CRID ${programCRID.quote()} specified in ${tva.e_ProgramInformationTable.elementize()} is not specified in ${tva.e_ProgramLocationTable.elementize()}`);		
 	});
@@ -2588,9 +2588,9 @@ doValidateContentGuide(CGtext, requestType, errs) {
 	if (!CG) return;
 
 	if (!CG.validate(this.TVAschema)) 
-		CG.validationErrors.forEach(ve => {
+		CG.validationErrors.forEach(function (ve) {
 			let s=ve.toString().split('\r');
-			s.forEach(err => errs.pushCode("CG001", err)); 
+			s.forEach(function (err) {errs.pushCode("CG001", err);}); 
 		});
 
 	if (CG.root().name()!=tva.e_TVAMain) {
@@ -2690,7 +2690,7 @@ validateContentGuide(CGtext, requestType)  {
 	var errs=new ErrorList();
 	this.doValidateContentGuide(CGtext, requestType, errs);
 
-	return new Promise((resolve, reject) => {
+	return new Promise(function (resolve, reject) {
 		resolve(errs);
 	});
 }

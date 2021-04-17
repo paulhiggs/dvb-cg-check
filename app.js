@@ -61,8 +61,10 @@ var cgcheck;
 
 	const RESULT_WITH_INSTRUCTION="<br><p><i>Results:</i></p>";
 	const SUMMARY_FORM_HEADER="<table><tr><th>item</th><th>count</th></tr>";
-	DETAIL_FORM_HEADER = (mode) =>`<table><tr><th>code</th><th>${mode}</th></tr>`;
 	
+	function DETAIL_FORM_HEADER(mode) {
+		return `<table><tr><th>code</th><th>${mode}</th></tr>`;
+	}
 	function tabluateMessage(value) {
 		res.write(`<tr><td>${value.code?phlib.HTMLize(value.code):""}</td>`);
 		res.write(`<td>${value.message?phlib.HTMLize(value.message):""}${value.element?`<br/><span class=\"xmlfont\">${phlib.HTMLize(value.element)}</span>`:""}</td></tr>`);
@@ -75,7 +77,7 @@ var cgcheck;
 
 	if (!lastType) 
 		lastType=cgcheck.supportedRequests[0].value;
-	cgcheck.supportedRequests.forEach(choice => {
+	cgcheck.supportedRequests.forEach(function (choice) {
 		res.write(`<input type=\"radio\" name=${ENTRY_FORM_REQUEST_TYPE_ID.quote()} value=${choice.value.quote()}`);
 		if (lastType==choice.value)
 			res.write(" checked");
@@ -91,8 +93,8 @@ var cgcheck;
 
 		if (errs.numCountsErr()>0 || errs.numCountsWarn()>0 ) {		
 			res.write(SUMMARY_FORM_HEADER);
-			Object.keys(errs.countsErr).forEach( i => {res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errs.countsErr[i]}</td></tr>`); });
-			Object.keys(errs.countsWarn).forEach( i => {res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errs.countsWarn[i]}</td></tr>`); });
+			Object.keys(errs.countsErr).forEach( function (i) {res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errs.countsErr[i]}</td></tr>`); });
+			Object.keys(errs.countsWarn).forEach( function (i) {res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errs.countsWarn[i]}</td></tr>`); });
 			resultsShown=true;
 			res.write("</table><br/>");
 		}
@@ -115,7 +117,7 @@ var cgcheck;
 
 	res.write(PAGE_BOTTOM);
 
-	return new Promise((resolve, reject) => {
+	return new Promise(function (resolve, reject) {
 		resolve(res);
 	});
 }
@@ -174,11 +176,11 @@ function processQuery(req, res) {
     else if (req && req.query && req.query.CGurl) {
 		fetch(req.query.CGurl)
 			.then(handleErrors)
-			.then(response => response.text())
-			.then(res => cgcheck.validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType))
-			.then(errs => drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs))
-			.then(res => res.end())
-			.catch(error => {
+			.then(function (response) {response.text();})
+			.then(function (res) {cgcheck.validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType);})
+			.then(function (errs) {drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs);})
+			.then(function (res) {res.end();})
+			.catch(function (error) {
 				drawForm(true, res, req.query.CGurl, req.body.requestType, `error (${error}) handling ${req.query.CGurl}`);
 				res.status(400);
 				res.end();
