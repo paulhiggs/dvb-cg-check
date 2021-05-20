@@ -93,8 +93,8 @@ var cgcheck;
 
 		if (errs.numCountsErr()>0 || errs.numCountsWarn()>0 ) {		
 			res.write(SUMMARY_FORM_HEADER);
-			Object.keys(errs.countsErr).forEach( function (i) {res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errs.countsErr[i]}</td></tr>`); });
-			Object.keys(errs.countsWarn).forEach( function (i) {res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errs.countsWarn[i]}</td></tr>`); });
+			Object.keys(errs.countsErr).forEach( function (i) {return res.write(`<tr><td>${phlib.HTMLize(i)}</td><td>${errs.countsErr[i]}</td></tr>`); });
+			Object.keys(errs.countsWarn).forEach( function (i) {return res.write(`<tr><td><i>${phlib.HTMLize(i)}</i></td><td>${errs.countsWarn[i]}</td></tr>`); });
 			resultsShown=true;
 			res.write("</table><br/>");
 		}
@@ -176,11 +176,12 @@ function processQuery(req, res) {
     else if (req && req.query && req.query.CGurl) {
 		fetch(req.query.CGurl)
 			.then(handleErrors)
-			.then(function (response) {response.text();})
-			.then(function (res) {cgcheck.validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType);})
-			.then(function (errs) {drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs);})
+			.then(function (response) {return response.text();})
+			.then(function (res) {return cgcheck.validateContentGuide(res.replace(/(\r\n|\n|\r|\t)/gm, ""), req.body.requestType);})
+			.then(function (errs) {return drawForm(true, res, req.query.CGurl, req.body.requestType, null, errs);})
 			.then(function (res) {res.end();})
 			.catch(function (error) {
+				console.log(error);
 				drawForm(true, res, req.query.CGurl, req.body.requestType, `error (${error}) handling ${req.query.CGurl}`);
 				res.status(400);
 				res.end();
